@@ -26,6 +26,8 @@ If a model call is slow, use the recorded backup and identify it as a recording.
 
 ## Ticket examples
 
+Observed live-run results for these cases, including wording the model overstated, are in [evaluation/results.md](evaluation/results.md). Read them before rehearsing: for example, ATM-1042 summaries said the tickets were "delivered" although only the SMS was marked delivered, so the edit step in the walkthrough should fix that exact wording on screen.
+
 | Case | Evidence lesson |
 | --- | --- |
 | ATM-1042 | Payment and issuance exist, SMS is marked delivered, and a matched fictional message acknowledges finding both tickets. Attendance and purchase-time terms remain unknown. |
