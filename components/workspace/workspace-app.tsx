@@ -1,5 +1,7 @@
 "use client";
 
+import { useDialogMotion } from "./use-dialog-motion";
+
 import {
   useCallback,
   useEffect,
@@ -281,6 +283,7 @@ function Modal({
   error?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const { dismiss, resume } = useDialogMotion(ref, onClose);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
     const first = ref.current?.querySelector<HTMLElement>(
@@ -288,7 +291,7 @@ function Modal({
     );
     first?.focus();
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") dismiss();
       if (e.key === "Tab") {
         const items = Array.from(
           ref.current?.querySelectorAll<HTMLElement>(
@@ -314,12 +317,12 @@ function Modal({
       document.body.style.overflow = old;
       previous?.focus();
     };
-  }, [onClose]);
+  }, [dismiss]);
   return (
     <div
       className="cw-modal-backdrop"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) dismiss();
       }}
     >
       <div
@@ -328,13 +331,14 @@ function Modal({
         aria-modal="true"
         aria-label={title}
         ref={ref}
+        onPointerDownCapture={resume}
       >
         <div className="cw-modal-head">
           <h2>{title}</h2>
           <button
             className="cw-button ghost icon"
             aria-label="Close dialog"
-            onClick={onClose}
+            onClick={dismiss}
           >
             <X size={20} />
           </button>

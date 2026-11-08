@@ -52,6 +52,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1164.0",
     "@base-ui/react": "^1.7.0",
     "@hookform/resolvers": "^5.7.1",
+    "@paper-design/shaders-react": "0.0.82",
     "@shadcn/react": "^0.3.0",
     "@smithy/fetch-http-handler": "^5.8.1",
     "aws4fetch": "^1.0.20",

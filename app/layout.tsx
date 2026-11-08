@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./apple-design.css";
+import "../components/workspace/enterprise-workspace.css";
+import "./enterprise-design.css";
 
 export const metadata: Metadata = {
   title: { default: "Causality — The whole story", template: "%s · Causality" },
