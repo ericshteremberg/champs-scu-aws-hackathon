@@ -1,6 +1,6 @@
 "use client";
 
-import { investigationProgressEvent } from "@/lib/investigation/progress";
+import { investigationProgressEvent, investigationFailureMessage, cancellationMessage, progressUnavailable } from "@/lib/investigation/progress";
 
 import { PolicyEditor } from "./policy-editor";
 import { ResendConnector } from "./resend-provider";
@@ -402,6 +402,7 @@ export default function WorkspaceApp({
   );
   const [investigationConfig, setInvestigationConfig] =
     useState<InvestigationConfig | null>(null);
+  const [runConnectionErrors, setRunConnectionErrors] = useState<Record<string, boolean>>({});
   const [runs, setRuns] = useState<Record<string, InvestigationRun | null>>({});
   const [pendingInvestigation, setPendingInvestigation] = useState<
     string | null
@@ -598,6 +599,7 @@ export default function WorkspaceApp({
         throw new Error(
           data.error || "Investigation progress could not be loaded.",
         );
+      setRunConnectionErrors(previous => previous[id] ? { ...previous, [id]: false } : previous);
       setRuns((previous) => ({ ...previous, [id]: data.run }));
       if (data.run) {
         const previousStatus = runStatuses.current[data.run.id];
@@ -617,11 +619,7 @@ export default function WorkspaceApp({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadRun(caseId, controller.signal).catch((error) => {
       if (!controller.signal.aborted)
-        setError(
-          error instanceof Error
-            ? error.message
-            : "Investigation progress is unavailable.",
-        );
+        setRunConnectionErrors(previous => ({ ...previous, [caseId]: true }));
     });
     return () => controller.abort();
   }, [caseId, workspaceId, loadRun, preview]);
@@ -631,11 +629,12 @@ export default function WorkspaceApp({
       ? runs[caseId]
       : state?.cases.find((item) => item.id === caseId)?.investigation
     : null;
+  const progressConnectionLost = Boolean(caseId && runConnectionErrors[caseId]);
   useEffect(() => {
     if (preview) return;
     const target =
       pendingInvestigation ||
-      (visibleRun?.status === "running" ? caseId : null);
+      (visibleRun?.status === "running" || progressConnectionLost ? caseId : null);
     if (!target) return;
     let fetching = false;
     const controller = new AbortController();
@@ -646,11 +645,7 @@ export default function WorkspaceApp({
         await loadRun(target, controller.signal);
       } catch (error) {
         if (!controller.signal.aborted)
-          setError(
-            error instanceof Error
-              ? error.message
-              : "Investigation progress is unavailable. Refresh the case to reconnect.",
-          );
+          setRunConnectionErrors(previous => previous[target] ? previous : ({ ...previous, [target]: true }));
       } finally {
         fetching = false;
       }
@@ -659,7 +654,7 @@ export default function WorkspaceApp({
       clearInterval(timer);
       controller.abort();
     };
-  }, [pendingInvestigation, visibleRun?.status, caseId, loadRun, preview]);
+  }, [pendingInvestigation, visibleRun?.status, progressConnectionLost, caseId, loadRun, preview]);
 
   useEffect(() => () => investigationController.current?.abort(), []);
 
@@ -669,9 +664,9 @@ export default function WorkspaceApp({
     try {
       const response = await fetch('/api/evidence/capture-originals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ caseId: id }) });
       const data = await response.json() as { state?: WorkspaceState; captured: number; alreadySaved: number; configured: boolean; remaining: number; unavailable: { provider: string; reason: string }[]; error?: string };
-      if (!response.ok) throw new Error(data.error || 'Original email collection could not finish.');
+      if (!response.ok) throw new Error(data.error || 'Original evidence collection could not finish.');
       if (data.state) setState(data.state);
-      setToast(!data.configured ? 'Connect Stripe or Resend to collect original evidence.' : `${data.captured} new original file(s) collected; ${data.alreadySaved} already saved.${data.captured ? ' Run a fresh investigation to include them in the PDF.' : ''}${data.unavailable.length ? ` Unavailable: ${[...new Set(data.unavailable.map(value => value.provider))].join(', ')}. Existing sources were preserved.` : ''}${data.remaining ? ' More linked emails remain; collect again.' : ''}`);
+      setToast(!data.configured ? 'Connect Stripe, Supabase or Resend to collect original evidence.' : `${data.captured} new original file(s) collected; ${data.alreadySaved} already saved.${data.captured ? ' Run a fresh investigation to include them in the PDF.' : ''}${data.unavailable.length ? ` Unavailable: ${[...new Set(data.unavailable.map(value => value.provider))].join(', ')}. Existing sources were preserved.` : ''}${data.remaining ? ' More linked emails remain; collect again.' : ''}`);
     } catch (error) { setError(error instanceof Error ? error.message : 'Original collection failed.'); }
     finally { setBusy(false); }
   };
@@ -688,6 +683,7 @@ export default function WorkspaceApp({
     setRuns((previous) => ({ ...previous, [id]: null }));
     const controller = new AbortController();
     investigationController.current = controller;
+    let rejectedStart: string | undefined;
     try {
       const response = await fetch("/api/investigations", {
         method: "POST",
@@ -697,16 +693,17 @@ export default function WorkspaceApp({
       });
       const data = (await response.json()) as InvestigationResult;
       if (response.status === 401) setSessionExpired(true);
-      if (!response.ok)
-        throw new Error(data.error || "The investigation could not start.");
+      if (!response.ok) {
+        rejectedStart = data.error || "The investigation could not start.";
+        throw new Error(rejectedStart);
+      }
       if (data.state) setState(data.state);
       if (data.run) {
         runStatuses.current[data.run.id] = data.run.status;
         setRuns((previous) => ({ ...previous, [id]: data.run }));
         if (data.run.status === "failed" || data.run.status === "stale")
           setError(
-            data.run.error ||
-              "The investigation could not produce a current draft. Refresh the case and try again.",
+            investigationFailureMessage(data.run.error || "The investigation could not produce a current draft. Refresh the case and try again."),
           );
         else if (data.run.status === "completed")
           setToast(
@@ -718,11 +715,7 @@ export default function WorkspaceApp({
     } catch (error) {
       if (!controller.signal.aborted) {
         await load(false);
-        setError(
-          error instanceof Error
-            ? error.message
-            : "The investigation could not finish. Refresh the case to check its status.",
-        );
+        setError(rejectedStart ? investigationFailureMessage(rejectedStart) : "The start request could not be confirmed. The investigation may have started. Refresh the case to check its status before starting another run.");
       }
     } finally {
       if (investigationController.current === controller)
@@ -757,7 +750,7 @@ export default function WorkspaceApp({
       if (pendingInvestigation === run.caseId)
         investigationController.current?.abort();
       await load(false);
-      setToast("Investigation cancelled. No draft was approved or submitted.");
+      setToast(cancellationMessage(data.run));
     } catch (error) {
       setError(
         error instanceof Error
@@ -1152,6 +1145,7 @@ export default function WorkspaceApp({
           </div>
         </header>
         <div className="cw-content">
+          {view === "cases" && progressConnectionLost && !sessionExpired && <div role="status" className="cw-banner neutral"><p>{progressUnavailable}</p></div>}
           {error && (
             <div role="alert" className="cw-banner error">
               <TriangleAlert size={20} />
@@ -3099,8 +3093,9 @@ function InvestigationActivity({
           <p>
             {active
               ? latest?.title || "Starting the investigation…"
-              : run?.error ||
-                (run?.mode === "sample"
+              : run?.error ? investigationFailureMessage(run.error)
+                : run?.status !== "completed" ? "No completed report is confirmed for this run. Refresh its status for details."
+                : (run?.mode === "sample"
                   ? "Sample investigation. No AWS model was called."
                   : "Prepared with Amazon Bedrock. Merchant review is required.")}
           </p>

@@ -7,14 +7,13 @@ import { cases, drafts, evidence, investigationRuns, auditLogs } from '@/db/sche
 import type { ChatGPTUser } from '@/app/chatgpt-auth';
 import type { DisputeCase, Evidence, EvidenceSource, InvestigationConfig, InvestigationRun } from '@/lib/domain';
 import { EVIDENCE_SECTIONS, InvestigationError, type EvidenceEnvelope, type EvidenceSection, type InvestigationEvent, type InvestigationResult } from '@/lib/investigation/types';
-import { runInvestigation } from '@/lib/investigation/engine';
+import { investigationLimits, runInvestigation } from '@/lib/investigation/engine';
 import { fetchMerchantSection } from '@/lib/investigation/merchant';
 import { ApiError, requireWorkspace } from './auth';
 
 const now = () => new Date().toISOString();
 const newId = (prefix: string) => `${prefix}_${crypto.randomUUID()}`;
 const mutable = ['needs_review', 'investigating', 'ready'];
-const RUN_LIMIT_MS = 120_000;
 const MAX_RECORDS = 100;
 
 type CaseRow = typeof cases.$inferSelect;
@@ -179,10 +178,11 @@ export async function startInvestigation(user: ChatGPTUser, caseId: string, mode
   const records = await db.select().from(evidence).where(and(eq(evidence.workspaceId, wid), eq(evidence.caseId, caseId))).limit(MAX_RECORDS + 1);
   if (records.length > MAX_RECORDS) throw new ApiError(409, 'This prototype supports up to 100 source records per investigation. Narrow the case evidence first.');
   const draft = await db.select().from(drafts).where(and(eq(drafts.workspaceId, wid), eq(drafts.caseId, caseId))).get();
-  const run: RunRow = { id: newId('run'), workspaceId: wid, caseId, status: 'running', mode, modelId: mode === 'bedrock' ? config.modelId! : null, startedAt: now(), expiresAt: new Date(Date.now() + RUN_LIMIT_MS).toISOString(), finishedAt: null, sourceRevision: item.dataRevision, baseDraftRevision: draft?.revision ?? 0, baseDraftStatus: draft?.status ?? 'none', baseDraftApprovedAt: draft?.approvedAt ?? '', eventsJson: '[]', error: null };
+  const runLimitMs = investigationLimits(mode === 'bedrock' ? config.modelId : undefined).totalTimeoutMs;
+  const run: RunRow = { id: newId('run'), workspaceId: wid, caseId, status: 'running', mode, modelId: mode === 'bedrock' ? config.modelId! : null, startedAt: now(), expiresAt: new Date(Date.now() + runLimitMs).toISOString(), finishedAt: null, sourceRevision: item.dataRevision, baseDraftRevision: draft?.revision ?? 0, baseDraftStatus: draft?.status ?? 'none', baseDraftApprovedAt: draft?.approvedAt ?? '', eventsJson: '[]', error: null };
   try { await db.batch([db.insert(investigationRuns).values(run), db.insert(auditLogs).values({ id: newId('log'), workspaceId: wid, actor: user.email, action: 'investigation.started', detail: mode === 'sample' ? 'Started a deterministic investigation of synthetic sample evidence.' : 'Started a sourced Amazon Bedrock investigation.', caseId, createdAt: run.startedAt })]); }
   catch (error) { const active = await db.select({ id: investigationRuns.id }).from(investigationRuns).where(and(eq(investigationRuns.workspaceId, wid), eq(investigationRuns.caseId, caseId), sql`${investigationRuns.status} IN ('running','committing')`)).get(); if (active) throw new ApiError(409, 'An investigation is already running for this case.', 'run_active'); throw error; }
-  const signal = AbortSignal.any([requestSignal, AbortSignal.timeout(RUN_LIMIT_MS)]);
+  const signal = AbortSignal.any([requestSignal, AbortSignal.timeout(runLimitMs)]);
   const pending = new Map<string, EvidenceRow>(); const events: InvestigationEvent[] = [];
   const assertActive = async () => {
     if (signal.aborted) throw new InvestigationError('cancelled', 'The investigation was cancelled or reached its time limit.');

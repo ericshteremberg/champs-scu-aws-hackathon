@@ -66,7 +66,7 @@ export function EvidenceCollector({ cases, onImported }: { cases: WorkspaceState
     }
     // Refresh after mailbox imports too, even if the final policy match was unavailable.
     try { const state = await api<WorkspaceState>('/api/workspace'); onImported(state, caseId, true); } catch { /* next workspace refresh retains persisted evidence */ }
-    setResults(current => ({ ...current, Policies: { state: failed ? 'attention' : 'ready', summary: 'Checked dated policies, checkout records and order-linked refund or cancellation correspondence. A match does not prove acceptance.', details } }));
+    setResults(current => ({ ...current, Policies: { state: failed ? 'attention' : 'ready', summary: failed ? 'Some policy collection steps could not finish. Review the details below; successful imports are preserved.' : 'Checked configured sources for dated policies, checkout records and order-linked refund or cancellation correspondence. A match does not prove acceptance.', details } }));
     setBusy(false);
   };
   const openPreview = async (provider: Provider, id: string) => {

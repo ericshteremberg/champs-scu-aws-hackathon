@@ -1,3 +1,4 @@
+import { investigationFailureMessage } from './progress.ts';
 import { BedrockRuntimeClient, ConverseCommand, type ConverseCommandInput, type Message, type Tool } from '@aws-sdk/client-bedrock-runtime';
 import { FetchHttpHandler } from '@smithy/fetch-http-handler';
 import { z } from 'zod';
@@ -9,7 +10,7 @@ const MAX_TOOL_CALLS = 16;
 const MAX_MODEL_CALLS = 12;
 export function investigationLimits(modelId?: string) {
   const opus5 = modelId?.endsWith('anthropic.claude-opus-5');
-  return { requestTimeoutMs: opus5 ? 120_000 : 45_000, totalTimeoutMs: opus5 ? 240_000 : 120_000 };
+  return { requestTimeoutMs: opus5 ? 180_000 : 45_000, totalTimeoutMs: opus5 ? 480_000 : 120_000 };
 }
 const MAX_CONTEXT_BYTES = 1024 * 1024;
 const toolInput = z.object({ section: z.enum(EVIDENCE_SECTIONS) }).strict();
@@ -146,7 +147,7 @@ export async function runInvestigation(input: InvestigationInput): Promise<Inves
         const diagnostic = error as { name?: unknown; $metadata?: { requestId?: string; httpStatusCode?: number } } | null;
         console.error(JSON.stringify({ event: 'bedrock_request_failed', type: typeof diagnostic?.name === 'string' && /^[A-Za-z]+$/.test(diagnostic.name) ? diagnostic.name : 'UnknownError', requestId: diagnostic?.$metadata?.requestId, httpStatus: diagnostic?.$metadata?.httpStatusCode }));
         const known = error instanceof Error && ['AccessDeniedException', 'ExpiredTokenException', 'UnrecognizedClientException', 'ValidationException', 'ThrottlingException', 'ResourceNotFoundException'].includes(error.name) ? ` (${error.name})` : '';
-        throw new InvestigationError('bedrock_failed', `Amazon Bedrock could not complete the request${known}. Check model access, region and workshop credentials.`);
+        throw new InvestigationError('bedrock_failed', investigationFailureMessage(`Amazon Bedrock could not complete the request${known}. Check model access, region and workshop credentials.`));
       }
       await check();
       await emit({ type: 'model_completed', title: 'Model response received', detail: 'Requested actions and citations are being validated.' });

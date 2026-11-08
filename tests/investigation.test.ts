@@ -36,17 +36,17 @@ function wire(section: EvidenceSection = 'summary') {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('portable investigation engine', () => {
-  it('allows an Opus report to complete after the old two-minute investigation deadline', async () => {
+  it('allows an Opus report to complete after the old four-minute investigation deadline', async () => {
     vi.useFakeTimers();
     try {
       const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>()
         .mockResolvedValueOnce(modelResponse(['order', 'tickets', 'delivery', 'support'].map(section => ({ name: 'get_evidence', input: { section } }))))
         .mockImplementationOnce(async () => {
-          await new Promise(resolve => setTimeout(resolve, 150_000));
+          await new Promise(resolve => setTimeout(resolve, 300_000));
           return modelResponse([{ name: 'finish_report', input: report() }]);
         });
       const pending = runInvestigation(input({ mode: 'bedrock', modelId: 'us.anthropic.claude-opus-5', invokeModel: invoke }));
-      await vi.advanceTimersByTimeAsync(151_000);
+      await vi.advanceTimersByTimeAsync(301_000);
       const result = await pending;
       expect(result.modelId).toBe('us.anthropic.claude-opus-5');
       expect(invoke.mock.calls[1][1].aborted).toBe(false);
@@ -56,7 +56,7 @@ describe('portable investigation engine', () => {
   it('identifies a Bedrock transport timeout without suggesting invalid credentials', async () => {
     const timeout = Object.assign(new Error('private provider details'), { name: 'TimeoutError' });
     const options = input({ mode: 'bedrock', modelId: 'us.anthropic.claude-opus-5', invokeModel: async () => { throw timeout; } });
-    await expect(runInvestigation(options)).rejects.toMatchObject({ code: 'bedrock_timeout', message: expect.stringContaining('120 seconds') });
+    await expect(runInvestigation(options)).rejects.toMatchObject({ code: 'bedrock_timeout', message: expect.stringContaining('180 seconds') });
     expect(options.events.some(event => event.type === 'completed')).toBe(false);
   });
 

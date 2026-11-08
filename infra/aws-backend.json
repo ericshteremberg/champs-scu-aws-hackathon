@@ -444,7 +444,7 @@
           "arm64"
         ],
         "MemorySize": 512,
-        "Timeout": 300,
+        "Timeout": 600,
         "ReservedConcurrentExecutions": 2,
         "Role": {
           "Fn::GetAtt": [
