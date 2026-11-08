@@ -42,6 +42,22 @@ describe('Stripe Apps API boundary', () => {
   it('does not claim charge access was tested without a dispute or linked charge', async () => {
     http.mockResolvedValueOnce(Response.json({ object: 'list', data: [] })); expect(await verifyStripeOAuthRead(tokens)).toEqual({ disputeReadVerified: true, chargeReadVerified: false }); expect(http).toHaveBeenCalledTimes(1);
   });
+  it.each(['ch_fictional', 'py_fictional'])('verifies du disputes with a %s payment', async (chargeId) => {
+    http.mockResolvedValueOnce(Response.json({ object: 'list', data: [{ id: 'du_fictional', charge: chargeId, livemode: true }] }));
+    http.mockResolvedValueOnce(Response.json({ id: chargeId, livemode: true }));
+    expect(await verifyStripeOAuthRead(tokens)).toEqual({ disputeReadVerified: true, chargeReadVerified: true });
+    expect(http.mock.calls[1][0]).toBe(`https://api.stripe.com/v1/charges/${chargeId}`);
+  });
+  it.each(['https://untrusted.test/payment', 'ch_bad/path', 'pi_wrongtype'])('rejects an invalid linked payment %s before reading it', async (chargeId) => {
+    http.mockResolvedValueOnce(Response.json({ object: 'list', data: [{ id: 'du_fictional', charge: chargeId, livemode: true }] }));
+    await expect(verifyStripeOAuthRead(tokens)).rejects.toMatchObject({ code: 'provider_invalid_response' });
+    expect(http).toHaveBeenCalledTimes(1);
+  });
+  it('rejects a du dispute from the wrong environment before reading its payment', async () => {
+    http.mockResolvedValueOnce(Response.json({ object: 'list', data: [{ id: 'du_fictional', charge: 'py_fictional', livemode: false }] }));
+    await expect(verifyStripeOAuthRead(tokens)).rejects.toMatchObject({ code: 'provider_invalid_response' });
+    expect(http).toHaveBeenCalledTimes(1);
+  });
   it('rejects mismatched payment identities and mode', async () => {
     http.mockResolvedValueOnce(Response.json({ object: 'list', data: [{ id: 'dp_fictional', charge: 'ch_fictional', livemode: true }] })); http.mockResolvedValueOnce(Response.json({ id: 'ch_other', livemode: true })); await expect(verifyStripeOAuthRead(tokens)).rejects.toMatchObject({ code: 'provider_invalid_response' });
   });
@@ -78,4 +94,14 @@ describe('selected dispute evidence reads', () => {
     }
     http.mockClear(); await expect(readStripeOAuthDispute(tokens, '../charges/all')).rejects.toMatchObject({ code: 'invalid_request' }); expect(http).not.toHaveBeenCalled();
   });
+});
+
+it('lists and imports a du dispute whose linked charge uses the py prefix', async () => {
+  const { listStripeOAuthDisputes, readStripeOAuthDispute } = await import('../aws/stripe-oauth-api.ts');
+  const dispute = { id: 'du_fictional', object: 'dispute', charge: 'py_fictional', payment_intent: 'pi_fictional', livemode: true, amount: 5000, currency: 'usd', reason: 'product_not_received', status: 'needs_response', created: 1793491200, evidence_details: { due_by: 1796083200 } };
+  http.mockResolvedValueOnce(Response.json({ object: 'list', data: [dispute], has_more: false }));
+  expect((await listStripeOAuthDisputes(tokens)).disputes[0].id).toBe(dispute.id);
+  http.mockResolvedValueOnce(Response.json(dispute)).mockResolvedValueOnce(Response.json({ id: 'py_fictional', object: 'charge', payment_intent: 'pi_fictional', livemode: true, amount: 5000, currency: 'usd' }));
+  expect(await readStripeOAuthDispute(tokens, dispute.id)).toMatchObject({ chargeId: 'py_fictional', paymentIntentId: 'pi_fictional' });
+  expect(http.mock.calls[2][0]).toBe('https://api.stripe.com/v1/charges/py_fictional');
 });

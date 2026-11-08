@@ -20,7 +20,6 @@ import {
   Building2,
   Check,
   CheckCheck,
-  ChevronDown,
   ChevronRight,
   CircleHelp,
   Clock3,
@@ -1072,7 +1071,6 @@ export default function WorkspaceApp({
         <div className="cw-workspace-label">
           <Building2 size={18} />
           <span>{state?.workspace?.name ?? "Your workspace"}</span>
-          <ChevronDown size={14} />
         </div>
         <nav className="cw-nav" aria-label="Workspace navigation">
           {views.map(({ id, title, icon: Icon }) => (
@@ -1134,10 +1132,6 @@ export default function WorkspaceApp({
             )}
           </div>
           <div className="cw-top-actions">
-            <span className="cw-caption">
-              <span className="cw-status-dot" />
-              Merchant review required
-            </span>
             <button
               className="cw-button ghost icon"
               onClick={() => navigate("access")}
@@ -1165,8 +1159,8 @@ export default function WorkspaceApp({
             <div className="cw-panel cw-recovery">
               <Empty
                 icon={LockKeyhole}
-                title="Let’s reconnect your session."
-                description="Your workspace is still here. Sign in again to continue with your cases and evidence."
+                title="Session expired"
+                description="Sign in again to continue."
               >
                 <a
                   className="cw-button primary"
@@ -1186,7 +1180,7 @@ export default function WorkspaceApp({
           ) : !state || preview?.mode === "error" ? (
             <div className="cw-panel cw-recovery">
               <Empty
-                title="Your workspace couldn’t load."
+                title="Couldn’t load workspace"
                 description="Check your connection and try again."
               >
                 <Button
@@ -1215,11 +1209,7 @@ export default function WorkspaceApp({
                     <Check size={20} />
                   </span>
                   <div>
-                    <h3>Make the workspace yours.</h3>
-                    <p>
-                      Review your business context, policies, and evidence
-                      readiness.
-                    </p>
+                    <h3>Workspace setup</h3>
                   </div>
                   <Button onClick={() => navigate("setup")}>
                     Setup checklist
@@ -1239,8 +1229,8 @@ export default function WorkspaceApp({
               {view === "cases" && caseId && !current && (
                 <div className="cw-panel cw-recovery">
                   <Empty
-                    title="This case isn’t available."
-                    description="It may not exist, or it may belong to a different workspace. Your other investigations are still available."
+                    title="Case unavailable"
+                    description="This case was not found in your workspace."
                   >
                     <Button primary onClick={() => navigate("cases")}>
                       Back to cases
@@ -1253,8 +1243,7 @@ export default function WorkspaceApp({
                 <>
                   <div className="cw-page-head">
                     <div>
-                      <h1>Every case. In context.</h1>
-                      <p>Your disputes, their evidence, and the next step.</p>
+                      <h1>Cases</h1>
                     </div>
                     <Button primary onClick={() => setModal("case")}>
                       <Plus size={18} />
@@ -1540,7 +1529,7 @@ export default function WorkspaceApp({
       )}
       {modal === "case" && (
         <Modal
-          title="Start an investigation"
+          title="New case"
           onClose={closeModal}
           error={error}
         >
@@ -1765,8 +1754,7 @@ export default function WorkspaceApp({
               />
             </Field>
             <p className="cw-caption">
-              A policy is evidence. Adding one does not authorize access to
-              customer data.
+              Policies do not grant data access.
             </p>
             <Button primary type="submit" disabled={busy}>
               {busy ? "Saving…" : "Save policy"}
@@ -1892,13 +1880,10 @@ function Onboarding({
       <div className="cw-onboarding-title">
         <span className="cw-eyebrow">WELCOME TO CAUSALITY</span>
         <h1 style={{ marginTop: 18 }}>
-          Set the context.
-          <br />
-          We’ll help you find the story.
+          Set up your workspace
         </h1>
         <p>
-          A few details create the home for your cases, evidence, and company
-          policies.
+          Add your business details to get started.
         </p>
       </div>
       <div
@@ -1918,9 +1903,9 @@ function Onboarding({
               setStep(1);
             }}
           >
-            <h2>Your business.</h2>
+            <h2>Business details</h2>
             <p>
-              These details identify your workspace. You can update them later.
+              You can change these later.
             </p>
             <Field label="Business name">
               <input
@@ -1968,10 +1953,9 @@ function Onboarding({
         )}
         {step === 1 && (
           <div className="cw-form">
-            <h2>Start with the right sources.</h2>
+            <h2>Add your sources</h2>
             <p>
-              Your workspace starts empty. Connect Stripe, add source records,
-              or explore clearly labeled sample cases after setup.
+              Connect accounts or add evidence manually after setup.
             </p>
             <div className="cw-choice">
               <span className="cw-icon-well">
@@ -1980,8 +1964,7 @@ function Onboarding({
               <div>
                 <h3>Stripe disputes</h3>
                 <p>
-                  Import dispute details and payment evidence from your
-                  configured Stripe environment.
+                  Disputes, payments and deadlines.
                 </p>
               </div>
             </div>
@@ -1992,16 +1975,14 @@ function Onboarding({
               <div>
                 <h3>Evidence & company policies</h3>
                 <p>
-                  Add selected records, customer messages, attachments, and the
-                  policy versions that apply.
+                  Messages, files and purchase-time terms.
                 </p>
               </div>
             </div>
             <div className="cw-banner neutral">
               <Database size={21} />
               <p>
-                Gmail and database connectors require additional configuration.
-                They will not read customer data automatically.
+                Sources stay disconnected until you authorize access.
               </p>
             </div>
             <div className="cw-modal-actions">
@@ -2015,31 +1996,27 @@ function Onboarding({
         )}
         {step === 2 && (
           <form className="cw-form" onSubmit={complete}>
-            <h2>Your team stays in control.</h2>
+            <h2>Review before submitting</h2>
             <p>
-              Causality organizes evidence for a considered response. You decide
-              what to approve and submit.
+              You approve the response. The bank decides the outcome.
             </p>
             <ul className="cw-scope-list">
               <li>
                 <ShieldCheck size={20} />
                 <span>
-                  Only records you add or explicitly connect enter your
-                  workspace.
+                  You choose which records to add.
                 </span>
               </li>
               <li>
                 <FileCheck2 size={20} />
                 <span>
-                  Findings remain linked to their sources, including
-                  contradictions and gaps.
+                  Findings link to sources and flag gaps.
                 </span>
               </li>
               <li>
                 <LockKeyhole size={20} />
                 <span>
-                  Broader access requires independent review. Policies do not
-                  grant permissions.
+                  Broader access needs independent approval.
                 </span>
               </li>
             </ul>
@@ -2052,14 +2029,13 @@ function Onboarding({
                 required
               />
               <label htmlFor="review-ack">
-                I understand that my team must review evidence before
-                submission, and that the issuing bank determines the outcome.
+                I will review evidence before submission. The bank determines the outcome.
               </label>
             </div>
             <div className="cw-modal-actions">
               <Button onClick={() => setStep(1)}>Back</Button>
               <Button type="submit" primary disabled={busy || !accepted}>
-                {busy ? "Creating workspace…" : "Open my workspace"}
+                {busy ? "Creating workspace…" : "Create workspace"}
                 <ArrowRight size={18} />
               </Button>
             </div>
@@ -2108,8 +2084,7 @@ function Overview({
               day: "numeric",
             })}
           </span>
-          <h1 style={{ marginTop: 8 }}>The full picture.</h1>
-          <p>A clear view of your disputes and the evidence behind them.</p>
+          <h1 style={{ marginTop: 8 }}>Overview</h1>
         </div>
         <div className="cw-actions">
           {state.cases.length > 0 && (
@@ -2128,8 +2103,7 @@ function Overview({
         <div className="cw-banner neutral">
           <Sparkles size={20} />
           <p>
-            You’re exploring synthetic sample cases. No Stripe data has been
-            imported.
+            Sample data · No live Stripe records
           </p>
         </div>
       )}
@@ -2152,7 +2126,7 @@ function Overview({
         </div>
         <div className="cw-stat">
           <div className="cw-stat-label">
-            <span>Awaiting your review</span>
+            <span>Needs review</span>
             <FileCheck2 size={20} />
           </div>
           <div className="cw-stat-value">
@@ -2161,23 +2135,21 @@ function Overview({
                 .length
             }
           </div>
-          <p>Prepared for a considered decision</p>
         </div>
         <div className="cw-stat">
           <div className="cw-stat-label">
-            <span>Linked evidence records</span>
+            <span>Evidence records</span>
             <FileText size={20} />
           </div>
           <div className="cw-stat-value">{evidenceCount}</div>
-          <p>Each source stays in context</p>
         </div>
       </div>
       {!state.cases.length ? (
         <div className="cw-two-col">
           <div className="cw-panel">
             <Empty
-              title="Your first case starts here."
-              description="Connect Stripe to import disputes, or create a case and add the relevant evidence yourself."
+              title="No cases yet"
+              description="Create a case or connect a source."
             >
               <Button primary onClick={() => navigate("integrations")}>
                 <Link2 size={18} />
@@ -2194,10 +2166,9 @@ function Overview({
               <span className="cw-icon-well">
                 <Sparkles size={24} />
               </span>
-              <h2 style={{ margin: "16px 0 12px" }}>See a case in context.</h2>
+              <h2 style={{ margin: "16px 0 12px" }}>Try a sample case</h2>
               <p>
-                Explore a synthetic investigation with a payment record,
-                delivery scan, and conflicting customer message.
+                Explore fictional payment, delivery and customer records.
               </p>
               <Button
                 className="full"
@@ -2214,7 +2185,7 @@ function Overview({
         <div className="cw-panel-stack">
           <div className="cw-panel">
             <div className="cw-panel-header">
-              <h3>Cases that need attention</h3>
+              <h3>Needs attention</h3>
               <button
                 className="cw-button ghost small"
                 onClick={() => navigate("cases")}
@@ -2249,7 +2220,7 @@ function Overview({
             </div>
             <div className="cw-panel">
               <div className="cw-panel-header">
-                <h3>Your investigation toolkit</h3>
+                <h3>Quick links</h3>
               </div>
               <div className="cw-panel-body">
                 <div className="cw-step">
@@ -2257,8 +2228,7 @@ function Overview({
                     <CreditCard size={20} />
                   </span>
                   <div className="cw-step-copy">
-                    <h3>Connect your sources</h3>
-                    <p>Bring the relevant records together.</p>
+                    <h3>Connections</h3>
                   </div>
                   <button
                     className="cw-button ghost icon"
@@ -2273,8 +2243,7 @@ function Overview({
                     <FileText size={20} />
                   </span>
                   <div className="cw-step-copy">
-                    <h3>Add your policies</h3>
-                    <p>Use the terms that applied.</p>
+                    <h3>Policies</h3>
                   </div>
                   <button
                     className="cw-button ghost icon"
@@ -2289,13 +2258,12 @@ function Overview({
                     <ShieldCheck size={20} />
                   </span>
                   <div className="cw-step-copy">
-                    <h3>Inspect access</h3>
-                    <p>Keep scope and activity visible.</p>
+                    <h3>Access requests</h3>
                   </div>
                   <button
                     className="cw-button ghost icon"
                     onClick={() => navigate("access")}
-                    aria-label="Inspect access"
+                    aria-label="Access requests"
                   >
                     <ArrowRight size={18} />
                   </button>
@@ -2721,7 +2689,7 @@ function CaseDetail({
           >
             <div className="cw-review-bar cw-investigate-bar">
               <div>
-                <h3>Follow the source. Understand the case.</h3>
+                <h3>Investigation</h3>
                 <p>
                   {current.evidence.length} linked records · Response due{" "}
                   {calendarDate(current.dueAt)}
@@ -2795,7 +2763,7 @@ function CaseDetail({
                       </button>
                     ))
                 ) : (
-                  <p>Added evidence appears here in chronological order.</p>
+                  <p>No records added.</p>
                 )}
               </aside>
               <section className="cw-source-view">
@@ -2902,8 +2870,8 @@ function CaseDetail({
                 ) : (
                   <Empty
                     icon={FileText}
-                    title="Build the evidence trail."
-                    description="Add the payment record, relevant customer message, or company record to start this investigation."
+                    title="No evidence yet"
+                    description="Add a payment, message or company record."
                   >
                     <Button onClick={addEvidence}>
                       <Plus size={18} />
@@ -2924,11 +2892,7 @@ function CaseDetail({
           >
             <div className="cw-page-head" style={{ marginBottom: 0 }}>
               <div>
-                <h2>The case, assembled.</h2>
-                <p>
-                  Review the findings, inspect their sources, and make the
-                  response your own.
-                </p>
+                <h2>Report</h2>
               </div>
               <div className="cw-actions">
                 <Button onClick={() => exportDraft()} disabled={!canExport}>
@@ -2974,10 +2938,10 @@ function CaseDetail({
                   <Sparkles size={19} />
                   <h3>
                     {analysis.assessment === "supported"
-                      ? "Evidence supports a response."
+                      ? "Response supported"
                       : analysis.assessment === "mixed"
-                        ? "The evidence needs a closer look."
-                        : "More evidence is needed."}
+                        ? "Conflicting evidence"
+                        : "More evidence needed"}
                   </h3>
                 </div>
                 <p>{analysis.summary}</p>
@@ -2989,7 +2953,7 @@ function CaseDetail({
                   </span>
                 </div>
                 <div className="cw-analysis-next">
-                  <strong>Recommended next step</strong>
+                  <strong>Next step</strong>
                   <p>{analysis.recommendation}</p>
                 </div>
               </div>
@@ -2997,15 +2961,15 @@ function CaseDetail({
             {current.findings.length > 0 && (
               <div className="cw-findings">
                 {current.findings.map((finding, i) => (
-                  <div className="cw-finding" key={i}>
-                    <h3>
+                  <details className="cw-finding cw-disclosure" key={i} open={finding.kind !== "supported"}>
+                    <summary>
                       {finding.kind === "conflict"
                         ? "Conflicting evidence · "
                         : finding.kind === "missing"
                           ? "Missing evidence · "
                           : "Supported · "}
                       {finding.title}
-                    </h3>
+                    </summary>
                     <p>{finding.detail}</p>
                     {finding.evidenceIds.length > 0 && (
                       <div className="cw-citations">
@@ -3028,28 +2992,25 @@ function CaseDetail({
                         })}
                       </div>
                     )}
-                  </div>
+                  </details>
                 ))}
               </div>
             )}
             {analysis?.gaps.length ? (
-              <div className="cw-analysis-gaps">
-                <h3>
-                  <CircleHelp size={18} />
-                  What remains unknown
-                </h3>
+              <details className="cw-analysis-gaps cw-disclosure" open>
+                <summary>Evidence gaps ({new Set(analysis.gaps).size})</summary>
                 <ul>
-                  {analysis.gaps.map((gap, i) => (
+                  {[...new Set(analysis.gaps)].map((gap, i) => (
                     <li key={i}>{gap}</li>
                   ))}
                 </ul>
-              </div>
+              </details>
             ) : null}
             {current.draft ? (
               <>
                 <Field
                   label="Merchant response draft"
-                  hint="Edits are saved only when you choose Save changes. Approval and export apply to this exact saved version."
+                  hint="Save changes before approval. Only the approved version can be exported."
                 >
                   <textarea
                     readOnly={frozen || investigating}
@@ -3066,14 +3027,14 @@ function CaseDetail({
                         ? "Unsaved changes"
                         : current.draft.status === "approved"
                           ? "Approved for submission"
-                          : "Ready for your review"}
+                          : "Review required"}
                     </h3>
                     <p>
                       {dirty
                         ? "Save and approve your changes before exporting."
                         : current.draft.status === "approved"
                           ? `Reviewed ${dateTime(current.draft.approvedAt)} by ${current.draft.approvedBy || "workspace owner"} · Revision ${current.draft.revision}`
-                          : "Inspect the cited records before approving. Approval does not send anything."}
+                          : "Check the sources. Approving does not submit."}
                     </p>
                   </div>
                   <div className="cw-actions">
@@ -3087,7 +3048,7 @@ function CaseDetail({
                             content: draft,
                             revision: current.draft?.revision ?? 0,
                           },
-                          "Draft saved. Approval is required for this version.",
+                          "Saved. Review this version before approval.",
                         )
                       }
                     >
@@ -3110,7 +3071,7 @@ function CaseDetail({
                             caseId: current.id,
                             revision: current.draft?.revision ?? 0,
                           },
-                          "This draft is approved. Nothing has been submitted.",
+                          "Approved · Not submitted",
                         )
                       }
                     >
@@ -3123,8 +3084,8 @@ function CaseDetail({
             ) : (
               <Empty
                 icon={FileText}
-                title="Your response starts with evidence."
-                description="Investigate the linked records to prepare a cited response for your team."
+                title="No report yet"
+                description="Add evidence, then run an investigation."
               >
                 {canUseMode && (
                   <Button primary disabled={!canInvestigate} onClick={start}>
@@ -3492,9 +3453,7 @@ function EvidenceForm({
             />
           </label>
           <p className="cw-caption">
-            The original file is stored privately with this case. PDF and image
-            text is not extracted. The upload timestamp is recorded; add a
-            separate source record for the factual event date.
+            Files are private. PDF/image text is not extracted. Add a source record for the event date; uploads record the upload time.
           </p>
           <Button primary type="submit" disabled={busy}>
             <Upload size={18} />
@@ -3535,11 +3494,7 @@ function EvidenceLibrary({
     <>
       <div className="cw-page-head">
         <div>
-          <h1>Evidence, with context.</h1>
-          <p>
-            Every record belongs to a case. Open its investigation to inspect
-            the source or add more evidence.
-          </p>
+          <h1>Evidence</h1>
         </div>
         <span className="cw-pill">{records.length} records</span>
       </div>
@@ -3606,8 +3561,8 @@ function EvidenceLibrary({
         ) : (
           <Empty
             icon={FileText}
-            title="A clear source for every claim."
-            description="Add evidence inside a case to keep customer records matched to the right investigation."
+            title="No evidence yet"
+            description="Open a case to add evidence."
           />
         )}
       </div>
@@ -3651,11 +3606,7 @@ function Integrations({
     <>
       <div className="cw-page-head">
         <div>
-          <h1>Evidence beyond the payment.</h1>
-          <p>
-            Connect permitted sources. Keep the scope of each investigation
-            clear.
-          </p>
+          <h1>Connections</h1>
         </div>
         <span className="cw-pill outline">
           <ShieldCheck size={16} />
@@ -3664,9 +3615,14 @@ function Integrations({
       </div>
       {!isDesignPreview && <>
         <ProviderConnectors cases={state.cases} onImported={onConnectorImported} />
-        <LiveEvidenceConnectors onImported={onConnectorImported} />
-        <EvidenceConnectors onImported={onConnectorImported} />
+        <details className="cw-disclosure cw-connection-group">
+          <summary>Custom data sources <span>Installed endpoints and database setup</span></summary>
+          <LiveEvidenceConnectors onImported={onConnectorImported} />
+          <EvidenceConnectors onImported={onConnectorImported} />
+        </details>
       </>}
+      <details className="cw-disclosure cw-connection-group" open={isDesignPreview || undefined}>
+      <summary>More sources & services <span>Manual imports, policies, analysis and archives</span></summary>
       <div className="cw-integration-grid">
         <section className="cw-panel cw-integration">
           <div className="cw-integration-head">
@@ -3683,24 +3639,8 @@ function Integrations({
             </span>
           </div>
           <p>
-            Investigate linked evidence, follow the source records, and prepare
-            a cited response for merchant review.
+            Generate findings and a cited draft. No automatic approval, refund, or submission.
           </p>
-          <div className="cw-rule" />
-          <ul className="cw-scope-list">
-            <li>
-              <Check size={19} />
-              <span>Model and evidence requests stay on the server</span>
-            </li>
-            <li>
-              <Check size={19} />
-              <span>Findings cite records from the selected case</span>
-            </li>
-            <li>
-              <LockKeyhole size={19} />
-              <span>No automatic approval, refund, or submission</span>
-            </li>
-          </ul>
           {investigationConfig?.bedrockConfigured ? (
             <dl className="cw-connection-metadata">
               <div>
@@ -3718,9 +3658,7 @@ function Integrations({
             <div className="cw-banner neutral" style={{ marginBottom: 0 }}>
               <Settings2 size={20} />
               <p>
-                Configure AWS credentials, a region, and a tool-capable Bedrock
-                model on the server. Synthetic cases can use sample mode while
-                AWS is being connected.
+                Configure AWS credentials, region, and a tool-capable model on the server. Sample cases work without AWS.
               </p>
             </div>
           )}
@@ -3739,24 +3677,8 @@ function Integrations({
             </span>
           </div>
           <p>
-            Import disputes and their payment records. Review a response before
-            submitting evidence through Stripe.
+            Import disputes and payment records. Review is required before submission.
           </p>
-          <div className="cw-rule" />
-          <ul className="cw-scope-list">
-            <li>
-              <Check size={19} />
-              <span>Dispute details, deadlines, and payment evidence</span>
-            </li>
-            <li>
-              <Check size={19} />
-              <span>Explicit merchant review before submission</span>
-            </li>
-            <li>
-              <LockKeyhole size={19} />
-              <span>Server-side credentials; no keys in your browser</span>
-            </li>
-          </ul>
           {connected ? (
             <p>
               {connection?.accountName ?? "Configured Stripe account"} ·{" "}
@@ -3773,8 +3695,7 @@ function Integrations({
               <div className="cw-banner neutral" style={{ marginBottom: 0 }}>
                 <Settings2 size={20} />
                 <p>
-                  Stripe credentials need to be configured by the workspace
-                  operator before a connection can be established.
+                  Ask your operator to configure Stripe credentials.
                 </p>
               </div>
             )
@@ -3837,27 +3758,7 @@ function Integrations({
             <span className="cw-pill">Manual import</span>
           </div>
           <p>
-            Keep the customer’s original account alongside the payment and
-            delivery records.
-          </p>
-          <div className="cw-rule" />
-          <ul className="cw-scope-list">
-            <li>
-              <Check size={19} />
-              <span>Add a selected message as evidence within a case</span>
-            </li>
-            <li>
-              <Check size={19} />
-              <span>Upload an email export or supporting screenshot</span>
-            </li>
-            <li>
-              <LockKeyhole size={19} />
-              <span>Use the Gmail connection above to review matching emails</span>
-            </li>
-          </ul>
-          <p>
-            Connect Gmail above to search and review selected messages. You can also
-            use Add evidence inside a case for email exports and screenshots.
+            Add email exports or screenshots to a case.
           </p>
           <Button
             onClick={() =>
@@ -3883,20 +3784,15 @@ function Integrations({
             </span>
           </div>
           <p>
-            Use operational records relevant to the customer and transaction.
-            Additional access requires an independent decision.
+            Import approved customer and order records.
           </p>
           <div className="cw-rule" />
           <p>
-            Import an approved case through your installed evidence connector.
-            It verifies the case, follows linked records, and returns only
-            permitted fields. Database credentials stay with the business.
+            The connector returns permitted fields only. Database credentials stay with your business.
           </p>
           {!investigationConfig?.merchantConfigured && (
             <p className="cw-caption">
-              Start with guided setup above to review your mapping and get
-              installation files. Add your installed endpoint in Your workspace
-              connections to verify access and import its approved case.
+              Open Custom data sources above to set up or connect an endpoint.
             </p>
           )}
           <div className="cw-actions">
@@ -3918,7 +3814,7 @@ function Integrations({
             </Button>
             <Button onClick={requestAccess}>
               <ShieldCheck size={18} />
-              Request a specific scope
+              Request access
             </Button>
           </div>
         </section>
@@ -3931,14 +3827,11 @@ function Integrations({
             <span className="cw-pill">{state.policies.length} saved</span>
           </div>
           <p>
-            Give each investigation the terms that applied at the time of the
-            purchase.
+            Attach the policy version that applied at purchase.
           </p>
           <div className="cw-rule" />
           <p>
-            Save policy text with its effective date, then add the relevant
-            policy to the case as evidence. Policy text never grants data-access
-            permissions.
+            Policy text does not grant data access.
           </p>
           <Button onClick={() => navigate("policies")}>
             Manage policies
@@ -3960,17 +3853,15 @@ function Integrations({
             </span>
           </div>
           <p>
-            Keep a private copy of the reviewed response, findings, and
-            supporting evidence.
+            Archive approved reports and evidence privately.
           </p>
           <div className="cw-rule" />
           <p>
-            Archiving is a separate action on the Report tab. Only the exact
-            approved draft revision can be archived. Downloads remain available
-            without S3.
+            Archive the approved revision from Report. Downloads work without S3.
           </p>
         </section>
       </div>
+      </details>
     </>
   );
 }
@@ -4010,7 +3901,7 @@ function ActivityList({
     </ul>
   ) : (
     <p>
-      Workspace activity will appear here as you add evidence and review cases.
+      No activity yet.
     </p>
   );
 }
@@ -4040,11 +3931,7 @@ function Access({
     <>
       <div className="cw-page-head">
         <div>
-          <h1>Your data. Your boundaries.</h1>
-          <p>
-            Inspect requests, decisions, and the activity behind each
-            investigation.
-          </p>
+          <h1>Access & activity</h1>
         </div>
         <Button primary onClick={request}>
           <Plus size={18} />
@@ -4068,7 +3955,6 @@ function Access({
             <ShieldCheck size={20} />
           </div>
           <div className="cw-stat-value">Case scoped</div>
-          <p>Selected records and specific tools</p>
         </div>
         <div className="cw-stat">
           <div className="cw-stat-label">
@@ -4076,7 +3962,6 @@ function Access({
             <FileText size={20} />
           </div>
           <div className="cw-stat-value">{state.activity.length}</div>
-          <p>Recorded outside the draft context</p>
         </div>
       </div>
       <div className="cw-panel">
@@ -4106,9 +3991,7 @@ function Access({
               <div className="cw-banner neutral">
                 <LockKeyhole size={20} />
                 <p>
-                  Requests must be reviewed independently. This single-owner
-                  build requires reviewer configuration before decisions can be
-                  made. Approval records do not provision a database connector.
+                  An independent reviewer must be configured to approve requests. Approval alone does not connect a database.
                 </p>
               </div>
               {state.accessRequests.map((r) => (
@@ -4124,8 +4007,8 @@ function Access({
           ) : (
             <Empty
               icon={ShieldCheck}
-              title="Access is intentional."
-              description="When a case needs more evidence, request the exact records and explain why they’re needed."
+              title="No access requests"
+              description="Request the records needed for a case."
             >
               <Button onClick={request}>
                 <Plus size={18} />
@@ -4141,11 +4024,9 @@ function Access({
         {tab === "model" && (
           <div className="cw-panel-body cw-two-col">
             <div>
-              <h2>Designed around a clear boundary.</h2>
+              <h2>Case-scoped access</h2>
               <p style={{ marginTop: 16 }}>
-                Your workspace contains the records you add and explicitly
-                import. Investigations do not have unrestricted access to your
-                company systems.
+                Investigations use records added or imported into the case.
               </p>
               <img
                 src="/causality/access-architecture-compact.svg"
@@ -4155,27 +4036,21 @@ function Access({
             </div>
             <div className="cw-findings">
               <div className="cw-finding">
-                <h3>Query only approved records.</h3>
+                <h3>Approved records only</h3>
                 <p>
-                  The merchant evidence API constrains access to the approved
-                  case and permitted fields.
+                  The evidence API limits reads to approved cases and fields.
                 </p>
               </div>
               <div className="cw-finding">
-                <h3>Keep permission decisions independent.</h3>
+                <h3>Independent review</h3>
                 <p>
-                  The requester cannot approve their own request. Access
-                  decisions and audit history remain separate from draft
-                  preparation.
+                  You cannot approve your own access request.
                 </p>
               </div>
               <div className="cw-finding">
-                <h3>Understand what is running today.</h3>
+                <h3>Current setup</h3>
                 <p>
-                  Investigations use Amazon Bedrock when configured, with a
-                  labeled sample mode for synthetic cases. The merchant API
-                  imports approved records. Gmail authorization remains a
-                  separate integration.
+                  Bedrock analyzes case evidence. Each source connection has its own permissions.
                 </p>
               </div>
             </div>
@@ -4272,10 +4147,7 @@ function Settings({
     <>
       <div className="cw-page-head">
         <div>
-          <h1>Your workspace.</h1>
-          <p>
-            Business context, policies, and the way your team handles evidence.
-          </p>
+          <h1>Workspace settings</h1>
         </div>
       </div>
       <div className="cw-panel-stack">
@@ -4332,7 +4204,7 @@ function Settings({
               </Field>
               <Field
                 label="Retention preference"
-                hint="Saved as a workspace preference. Automatic deletion is not enabled in this build."
+                hint="Preference only. Automatic deletion is not enabled."
               >
                 <select
                   name="retentionDays"

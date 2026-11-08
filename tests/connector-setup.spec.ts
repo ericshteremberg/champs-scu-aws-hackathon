@@ -71,6 +71,7 @@ async function setup(page: Page, initiallyUnavailable = false) {
     }
   });
   await page.goto("/workspace?view=integrations");
+  await page.locator("summary").filter({ hasText: "Custom data sources" }).click();
   return { connections, available: () => { unavailable = false; } };
 }
 
@@ -86,13 +87,13 @@ for (const templateId of ["atmsphr-tickets", "rentul-rentals"] as const) {
     await setupSection.getByLabel("Connection name", { exact: true }).fill(`${template.name} reviewed`);
     await setupSection.getByRole("button", { name: "Review mapping", exact: true }).click();
     await expect(setupSection.getByRole("button", { name: "Preview case access", exact: true })).toBeDisabled();
-    await setupSection.getByRole("checkbox", { name: /I have reviewed/ }).check();
+    await setupSection.getByRole("checkbox", { name: /I reviewed/ }).check();
     await setupSection.getByRole("button", { name: "Preview case access", exact: true }).click();
     await expect(setupSection.getByText("Boundary checks passed", { exact: true })).toBeVisible();
     await expect(setupSection.getByText("Unrelated case", { exact: true })).toBeVisible();
     await expect(setupSection.getByRole("region", { name: "Permitted case evidence" })).toContainText(templateId === "atmsphr-tickets" ? "Ticket" : "Rental");
     await setupSection.getByRole("button", { name: "Save configuration", exact: true }).click();
-    await expect(setupSection.getByText("Your mapping is ready to install.", { exact: true })).toBeVisible();
+    await expect(setupSection.getByText("Install connector", { exact: true })).toBeVisible();
     await expect(setupSection.getByText("This saved setup is not a live connection.", { exact: false })).toBeVisible();
     const file = page.waitForEvent("download");
     await setupSection.getByRole("button", { name: "connector-manifest.json", exact: true }).click();
@@ -111,16 +112,16 @@ test("mapping changes require confirmation again and an invalid relationship rem
   const section = page.getByRole("region", { name: "Evidence connectors" });
   await section.getByRole("button", { name: "Add evidence connector" }).click();
   await section.getByRole("button", { name: "Review mapping", exact: true }).click();
-  await section.getByRole("checkbox", { name: /I have reviewed/ }).check();
+  await section.getByRole("checkbox", { name: /I reviewed/ }).check();
   await section.getByText("Review purchase mapping", { exact: false }).click();
   await section.getByRole("combobox", { name: "Payment reference", exact: true }).selectOption("order_number");
-  await expect(section.getByRole("checkbox", { name: /I have reviewed/ })).not.toBeChecked();
-  await section.getByRole("checkbox", { name: /I have reviewed/ }).check();
+  await expect(section.getByRole("checkbox", { name: /I reviewed/ })).not.toBeChecked();
+  await section.getByRole("checkbox", { name: /I reviewed/ }).check();
   await section.getByRole("button", { name: "Preview case access", exact: true }).click();
   await expect(section.getByRole("alert")).toBeVisible();
   await expect(section.getByRole("button", { name: "Save configuration", exact: true })).toHaveCount(0);
   await section.getByRole("combobox", { name: "Payment reference", exact: true }).selectOption("payment_ref");
-  await section.getByRole("checkbox", { name: /I have reviewed/ }).check();
+  await section.getByRole("checkbox", { name: /I reviewed/ }).check();
   await section.getByRole("button", { name: "Preview case access", exact: true }).click();
   await expect(section.getByText("Boundary checks passed", { exact: true })).toBeVisible();
 });
@@ -134,7 +135,7 @@ test("setup displays backend unavailability honestly and supports retry on mobil
   available();
   await section.getByRole("button", { name: "Retry loading", exact: true }).click();
   await section.getByRole("button", { name: "Add evidence connector" }).click();
-  await expect(section.getByRole("heading", { name: "Start with your business workflow.", exact: true })).toBeVisible();
+  await expect(section.getByRole("heading", { name: "Choose a template", exact: true })).toBeVisible();
   const width = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }));
   expect(width.content).toBeLessThanOrEqual(width.viewport + 1);
 });

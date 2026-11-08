@@ -58,7 +58,8 @@ export async function exchangeStripeOAuthToken(app: StripeOAuthApp, fields: { gr
 export async function verifyStripeOAuthRead(tokens: StripeOAuthTokens): Promise<{ disputeReadVerified: true; chargeReadVerified: boolean }> {
   // No developer key, account override, expanded objects, or write endpoint is used here.
   const headers = { Authorization: `Bearer ${tokens.accessToken}` };
-  const result = z.object({ object: z.literal('list'), data: z.array(z.object({ id: z.string().regex(/^(?:dp|du)_[A-Za-z0-9]+$/), livemode: z.boolean(), charge: z.string().regex(/^ch_[A-Za-z0-9]+$/).nullable() })).max(1) }).safeParse(await request('/v1/disputes?limit=1', { method: 'GET', headers }));
+  // Stripe returns both legacy and newer dispute/payment ID prefixes.
+  const result = z.object({ object: z.literal('list'), data: z.array(z.object({ id: z.string().regex(/^(?:dp|du)_[A-Za-z0-9]+$/), livemode: z.boolean(), charge: z.string().regex(/^(?:ch|py)_[A-Za-z0-9]+$/).nullable() })).max(1) }).safeParse(await request('/v1/disputes?limit=1', { method: 'GET', headers }));
   if (!result.success || result.data.data.some(d => d.livemode !== (tokens.mode === 'live'))) throw new ApiError(502, 'Stripe returned an unexpected dispute response.', 'provider_invalid_response');
   const chargeId = result.data.data[0]?.charge;
   if (!chargeId) return { disputeReadVerified: true, chargeReadVerified: false };
@@ -68,7 +69,7 @@ export async function verifyStripeOAuthRead(tokens: StripeOAuthTokens): Promise<
 }
 
 export const stripeDisputeId = z.string().regex(/^(?:dp|du)_[A-Za-z0-9]{1,120}$/);
-const stripeChargeId = z.string().regex(/^ch_[A-Za-z0-9]{1,120}$/);
+const stripeChargeId = z.string().regex(/^(?:ch|py)_[A-Za-z0-9]{1,120}$/);
 const stripePaymentId = z.string().regex(/^pi_[A-Za-z0-9]{1,120}$/);
 const disputeSchema = z.object({ id: stripeDisputeId, object: z.literal('dispute'), livemode: z.boolean(), amount: z.number().int().positive().max(999999999), currency: z.string().regex(/^[a-z]{3}$/), charge: stripeChargeId, payment_intent: stripePaymentId.nullable().optional(), reason: z.string().min(1).max(100), status: z.string().min(1).max(100), created: z.number().int().min(1).max(4102444800), evidence_details: z.object({ due_by: z.number().int().min(0).max(4102444800).nullable() }) });
 const allowedDispute = (d: z.infer<typeof disputeSchema>, tokens: StripeOAuthTokens) => {

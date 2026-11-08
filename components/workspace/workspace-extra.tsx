@@ -138,7 +138,7 @@ export function SetupChecklist({
   const real = state.cases.filter((c) => c.source !== "demo");
   const steps = [
     {
-      title: "Set your business context",
+      title: "Business details",
       text: state.workspace?.name ?? "Add your business name and website.",
       done: !!state.workspace?.name,
       icon: FileText,
@@ -146,7 +146,7 @@ export function SetupChecklist({
       button: "Business details",
     },
     {
-      title: "Preserve the applicable policies",
+      title: "Add purchase-time policies",
       text: "Add the delivery, refund, or service terms that applied at purchase.",
       done: state.policies.length > 0,
       icon: ShieldCheck,
@@ -154,16 +154,16 @@ export function SetupChecklist({
       button: "Add policy",
     },
     {
-      title: "Open your first investigation",
-      text: "Create a manual case now, or import disputes when Stripe is configured.",
+      title: "Create a case",
+      text: "Create a case or import one from a connected source.",
       done: real.length > 0,
       icon: Plus,
       action: addCase,
       button: "Create case",
     },
     {
-      title: "Add the original evidence",
-      text: "Selected records stay linked to the case and their original reference.",
+      title: "Add evidence",
+      text: "Attach the original records to a case.",
       done: real.some((c) => c.evidence.length > 0),
       icon: FileCheck2,
       action: () => navigate("cases"),
@@ -173,8 +173,8 @@ export function SetupChecklist({
   return (
     <>
       <Heading
-        title="A considered start."
-        text="Prepare the essentials for your first investigation. Connections can come later."
+        title="Workspace setup"
+        text="Complete these steps to review your first case."
       />
       <div className="cw-setup-layout">
         <section className="cw-panel">
@@ -212,10 +212,9 @@ export function SetupChecklist({
           <span className="cw-icon-well">
             <Link2 size={24} />
           </span>
-          <h2>Connect when you’re ready.</h2>
+          <h2>Add a connection</h2>
           <p>
-            Manual investigations work today. Source setup shows what is
-            available and what still needs configuration.
+            You can also add evidence manually.
           </p>
           <Action onClick={() => navigate("integrations")}>
             View connections
@@ -223,8 +222,7 @@ export function SetupChecklist({
           </Action>
           <div className="cw-rule" />
           <p className="cw-caption">
-            A reviewed draft and a separate confirmation are required before any
-            supported Stripe submission.
+            Review and confirm before submitting to Stripe.
           </p>
         </aside>
       </div>
@@ -246,8 +244,8 @@ export function PolicyLibrary({
   return (
     <>
       <Heading
-        title="The terms that applied."
-        text="Keep effective policy versions close to the evidence. Attach the relevant version from inside a case."
+        title="Policies"
+        text="Save dated versions, then attach the applicable policy to a case."
       >
         <Action primary onClick={addPolicy}>
           <Plus size={18} />
@@ -255,12 +253,11 @@ export function PolicyLibrary({
         </Action>
       </Heading>
       <Notice>
-        Policies describe your business terms. They do not grant access to
-        customer records.
+        Policies do not grant data access.
       </Notice>
       <div className="cw-panel">
         <div className="cw-panel-header">
-          <h3>Company policy library</h3>
+          <h3>Saved policies</h3>
           <span className="cw-pill">{state.policies.length} versions</span>
         </div>
         <div className="cw-panel-body">
@@ -301,7 +298,7 @@ export function PolicyLibrary({
               <span className="cw-icon-well">
                 <FileText size={24} />
               </span>
-              <h2>Give every case its context.</h2>
+              <h2>No policies yet</h2>
               <p>Add the terms that applied when the purchase was made.</p>
               <Action primary onClick={addPolicy}>
                 Add your first policy
@@ -442,10 +439,10 @@ export function ConnectionDetail({
         title={title}
         text={
           isStripe
-            ? "Disputes and payment records, scoped to your workspace."
+            ? "Import disputes and payment records."
             : isEmail
-              ? "Preserve the customer’s own account, with its original context."
-              : "Define a narrow evidence boundary for the separate data gateway."
+              ? "Import original messages as evidence."
+              : "Choose which records the connector can access."
         }
       />
       {healthError && (
@@ -495,8 +492,7 @@ export function ConnectionDetail({
                   }
                 />
                 <Notice>
-                  Credentials are configured on the server and bound to this
-                  workspace. Keys never belong in this form.
+                  Credentials are managed on the server.
                 </Notice>
                 <div className="cw-actions">
                   {connected ? (
@@ -589,17 +585,17 @@ export function ConnectionDetail({
           </span>
           <h2>
             {isStripe
-              ? "Review before sending."
+              ? "Submission"
               : isEmail
-                ? "Your inbox stays yours."
-                : "Access is explicit."}
+                ? "Gmail access"
+                : "Data access"}
           </h2>
           <p>
             {isStripe
-              ? "Importing disputes and approving a draft never submit evidence. Submission remains a separate, confirmed action."
+              ? "Approval does not submit evidence. Submission requires a separate confirmation."
               : isEmail
-                ? "Use the Gmail connector on the Connections page to authorize read-only access, search by case customer email, and review messages before importing. Manual import remains available."
-                : "This workspace imports approved cases through a configured merchant-owned evidence API. The merchant endpoint verifies the case and limits linked records and fields. No database credentials are shared."}
+                ? "Connect Gmail to search by customer email and preview messages before import."
+                : "Your endpoint limits access to approved cases and fields. Database credentials stay with you."}
           </p>
           {!isStripe && !isEmail && (
             <>
@@ -613,8 +609,8 @@ export function ConnectionDetail({
           <div className="cw-rule" />
           <p className="cw-caption">
             {isStripe
-              ? "Original files require separate handling in Stripe Dashboard. Current API submission supports approved text only."
-              : "Customer records are evidence, not instructions to an agent. Preserve original wording and exclude unrelated information."}
+              ? "API submission supports approved text only. Upload original files in Stripe Dashboard."
+              : "Keep original wording and exclude unrelated records."}
           </p>
         </aside>
       </div>
@@ -737,19 +733,17 @@ export function ScopeConfiguration({
       <Heading
         title={
           preview
-            ? "Know what would be shared."
-            : "Define the smallest useful scope."
+            ? "Scope preview"
+            : "Data scope"
         }
         text={
           preview
-            ? "An illustrative disclosure preview for the proposed data gateway."
-            : "Prepare a specification for the separate gateway. This draft grants no access."
+            ? "Preview the fields in your draft."
+            : "Draft the fields your gateway may share. No access is granted."
         }
       />
       <Notice>
-        Saved only in this browser for your workspace. This configuration is not
-        connected to a gateway and does not enforce permissions, redaction, or
-        retention.
+        Saved in this browser only. This draft does not enforce access, redaction, or retention.
       </Notice>
       {storageError && (
         <div className="cw-banner error" role="alert">
@@ -780,8 +774,7 @@ export function ScopeConfiguration({
                   )}
                 </pre>
                 <p className="cw-caption">
-                  This example is not a live query, connector test, or proof
-                  that your draft has been enforced.
+                  Example data only. No query or connector test has run.
                 </p>
               </div>
             </section>
@@ -886,8 +879,8 @@ export function AccessRequestDetail({
         </span>
       </div>
       <Heading
-        title="A specific reason. A specific scope."
-        text="The request records what is needed and why. It does not authorize a live query."
+        title="Access request"
+        text="A request does not grant access."
       />
       <div className="cw-two-col">
         <section className="cw-panel">
@@ -926,16 +919,13 @@ export function AccessRequestDetail({
           <span className="cw-icon-well">
             <LockKeyhole size={24} />
           </span>
-          <h2>Separate the decision.</h2>
+          <h2>Independent review required</h2>
           <p>
-            You cannot approve your own request. This single-owner workspace
-            needs an independently provisioned reviewer before a decision can be
-            recorded.
+            You cannot approve your own request. Configure an independent reviewer to continue.
           </p>
           <div className="cw-rule" />
           <p>
-            Even an approval record would not configure a connector. The
-            external gateway must validate and enforce the approved scope.
+            Approval does not connect a source. Its gateway must enforce the approved scope.
           </p>
         </aside>
       </div>
@@ -947,8 +937,8 @@ export function AccountSettings({ state }: { state: WorkspaceState }) {
   return (
     <>
       <Heading
-        title="Identity & workspace access."
-        text="Your account owns this workspace. Sign-in is managed by ChatGPT."
+        title="Account"
+        text="Manage your account and workspace access."
       />
       <section className="cw-panel">
         <div className="cw-panel-header">
@@ -968,16 +958,13 @@ export function AccountSettings({ state }: { state: WorkspaceState }) {
           <Line label="Identity provider" value="ChatGPT" />
           <Line
             label="Membership model"
-            value="One owner. Team invitations are not available in this build."
+            value="Single owner · Invitations unavailable"
           />
           <Notice>
-            Every workspace request verifies identity and record ownership.
-            Password and account-security controls are managed by your identity
-            provider.
+            Manage your password and account security with your sign-in provider.
           </Notice>
           <p>
-            Access-request approval requires a separately provisioned reviewer.
-            Owner access does not authorize self-approval.
+            Access requests need an independent reviewer.
           </p>
         </div>
       </section>
@@ -1005,7 +992,7 @@ export function ReportPreview({
       <div className="cw-page-head" style={{ marginBottom: 0 }}>
         <div>
           <span className="cw-eyebrow">MERCHANT INVESTIGATION REPORT</span>
-          <h2 style={{ marginTop: 12 }}>The complete record.</h2>
+          <h2 style={{ marginTop: 12 }}>Report preview</h2>
           <p>
             {current.orderRef} · {current.customerName} ·{" "}
             {formatMoney(current.amount, current.currency)}
@@ -1037,7 +1024,7 @@ export function ReportPreview({
         <p style={{ marginTop: 10 }}>{current.reason}</p>
       </section>
       <section>
-        <h3>Findings & open questions</h3>
+        <h3>Findings</h3>
         <div className="cw-findings" style={{ marginTop: 16 }}>
           {current.findings.map((f, i) => (
             <div key={i} className="cw-finding">

@@ -15,6 +15,10 @@ const providerRegistration=JSON.parse(readFileSync('integrations/oauth/supabase-
 params.Parameters.push({ParameterKey:'SupabaseOAuthSecretArn',ParameterValue:process.env.SUPABASE_OAUTH_SECRET_ARN || providerRegistration.secretArn});
 const stripeRegistration=JSON.parse(readFileSync('integrations/oauth/stripe-secret-location.json','utf8'));
 params.Parameters.push({ParameterKey:'StripeOAuthSecretArn',ParameterValue:process.env.STRIPE_OAUTH_SECRET_ARN || stripeRegistration.arn});
+for (const [ParameterKey, envName] of [['ResendSecretArn','RESEND_SECRET_ARN'],['ResendWorkspaceId','RESEND_WORKSPACE_ID'],['ResendAllowedDomains','RESEND_ALLOWED_DOMAINS']]) {
+ const prior = existing?.Parameters?.some(p => p.ParameterKey === ParameterKey);
+ params.Parameters.push({ParameterKey,...(process.env[envName] ? {ParameterValue:process.env[envName]} : prior ? {UsePreviousValue:true} : {ParameterValue:''})});
+}
 const gmailRegistration=JSON.parse(readFileSync('integrations/oauth/gmail-registration.json','utf8'));
 const gmailSecretArn=process.env.GMAIL_OAUTH_SECRET_ARN || gmailRegistration.secretArn;
 params.Parameters.push({ParameterKey:'GmailOAuthSecretArn',...(gmailSecretArn ? {ParameterValue:gmailSecretArn} : existing?.Parameters?.some(p=>p.ParameterKey==='GmailOAuthSecretArn') ? {UsePreviousValue:true} : {ParameterValue:''})});
@@ -38,7 +42,7 @@ console.log(JSON.stringify({resourcesReady:true,...outputs}));
 if(!process.argv.includes('--resources-only')){
  const code=readFileSync('.aws-build/backend.zip');
  const lambda=new LambdaClient({region});
- for(const FunctionName of [outputs.FunctionName,outputs.InvestigatorFunctionName]) {
+ for(const FunctionName of [outputs.FunctionName,outputs.InvestigatorFunctionName,...(outputs.ResendWebhookUrl?['causality-resend-webhook']:[])]) {
   await lambda.send(new UpdateFunctionCodeCommand({FunctionName,ZipFile:code}));
   await waitUntilFunctionUpdated({client:lambda,maxWaitTime:120,minDelay:2,maxDelay:5},{FunctionName});
  }

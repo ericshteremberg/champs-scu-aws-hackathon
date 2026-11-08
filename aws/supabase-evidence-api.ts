@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 const identifier = z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/);
 const columns = z.array(identifier).min(1).max(8).refine(values => new Set(values).size === values.length);
 export const orderMappingSchema = z.object({
-  order: z.object({ table: identifier, idColumn: identifier, paymentColumn: identifier, paymentKind: z.enum(['payment_intent', 'charge']), columns }).strict(),
+  order: z.object({ table: identifier, idColumn: identifier, paymentColumn: identifier, paymentKind: z.enum(['payment_intent', 'charge']), customerEmailColumn: identifier.optional(), columns }).strict(),
   related: z.array(z.object({ section: z.enum(['tickets', 'delivery', 'history', 'attendance', 'support']), table: identifier, orderColumn: identifier, columns }).strict()).max(3),
 }).strict();
 const sensitive = /password|passwd|secret|token|qr.?code|qr.?payload|barcode|private.?key|api.?key|cvv|cvc|card.?number/i;
@@ -15,7 +15,7 @@ export function validateOrderMapping(input: unknown, approved: SchemaTable[], sc
   const parsed = orderMappingSchema.safeParse(input);
   if (!parsed.success) throw new ApiError(400, 'Choose valid order and related-record columns.', 'mapping_invalid');
   const mapping = parsed.data;
-  if (!mapping.order.columns.includes(mapping.order.idColumn) || !mapping.order.columns.includes(mapping.order.paymentColumn) || mapping.order.idColumn === mapping.order.paymentColumn) throw new ApiError(400, 'Include distinct order ID and Stripe payment columns in the order fields.', 'mapping_invalid');
+  if (!mapping.order.columns.includes(mapping.order.idColumn) || !mapping.order.columns.includes(mapping.order.paymentColumn) || mapping.order.idColumn === mapping.order.paymentColumn || (mapping.order.customerEmailColumn && !mapping.order.columns.includes(mapping.order.customerEmailColumn))) throw new ApiError(400, 'Include distinct order ID and Stripe payment columns, plus any mapped customer email, in the order fields.', 'mapping_invalid');
   if (new Set(mapping.related.map(r => r.table)).size !== mapping.related.length || mapping.related.some(r => r.table === mapping.order.table || !r.columns.includes(r.orderColumn))) throw new ApiError(400, 'Choose distinct related tables and include each order-link column.', 'mapping_invalid');
   for (const table of [mapping.order, ...mapping.related]) {
     const allowed = approved.find(t => t.name === table.table), live = schema.find(t => t.name === table.table);
@@ -36,7 +36,7 @@ async function rows(accessToken: string, ref: string, table: string, selected: s
   return result.data;
 }
 export async function fetchMappedEvidence(accessToken: string, ref: string, input: OrderEvidenceMapping, paymentRef: string) {
-  if (!projectRef.safeParse(ref).success || !orderMappingSchema.safeParse(input).success || !/^(?:pi|ch)_[A-Za-z0-9]{1,120}$/.test(paymentRef)) throw new ApiError(400, 'A verified Stripe payment and saved mapping are required.', 'mapping_invalid');
+  if (!projectRef.safeParse(ref).success || !orderMappingSchema.safeParse(input).success || !/^(?:pi|ch|py)_[A-Za-z0-9]{1,120}$/.test(paymentRef)) throw new ApiError(400, 'A verified Stripe payment and saved mapping are required.', 'mapping_invalid');
   const root = input.order;
   const orders = await rows(accessToken, ref, root.table, root.columns, root.paymentColumn, paymentRef, 2);
   if (orders.length !== 1) throw new ApiError(409, orders.length ? 'Multiple orders match this payment. Fix the mapping before importing.' : 'No order matches the verified Stripe payment.', 'mapping_order_unresolved');
@@ -46,6 +46,7 @@ export async function fetchMappedEvidence(accessToken: string, ref: string, inpu
   const unique = await rows(accessToken, ref, root.table, [root.idColumn, root.paymentColumn], root.idColumn, String(orderId), 2);
   if (unique.length !== 1 || String(unique[0][root.idColumn]) !== String(orderId) || String(unique[0][root.paymentColumn]) !== paymentRef) throw new ApiError(409, 'Order IDs are not unique across this table. A tenant-aware mapping is required.', 'mapping_order_unresolved');
   const limitations = ['Only the approved fields and direct order-linked tables were queried. Other records may exist.'];
+  if (root.customerEmailColumn && !z.string().email().max(254).safeParse(orders[0][root.customerEmailColumn]).success) limitations.push('The mapped order email is absent or invalid. No customer email will be filled from this snapshot.');
   const records: LinkedEvidenceRecord[] = [];
   const record = (section: string, table: string, fields: z.infer<typeof rowSchema>) => ({ id: createHash('sha256').update(JSON.stringify([ref, table, paymentRef, section, fields])).digest('hex'), section, table, fields });
   records.push(record('order', root.table, orders[0]));

@@ -20,6 +20,21 @@
       "Default": "",
       "Description": "Existing Secrets Manager Stripe app registration, never a developer key value."
     },
+    "ResendSecretArn": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Existing Resend credential ARN; no secret values."
+    },
+    "ResendWorkspaceId": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Single approved workspace bound to this merchant Resend account."
+    },
+    "ResendAllowedDomains": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Comma-separated exact sending domains approved for evidence."
+    },
     "GmailOAuthSecretArn": {
       "Type": "String",
       "Default": "",
@@ -301,6 +316,31 @@
           },
           {
             "Fn::If": [
+              "HasResend",
+              {
+                "PolicyName": "ResendEvidenceRead",
+                "PolicyDocument": {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Action": [
+                        "secretsmanager:GetSecretValue"
+                      ],
+                      "Resource": {
+                        "Ref": "ResendSecretArn"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
+          },
+          {
+            "Fn::If": [
               "HasGmailOAuth",
               {
                 "PolicyName": "GmailOAuthRegistration",
@@ -367,6 +407,15 @@
             "STRIPE_OAUTH_SECRET_ARN": {
               "Ref": "StripeOAuthSecretArn"
             },
+            "RESEND_SECRET_ARN": {
+              "Ref": "ResendSecretArn"
+            },
+            "RESEND_WORKSPACE_ID": {
+              "Ref": "ResendWorkspaceId"
+            },
+            "RESEND_ALLOWED_DOMAINS": {
+              "Ref": "ResendAllowedDomains"
+            },
             "GMAIL_OAUTH_SECRET_ARN": {
               "Ref": "GmailOAuthSecretArn"
             }
@@ -428,6 +477,146 @@
         "LogGroupName": "/aws/lambda/causality-hackathon-investigator",
         "RetentionInDays": 7
       }
+    },
+    "ResendWebhookRole": {
+      "Type": "AWS::IAM::Role",
+      "Condition": "HasResend",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "ResendEvidenceRead",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "secretsmanager:GetSecretValue"
+                  ],
+                  "Resource": {
+                    "Ref": "ResendSecretArn"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "ResendEventCapture",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:PutItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "WorkspaceTable",
+                      "Arn"
+                    ]
+                  },
+                  "Condition": {
+                    "ForAllValues:StringEquals": {
+                      "dynamodb:LeadingKeys": [
+                        {
+                          "Ref": "ResendWorkspaceId"
+                        }
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "ResendWebhookFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Condition": "HasResend",
+      "Properties": {
+        "FunctionName": "causality-resend-webhook",
+        "Runtime": "nodejs22.x",
+        "Handler": "index.resendWebhookHandler",
+        "Architectures": [
+          "arm64"
+        ],
+        "MemorySize": 256,
+        "Timeout": 20,
+        "ReservedConcurrentExecutions": 2,
+        "Role": {
+          "Fn::GetAtt": [
+            "ResendWebhookRole",
+            "Arn"
+          ]
+        },
+        "Code": {
+          "ZipFile": "exports.resendWebhookHandler=async()=>({statusCode:503,body:'Setup pending'});"
+        },
+        "Environment": {
+          "Variables": {
+            "CAUSALITY_TABLE": {
+              "Ref": "WorkspaceTable"
+            },
+            "RESEND_SECRET_ARN": {
+              "Ref": "ResendSecretArn"
+            },
+            "RESEND_WORKSPACE_ID": {
+              "Ref": "ResendWorkspaceId"
+            },
+            "RESEND_ALLOWED_DOMAINS": {
+              "Ref": "ResendAllowedDomains"
+            }
+          }
+        }
+      }
+    },
+    "ResendWebhookUrl": {
+      "Type": "AWS::Lambda::Url",
+      "Condition": "HasResend",
+      "Properties": {
+        "TargetFunctionArn": {
+          "Ref": "ResendWebhookFunction"
+        },
+        "AuthType": "NONE"
+      }
+    },
+    "ResendWebhookUrlPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Condition": "HasResend",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "ResendWebhookFunction"
+        },
+        "Action": "lambda:InvokeFunctionUrl",
+        "Principal": "*",
+        "FunctionUrlAuthType": "NONE"
+      }
+    },
+    "ResendWebhookInvokePermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Condition": "HasResend",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "ResendWebhookFunction"
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "*",
+        "InvokedViaFunctionUrl": true
+      }
     }
   },
   "Outputs": {
@@ -455,6 +644,15 @@
       "Value": {
         "Ref": "InvestigatorFunction"
       }
+    },
+    "ResendWebhookUrl": {
+      "Condition": "HasResend",
+      "Value": {
+        "Fn::GetAtt": [
+          "ResendWebhookUrl",
+          "FunctionUrl"
+        ]
+      }
     }
   },
   "Conditions": {
@@ -478,6 +676,34 @@
               "Ref": "StripeOAuthSecretArn"
             },
             ""
+          ]
+        }
+      ]
+    },
+    "HasResend": {
+      "Fn::And": [
+        {
+          "Fn::Not": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "ResendSecretArn"
+                },
+                ""
+              ]
+            }
+          ]
+        },
+        {
+          "Fn::Not": [
+            {
+              "Fn::Equals": [
+                {
+                  "Ref": "ResendWorkspaceId"
+                },
+                ""
+              ]
+            }
           ]
         }
       ]

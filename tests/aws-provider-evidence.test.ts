@@ -114,3 +114,23 @@ describe('customer-selected Stripe disputes and linked Supabase evidence', () =>
     await expect(act('stripe_disputes')).rejects.toMatchObject({ code: 'conflict' });
   });
 });
+
+it('fills a missing case email only from the explicitly mapped and reviewed order, and preserves an existing email', async () => {
+  const c = fixture.rows.get(key(keys.case(caseId)))!; (c.data as { email: string }).email = '';
+  const withEmail: OrderEvidenceMapping = { ...mapping, order: { ...mapping.order, customerEmailColumn: 'email', columns: [...mapping.order.columns, 'email'] } };
+  const expanded = [{ name: 'orders', columns: [...schema[0].columns, 'email'] }, schema[1]];
+  const conn = fixture.rows.get(key('provider#supabase'))!;
+  seed(conn.key, { ...(conn.data as object), approvedTables: expanded }); fixture.schema.mockResolvedValue(expanded);
+  await act('save_mapping', { mapping: withEmail, confirmed: true });
+  const query = fixture.query.getMockImplementation()!;
+  fixture.query.mockImplementation(async (...args: unknown[]) => {
+    const rows = await query(...args); return String(args[2]).includes('"email"') ? rows.map((r: object) => ({ ...r, email: 'reviewed@example.test' })) : rows;
+  });
+  await importRecords((await preview()).id);
+  const first = (await getWorkspaceState(user)).cases[0]; expect(first.email).toBe('reviewed@example.test'); expect(first.orderRef).toBe('ORDER-1');
+  fixture.query.mockImplementation(async (...args: unknown[]) => {
+    const rows = await query(...args); return String(args[2]).includes('"email"') ? rows.map((r: object) => ({ ...r, email: 'changed@example.test' })) : rows;
+  });
+  await importRecords((await preview()).id);
+  expect((await getWorkspaceState(user)).cases[0].email).toBe('reviewed@example.test');
+});

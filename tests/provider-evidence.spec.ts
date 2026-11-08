@@ -9,8 +9,9 @@ async function setup(page: Page, mapped = true) {
   await page.request.post(`${base}/api/workspace`, { headers: { ...headers, Origin: base }, data: { action: 'createWorkspace', name: 'Evidence UI test' } });
   const result = await page.request.post(`${base}/api/workspace`, { headers: { ...headers, Origin: base }, data: { action: 'addCase', title: 'Missing ticket', customerName: 'Customer', amount: 5000, reason: 'Ticket not received', dueAt: '2026-12-01' } });
   const caseId = (await result.json()).cases[0].id as string;
-  const status: ProviderStatus = { supabase: { configured: true, connection: { status: 'authorized', updatedAt: '2026-11-01', project: { ref: 'abcdefghijklmnopqrst', name: 'Tickets', region: 'us-east-1', organization: 'Example' }, approvedTables: [{ name: 'orders', columns: ['id', 'payment_ref', 'private_token'] }, { name: 'tickets', columns: ['order_id', 'status'] }] } }, stripe: { configured: true, connection: { status: 'authorized', updatedAt: '2026-11-01', accountId: 'acct_fictional', mode: 'live' } }, gmail: { configured: true, connection: null }, imap: { configured: true, connection: null } };
+  const status: ProviderStatus = { supabase: { configured: true, connection: { status: 'authorized', updatedAt: '2026-11-01', project: { ref: 'abcdefghijklmnopqrst', name: 'Tickets', region: 'us-east-1', organization: 'Example' }, approvedTables: [{ name: 'orders', columns: ['id', 'payment_ref', 'email', 'private_token'] }, { name: 'tickets', columns: ['order_id', 'status'] }] } }, stripe: { configured: true, connection: { status: 'authorized', updatedAt: '2026-11-01', accountId: 'acct_fictional', mode: 'live' } }, gmail: { configured: true, connection: null }, imap: { configured: true, connection: null } };
   const requests: Record<string, unknown>[] = [];
+  await page.route('**/api/providers/resend', route => route.fulfill({ json: { configured: false, verifiedAt: null, domains: [] } }));
   await page.route('**/api/providers', route => route.fulfill({ json: status }));
   await page.route('**/api/providers/evidence', async route => {
     if (route.request().method() === 'GET') return route.fulfill({ json: { mapping: mapped ? mapping : null, eligibleCaseIds: [caseId] } });
@@ -41,11 +42,13 @@ test('mapping uses only approved fields and supports a direct related table', as
   await card.getByRole('combobox', { name: 'Stripe payment column', exact: true }).selectOption('payment_ref');
   await expect(card.getByRole('checkbox', { name: 'private_token', exact: true })).toHaveCount(0);
   await card.getByRole('checkbox', { name: 'id', exact: true }).check(); await card.getByRole('checkbox', { name: 'payment_ref', exact: true }).check();
+  await card.getByRole('combobox', { name: 'Customer email column (optional)', exact: true }).selectOption('email');
+  await card.getByRole('checkbox', { name: 'email', exact: true }).check();
   await card.getByRole('button', { name: 'Add related table' }).click();
   await card.getByRole('combobox', { name: 'Related table 1', exact: true }).selectOption('tickets'); await card.getByRole('combobox', { name: 'Order link column 1', exact: true }).selectOption('order_id');
   await card.getByRole('checkbox', { name: 'order_id', exact: true }).check(); await card.getByRole('checkbox', { name: 'status', exact: true }).check();
   await card.getByRole('button', { name: 'Save evidence mapping' }).click();
-  await expect(card.getByRole('status')).toContainText('Mapping saved'); expect(requests.at(-1)).toEqual({ action: 'save_mapping', mapping, confirmed: true });
+  await expect(card.getByRole('status')).toContainText('Mapping saved'); expect(requests.at(-1)).toEqual({ action: 'save_mapping', mapping: { ...mapping, order: { ...mapping.order, customerEmailColumn: 'email', columns: ['id', 'payment_ref', 'email'] } }, confirmed: true });
 });
 test('customer reviews inert record text before confirming import, including on mobile', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });

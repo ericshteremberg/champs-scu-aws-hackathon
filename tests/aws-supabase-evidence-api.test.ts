@@ -52,3 +52,13 @@ describe('approved Supabase evidence queries', () => {
     expect((await fetchMappedEvidence(token, ref, mapping, 'pi_verified')).records).toHaveLength(2);
   });
 });
+
+it('supports a verified py charge as the mapped payment reference', async () => {
+  fixture.query.mockReset().mockResolvedValueOnce([{ ...order, stripe_pi: 'py_verified' }]).mockResolvedValueOnce([{ ...order, stripe_pi: 'py_verified' }]).mockResolvedValueOnce([]);
+  expect((await fetchMappedEvidence(token, ref, { ...mapping, order: { ...mapping.order, paymentKind: 'charge' } }, 'py_verified')).records).toHaveLength(1);
+  expect(fixture.query.mock.calls[0][3]).toEqual(['py_verified']);
+});
+
+it('requires an optional mapped email to be among the approved selected fields', () => {
+  expect(() => validateOrderMapping({ ...mapping, order: { ...mapping.order, customerEmailColumn: 'unapproved_email' } }, schema, schema)).toThrow();
+});

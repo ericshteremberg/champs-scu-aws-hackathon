@@ -9,6 +9,7 @@ async function setup(page: Page, connection: SupabaseConnection | null = null, s
   expect((await page.request.post(`${base}/api/workspace`, { headers: { ...headers, Origin: base }, data: { action: 'createWorkspace', name: 'Provider UI test' } })).status()).toBe(200);
   const status: ProviderStatus = { supabase: { configured: true, connection }, stripe, gmail, imap: { configured: true, connection: null } };
   const requests: Record<string, unknown>[] = [];
+  await page.route('**/api/providers/resend', route => route.fulfill({ json: { configured: false, verifiedAt: null, domains: [] } }));
   await page.route('**/api/providers/evidence', route => route.fulfill({ json: { mapping: null, eligibleCaseIds: [] } }));
   await page.route('**/api/providers', route => route.fulfill({ json: status }));
   await page.route('**/api/providers/stripe', async route => {
@@ -73,7 +74,7 @@ test('callback feedback is readable and the connection panel fits a phone', asyn
 test('Stripe Connect opens the exact private test path without asking for keys', async ({ page }) => {
   const { panel } = await setup(page, null, { configured: true, connection: null });
   await expect(panel.getByRole('button', { name: 'Connect Stripe', exact: true })).toBeEnabled();
-  await expect(panel).toContainText('has not been reviewed by Stripe');
+  await expect(panel).toContainText('Not reviewed by Stripe');
   await page.route('**/api/providers/stripe/start', route => route.fulfill({ json: { authorizationUrl: 'https://marketplace.stripe.com/oauth/v2/fictional_private_test/authorize?client_id=ca_fictional&state=fictional' } }));
   await page.route('https://marketplace.stripe.com/**', route => route.fulfill({ contentType: 'text/html', body: '<h1>Fictional Stripe consent</h1>' }));
   await panel.getByRole('button', { name: 'Connect Stripe', exact: true }).click();
@@ -139,7 +140,7 @@ test('Gmail requires preview before import, renders email as text and disconnect
 test('Gmail stays unavailable without developer registration', async ({ page }) => {
   const { panel } = await setup(page);
   await expect(panel.getByRole('button', { name: 'Gmail setup unavailable' })).toBeDisabled();
-  await expect(panel).toContainText('one-time Google app registration');
+  await expect(panel).toContainText('Google app setup is required');
 });
 
 test('IMAP setup requires consent, clears passwords on failure and fits a phone', async ({ page }) => {

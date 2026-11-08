@@ -30,13 +30,13 @@ export function StripeAccountConnector({ status, onChange }: { status: ProviderS
   };
   return <article className="cw-provider-card" aria-label="Stripe account authorization">
     <h3>Stripe <span className={`cw-pill${active ? ' green' : ''}`}>{active ? 'Authorized' : connection?.status === 'reconnect_required' ? 'Reconnect required' : 'Not connected'}</span></h3>
-    <p>Authorize read access to disputes, charges and refund history. Causality cannot issue refunds or submit evidence through this connection.</p>
-    <p className="cw-provider-note">This is an external test version of Causality that has not been reviewed by Stripe. Install it only if you trust the developer.</p>
+    <p>Read disputes, payments and refunds. This connection cannot refund or submit evidence.</p>
+    <p className="cw-provider-note">External test app · Not reviewed by Stripe. Install only if you trust the developer.</p>
     {error && <p className="cw-banner error" role="alert">{error}</p>}
     {notice && <p className="cw-banner neutral" role="status">{notice}</p>}
     {connection?.accountId && <p>Account: <strong>{connection.accountId}</strong><br />Environment: {connection.mode === 'live' ? 'Live' : 'Test'}</p>}
     {connection?.lastVerifiedAt && <p className="cw-provider-note">Last verified: {new Date(connection.lastVerifiedAt).toLocaleString()}{!connection.chargeReadVerified && '. Payment read access still needs a linked charge.'}</p>}
-    {active && <><p className="cw-provider-note">Verify reads at most one dispute and its linked payment. It does not import a case or save customer record contents.</p><button className="cw-button primary" disabled={!!busy} onClick={() => void call('verify')}>{busy === 'verify' ? <LoaderCircle size={16} /> : <ShieldCheck size={16} />}Verify read access</button></>}
+    {active && <><p className="cw-provider-note">Checks one dispute and its payment; does not import or save records.</p><button className="cw-button primary" disabled={!!busy} onClick={() => void call('verify')}>{busy === 'verify' ? <LoaderCircle size={16} /> : <ShieldCheck size={16} />}Verify read access</button></>}
     {!connection || connection.status === 'disconnected' ? <>
       {connection?.uninstallRequired && <p className="cw-provider-note">Uninstall Causality in Stripe before reconnecting if Stripe reports that the app is already installed.</p>}
       <button className="cw-button primary" disabled={!!busy || !status?.configured} onClick={() => void call('connect')}>{busy === 'connect' ? <LoaderCircle size={16} /> : <Link2 size={16} />}{status?.configured ? 'Connect Stripe' : 'Stripe setup unavailable'}</button>

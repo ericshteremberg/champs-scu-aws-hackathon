@@ -97,22 +97,22 @@ export function LiveEvidenceConnectors({ onImported }: { onImported: (state: Wor
 
   return <section className="cw-panel cw-live-connectors" aria-label="Installed evidence connections">
     <header className="cw-live-heading">
-      <div><span className="cw-live-eyebrow"><Database size={14} />Your workspace connections</span><h2>Bring your own evidence.</h2><p>Connect an installed endpoint, verify its approved case, and manage access here.</p></div>
+      <div><span className="cw-live-eyebrow"><Database size={14} />Installed endpoints</span><h2>Evidence connectors</h2><p>Connect a running endpoint to import its approved case.</p></div>
       <button type="button" className={`cw-button${open ? "" : " primary"}`} disabled={!!busy || loading} onClick={open ? close : () => { setOpen(true); setError(""); setNotice(""); }}>
-        {open ? <X size={17} /> : <Plus size={17} />}{open ? "Close connection form" : "Connect installed endpoint"}
+        {open ? <X size={17} /> : <Plus size={17} />}{open ? "Cancel" : "Add endpoint"}
       </button>
     </header>
     {error && <div className="cw-banner error cw-live-message" role="alert"><TriangleAlert size={18} /><div><p>{error}</p>{!open && <button type="button" className="cw-button small" disabled={!!busy} onClick={() => void retry()}>Retry connections</button>}</div></div>}
     {notice && <div className="cw-banner cw-live-message" role="status"><Check size={18} /><p>{notice}</p></div>}
     {open && <form onSubmit={event => void connect(event)} className="cw-live-form">
       <fieldset disabled={!!busy}>
-        <legend>Connect your installed connector</legend>
-        <p className="cw-live-setup-note">Your connector must already be running at a public HTTPS address. Each connection is limited to one approved case.</p>
+        <legend>Endpoint details</legend>
+        <p className="cw-live-setup-note">Requires a public HTTPS endpoint. Each connection covers one approved case.</p>
         <div className="cw-live-form-grid">
           <label className="cw-field"><span>Connection name</span><input ref={nameInput} required maxLength={100} value={name} onChange={event => setName(event.target.value)} placeholder="ATMSPHR evidence" autoComplete="off" /></label>
           <label className="cw-field"><span>Approved case ID</span><input required maxLength={200} pattern="[A-Za-z0-9_-]+" value={externalCaseId} onChange={event => setExternalCaseId(event.target.value)} placeholder="dispute_1042" autoComplete="off" spellCheck={false} /></label>
-          <label className="cw-field cw-live-wide"><span>Connector HTTPS base URL</span><input type="url" required maxLength={2048} value={baseUrl} onChange={event => setBaseUrl(event.target.value)} placeholder="https://evidence.yourcompany.com" autoComplete="off" spellCheck={false} /><small>The address where your connector is installed. Leave off the case-specific route.</small></label>
-          <label className="cw-field cw-live-wide"><span>Approved-case access token</span><input type="password" required minLength={32} maxLength={2048} value={token} onChange={event => setToken(event.target.value)} autoComplete="off" spellCheck={false} placeholder="Paste the token issued by your connector" /><small>Use the connector token for this case. Database passwords and Supabase service keys do not belong here. This field clears after each verification attempt.</small></label>
+          <label className="cw-field cw-live-wide"><span>Connector HTTPS base URL</span><input type="url" required maxLength={2048} value={baseUrl} onChange={event => setBaseUrl(event.target.value)} placeholder="https://evidence.yourcompany.com" autoComplete="off" spellCheck={false} /><small>Base URL only; omit the case route.</small></label>
+          <label className="cw-field cw-live-wide"><span>Approved-case access token</span><input type="password" required minLength={32} maxLength={2048} value={token} onChange={event => setToken(event.target.value)} autoComplete="off" spellCheck={false} placeholder="Paste the token issued by your connector" /><small>Case token only—not a database password or Supabase key. Cleared after verification.</small></label>
         </div>
         <div className="cw-live-form-footer"><p><LockKeyhole size={16} />We verify the case, business, order, and payment before saving this connection.</p><button type="submit" className="cw-button primary" disabled={!!busy || !name.trim() || !baseUrl.trim() || !externalCaseId.trim() || token.trim().length < 32}>{busy === "connect" ? <LoaderCircle size={17} /> : <ShieldCheck size={17} />}{busy === "connect" ? "Verifying connection…" : "Verify and connect"}</button></div>
       </fieldset>
@@ -122,12 +122,12 @@ export function LiveEvidenceConnectors({ onImported }: { onImported: (state: Wor
         <div className="cw-live-row-heading"><div><div className="cw-live-title"><Link2 size={18} /><h3>{item.name}</h3><span className={`cw-pill${item.status === "connected" ? " green" : ""}`}>{item.status === "connected" ? "Connected" : "Disconnected"}</span></div><p className="cw-live-url">{item.baseUrl}</p></div><span className="cw-live-verified">Last verified {stamp(item.verifiedAt)}</span></div>
         <dl className="cw-live-metadata"><div><dt>Business</dt><dd>{item.merchantName}</dd></div><div><dt>Approved case</dt><dd>{item.externalCaseId}</dd></div><div><dt>Order</dt><dd>{item.orderRef}</dd></div><div><dt>Payment</dt><dd>{item.paymentRef}</dd></div></dl>
         {failures[item.id] && <div className="cw-banner error" role="alert"><TriangleAlert size={18} /><p>{failures[item.id]}</p></div>}
-        {confirmDisconnect === item.id ? <div className="cw-live-disconnect"><p>Disconnect this endpoint? Future evidence requests through this connection will stop. Existing imported records stay in your workspace.</p><div className="cw-actions"><button type="button" className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(null)}>Keep connection</button><button type="button" className="cw-button danger" disabled={!!busy} onClick={() => void action(item, "disconnect")}>{busy === `disconnect:${item.id}` ? <LoaderCircle size={16} /> : <Unplug size={16} />}Confirm disconnect</button></div></div> : <div className="cw-actions">
+        {confirmDisconnect === item.id ? <div className="cw-live-disconnect"><p>Disconnect this endpoint? New requests stop; imported evidence stays.</p><div className="cw-actions"><button type="button" className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(null)}>Keep connection</button><button type="button" className="cw-button danger" disabled={!!busy} onClick={() => void action(item, "disconnect")}>{busy === `disconnect:${item.id}` ? <LoaderCircle size={16} /> : <Unplug size={16} />}Confirm disconnect</button></div></div> : <div className="cw-actions">
           <button type="button" className="cw-button primary" disabled={!!busy || item.status !== "connected"} onClick={() => void action(item, "import")}>{busy === `import:${item.id}` ? <LoaderCircle size={16} /> : <ArrowRight size={16} />}Import approved case</button>
           <button type="button" className="cw-button" disabled={!!busy || item.status !== "connected"} onClick={() => void action(item, "recheck")}><RefreshCw size={16} />{busy === `recheck:${item.id}` ? "Verifying…" : "Verify again"}</button>
           {item.status === "connected" ? <button type="button" className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(item.id)}><Unplug size={16} />Disconnect</button> : <button type="button" className="cw-button" disabled={!!busy} onClick={() => { setName(item.name); setBaseUrl(item.baseUrl); setExternalCaseId(item.externalCaseId); setToken(""); setOpen(true); setNotice(""); setError(""); }}>Reconnect with a new token</button>}
         </div>}
       </article>)}
-    </div> : !open && !error && <div className="cw-live-empty"><p>No installed endpoints connected yet. Use guided setup below to prepare a connector, then add its URL and approved-case token here.</p></div>}
+    </div> : !open && !error && <div className="cw-live-empty"><p>No endpoints connected. Use setup below to create one.</p></div>}
   </section>;
 }

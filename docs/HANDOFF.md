@@ -11,10 +11,20 @@ The deployment has no Cloudflare database or R2 binding. The temporary developme
 - Model: `us.amazon.nova-2-lite-v1:0`; a complete real investigation with validated citations was saved as a new draft requiring approval.
 - Direct AWS acceptance passed: six DynamoDB samples and owner isolation, all three background ticket outcomes, private S3 uploads/downloads, cancellation, concurrent approval preservation, and approved archives.
 - Published browser acceptance passed with `npm run test:dev:smoke`: authenticated frontend and signed Lambda bridge, real Bedrock investigation, approval/export, S3 archive, browser S3 upload, and private original download, with no JavaScript errors.
-- Real ATMSPHR evidence, production Stripe, refund actions, and customer messaging are not connected.
+- Customer Stripe reads are connected and verified. Real Supabase rows and mailbox imports still need customer setup/testing. Refunds and outbound customer messaging remain disabled.
 - Stripe and Supabase developer registration and customer authorization flows are implemented. Both have authorized customer connections in the shared workspace. A real Supabase project-list read passed; the customer still needs to select a project and approve its evidence columns. [OAuth connector status](OAUTH_CONNECTORS.md) describes the AWS secrets, state/token lifecycle, routes, checks and remaining work. [Selected dispute import, approved order mappings and reviewed linked-record imports](LINKED_EVIDENCE.md) are implemented. Real customer-row verification remains pending the in-app project/scope/mapping choices.
 
 All six bundled cases are synthetic. The three ticket cases demonstrate receipt acknowledgement, delivery failures, and insufficient evidence. **Sample investigation** is deterministic. **AWS investigation** calls Bedrock. AWS failures remain errors and never silently become sample results.
+
+## Linked-evidence release, November 8, 2026
+
+The active implementation branch is `codex/aiden-aws-harness`. It incorporates `main` through `171d296`, including Eric's revised frontend and Resend connector. New work is the selected Stripe dispute import, explicit Supabase order/payment/email mapping, and reviewed case-bound record import described in [LINKED_EVIDENCE.md](LINKED_EVIDENCE.md). This feature branch must be fetched on the other computer; pushing it does not update `main`.
+
+Live checks verified Stripe dispute and linked-charge reads, ten latest dispute summaries, and one full dispute/payment association without importing a real case. That sampled payment lacked a customer email. The optional approved order-email mapping fills an empty case address only after record review. Actual Supabase row queries remain untested because no project/scope/mapping has been selected. No database project, real dispute or mailbox was selected automatically.
+
+Resend's existing developer secret and documented shared-workspace/domain binding were restored with the merged AWS template. Read verification passed for its two approved sending domains. The recreated receiver URL is recorded in [RESEND_CONNECTOR.md](RESEND_CONNECTOR.md); it returns 503 for unsigned input while the signing secret is absent. Webhook registration and real delivery-event capture are still pending. Do not deploy an older infrastructure template that omits these resources and parameters.
+
+Release verification: `npm run check` passed (556 backend/adapter tests, TypeScript, frontend build and Lambda build). All 35 browser scenarios passed, with affected tests rerun after resolving upstream copy changes and adding the optional email mapping. Targeted ESLint and Wrangler dry runs passed. The final AWS deployment retained the Resend configuration and uploaded all three Lambda bundles. Frontend Worker version: `569fb256-cde1-4273-b26e-dabc4f2bf930`. Hosted checks passed for authentication, cross-origin and forged-input rejection, desktop/mobile evidence setup, and live Stripe reads. Logs and screenshots are in ignored `.aws-build/provider-evidence-*` and `.aws-build/linked-evidence-*` files. Architecture and handoff documents were updated in place; this repository has no root `context.md`.
 
 ## IMAP customer setup
 

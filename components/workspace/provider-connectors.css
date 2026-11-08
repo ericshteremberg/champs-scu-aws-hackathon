@@ -2,8 +2,8 @@
 .cw-provider-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
 .cw-provider-heading h2 { margin: 0 0 8px; }
 .cw-provider-heading p, .cw-provider-card p { line-height: 1.6; }
-.cw-provider-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 24px; }
-.cw-provider-card { border: 1px solid var(--cw-border, #dededb); border-radius: 12px; padding: 20px; min-width: 0; }
+.cw-provider-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
+.cw-provider-card { border-top: 1px solid var(--cw-border, #dededb); padding: 20px 0; min-width: 0; }
 .cw-provider-card h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 0; }
 .cw-provider-card strong { overflow-wrap: anywhere; }
 .cw-provider-card > .cw-button { margin-top: 16px; }
@@ -17,7 +17,7 @@
 .cw-provider-columns label { display: flex; align-items: start; gap: 8px; font-size: 13px; overflow-wrap: anywhere; }
 @media (max-width: 800px) { .cw-provider-grid { grid-template-columns: 1fr; } .cw-provider-panel, .cw-provider-card { padding: 16px; } .cw-provider-columns { grid-template-columns: 1fr; } }
 
-.cw-gmail-card { grid-column: 1 / -1; grid-row: 2; }
+.cw-gmail-card { min-width: 0; }
 .cw-gmail-card .cw-field { margin-top: 16px; }
 .cw-gmail-card select { max-width: 100%; }
 .cw-gmail-results { list-style: none; padding: 0; }
@@ -27,7 +27,7 @@
 .cw-gmail-preview { margin-top: 20px; padding: 16px; border: 1px solid var(--cw-border, #dededb); border-radius: 8px; }
 .cw-gmail-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow-y: auto; font: inherit; line-height: 1.6; }
 
-.cw-imap-card { grid-column: 1 / -1; grid-row: 3; }
+.cw-imap-card { grid-column: 1 / -1; }
 .cw-imap-card p, .cw-imap-card label { overflow-wrap: anywhere; }
 .cw-imap-card .cw-field { margin-top: 16px; }
 .cw-imap-form { display: grid; gap: 12px; }
@@ -35,7 +35,7 @@
 .cw-imap-consent { display: flex; align-items: start; gap: 10px; line-height: 1.5; }
 .cw-imap-consent input { flex-shrink: 0; margin-top: 4px; }
 
-.cw-evidence-card { grid-column: 1 / -1; grid-row: 4; }
+.cw-evidence-card { grid-column: 1 / -1; }
 .cw-evidence-card .cw-field { margin: 16px 0; }
 .cw-evidence-card select { width: 100%; min-width: 0; max-width: 100%; }
 .cw-evidence-card p, .cw-evidence-card label { overflow-wrap: anywhere; }

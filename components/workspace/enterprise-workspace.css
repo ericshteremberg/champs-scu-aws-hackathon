@@ -382,3 +382,28 @@
   .cw.cw-shell .cw-content { padding: 0; }
   .cw.cw-shell .cw-panel { border: 0; }
 }
+
+/* Keep supporting detail available without repeating it in the primary view. */
+.cw.cw-shell .cw-disclosure > summary {
+  cursor: pointer;
+  color: var(--cw-ink);
+  font-size: inherit;
+  font-weight: 600;
+  line-height: 24px;
+  border-radius: 4px;
+}
+.cw.cw-shell .cw-disclosure > summary::marker { color: var(--cw-muted); }
+.cw.cw-shell .cw-disclosure > summary:focus-visible {
+  outline: 2px solid var(--cw-ink);
+  outline-offset: 5px;
+}
+.cw.cw-shell .cw-disclosure[open] > summary { margin-bottom: 12px; }
+.cw.cw-shell .cw-connection-group { border-top: 1px solid var(--cw-line); margin-top: 24px; padding-top: 20px; }
+.cw.cw-shell .cw-connection-group > summary { padding: 4px 0; }
+.cw.cw-shell .cw-connection-group > summary > span { margin-left: 16px; font-weight: 400; color: var(--cw-muted); }
+.cw.cw-shell .cw-connection-group[open] > summary { margin-bottom: 24px; }
+.cw.cw-shell .cw-finding.cw-disclosure { padding-block: 16px; }
+.cw.cw-shell .cw-finding.cw-disclosure > p { margin-top: 0; }
+@media print {
+  .cw-disclosure::details-content { content-visibility: visible; }
+}
