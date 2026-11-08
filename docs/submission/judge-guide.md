@@ -4,8 +4,8 @@ Causality assembles transaction evidence into a cited chargeback response and a 
 
 ## Where to start
 
-- [Live app](https://causality-hackathon-dev.slidah60.workers.dev), team-guided access. This is a shared development workspace, not a public self-service trial.
-- [Final source snapshot](https://github.com/ericshteremberg/champs-scu-aws-hackathon/tree/0df300af9207d503c872d3c5c8b8a95dbad0b14d). Repository access must be resolved before submission. [Main](https://github.com/ericshteremberg/champs-scu-aws-hackathon/tree/main) integrates this deployed feature with the compatible workspace updates; the live deployment and accepted report remain unchanged.
+- [Live workspace](https://causality-hackathon-dev.slidah60.workers.dev/workspace), no username or password. This is the live shared hackathon workspace with connected business records.
+- [Public source on main](https://github.com/ericshteremberg/champs-scu-aws-hackathon/tree/main). See the handoff for current deployment details.
 - [Current implementation handoff](../HANDOFF.md), [policy workflow](../POLICY_COLLECTION.md), and [PDF evidence system](../EVIDENCE_PACKET.md).
 
 ## Demonstration sequence
@@ -68,4 +68,4 @@ Model cost per investigation is the sum of all tool rounds: `(input tokens × in
 
 Use current app screens: case overview, linked source record, report, and PDF exhibit. Public screenshots or videos should use reviewed redacted copies of customer material, with any masking disclosed. Do not publish development credentials or private originals. A generated record capture must remain labeled as a rendering, not an original provider screenshot.
 
-The existing `docs/demo/casework-hackathon-demo.mp4` is a historical synthetic Casework prototype and is not the final Causality/Opus demonstration. Record the current interface for the final video. Keep a local backup video and PDF for judging in case the workshop session expires. The shared development login should be handled privately during a guided demo.
+The existing `docs/demo/casework-hackathon-demo.mp4` is a historical synthetic Casework prototype and is not the final Causality/Opus demonstration. Record the current interface for the final video. Keep a local backup video and PDF for judging in case the workshop session expires. The shared development workspace is publicly accessible for judging.

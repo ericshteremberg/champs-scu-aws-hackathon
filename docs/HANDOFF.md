@@ -4,7 +4,7 @@ The accepted deployed feature is integrated with main through `05b9d71`. The mer
 
 Integration verification: type checking, 649 automated tests (56 core, 477 investigation/AWS/PDF, 116 connector), frontend build and AWS build passed. Two stale sample-report assertions were updated to check status in the source inventory and detailed findings. No real customer investigation was run.
 
-Both AWS prize categories are saved on Devpost, which remains DRAFT at 4/5 steps. Eric is handling removal of Zach from the judging portal. Repository visibility remains private and final submission is still pending explicit authorization. There is no root `context.md`; this handoff remains the architecture/context record.
+Both AWS prize categories are saved on Devpost, which remains DRAFT at 4/5 steps. Eric cannot remove Zach from the judging portal and needs organizer assistance. Repository visibility is now public and final submission is still pending explicit authorization. There is no root `context.md`; this handoff remains the architecture/context record.
 
 # Causality AWS handoff
 
@@ -13,6 +13,10 @@ The final product keeps Causality's interface and review workflow, with an AWS-n
 The deployment has no Cloudflare database or R2 binding. The temporary development D1 database was deleted. D1/R2 source remains for original Sites compatibility and local regression tests only.
 
 ## Current state
+
+- Public access deployment: Worker `93148d73-820f-4c11-b2a0-3a36bc27a42b`. Type checking, all 59 core/access tests and frontend build passed. Anonymous HTTPS requests to `/workspace`, `/api/workspace`, `/api/runtime` and `/favicon.svg` returned 200 with no Basic challenge and no-store headers. The API returned the existing fixed shared reviewer identity. No customer case was rerun or changed. AWS deployment remains on `5088ad6`.
+
+- Public hackathon access, November 8, 2026: explicitly authorized by the user for the existing live shared workspace and connected customer records. `wrangler.dev.jsonc` sets `DEV_PUBLIC_WORKSPACE=true` only for `standalone-dev`. Requests keep HTTPS, no-store responses, stripped inbound credentials/platform headers and the fixed shared reviewer identity. Sign-in, callback and sign-out redirect to the workspace without a Basic challenge. Set the flag false and redeploy to restore password access. AWS credentials stay server-side; actual Stripe submission/draft writes remain blocked. Devpost story, pitch, tags and live link were saved as a draft; video is pending and no final submission occurred. There is no root `context.md`; this document remains the context record.
 
 - Deployed status/deadline update from source `5088ad6` to AWS and Worker `41931fd3-958e-492b-b257-6aea0a571501`. All three Lambda code hashes match the built bundle; the investigator reports a 600-second timeout. A read-only hosted browser test used intercepted progress responses to verify automatic-correction wording, reconnection and automatic clearing of the connection warning, and completed retry history. No customer investigation or write was performed.
 

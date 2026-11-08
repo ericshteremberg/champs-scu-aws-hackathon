@@ -203,3 +203,42 @@ test('development signout challenges again and explains browser credential cachi
   assert.match(message, /cach|keep|remember|retain/i);
   assert.equal(result.headers.get('location'), null);
 });
+
+const publicEnvironment = { DEPLOYMENT_MODE: 'standalone-dev', DEV_PUBLIC_WORKSPACE: 'true' };
+
+test('public workspace accepts anonymous requests without a password and fixes shared identity', async () => {
+  const original = new Request(`${origin}/api/workspace`, { headers: {
+    authorization: 'Bearer untrusted',
+    'oai-authenticated-user-id': 'another-workspace',
+    'oai-authenticated-role': 'admin',
+  } });
+  const result = await authenticateDevelopmentRequest(original, publicEnvironment);
+  assert.ok(result instanceof Request);
+  assert.equal(result.headers.get('authorization'), null);
+  assert.equal(result.headers.get('oai-authenticated-role'), null);
+  assert.equal(result.headers.get('oai-authenticated-user-id'), 'causality-development-reviewer');
+  assert.ok(await authenticateDevelopmentRequest(request('/workspace', null), publicEnvironment) instanceof Request);
+});
+
+test('public access requires an exact explicit flag and standalone deployment', async () => {
+  for (const flag of [undefined, '', 'false', 'TRUE', 'true ']) {
+    assertChallenge(await authenticateDevelopmentRequest(request('/workspace', null), { ...environment, DEV_PUBLIC_WORKSPACE: flag }));
+  }
+  const invalidMode = await authenticateDevelopmentRequest(request('/workspace', null), { ...publicEnvironment, DEPLOYMENT_MODE: 'production' });
+  assert.ok(invalidMode instanceof Response);
+  assert.equal(invalidMode.status, 503);
+  const insecure = await authenticateDevelopmentRequest(new Request('http://development.example.invalid/workspace'), publicEnvironment);
+  assert.ok(insecure instanceof Response);
+  assert.equal(insecure.status, 403);
+});
+
+test('public sign-in, callback and sign-out redirect to workspace without credential prompts', async () => {
+  for (const path of ['/signin-with-chatgpt', '/callback', '/signout-with-chatgpt']) {
+    const result = await authenticateDevelopmentRequest(request(`${path}?return_to=https://untrusted.example.invalid`, null), publicEnvironment);
+    assert.ok(result instanceof Response);
+    assert.equal(result.status, 303);
+    assert.equal(result.headers.get('location'), `${origin}/workspace`);
+    assert.equal(result.headers.get('www-authenticate'), null);
+    assert.equal(result.headers.get('cache-control'), 'private, no-store');
+  }
+});

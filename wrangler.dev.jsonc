@@ -27,6 +27,7 @@
   },
   "vars": {
     "DEPLOYMENT_MODE": "standalone-dev",
+    "DEV_PUBLIC_WORKSPACE": "true",
     "DATA_BACKEND": "aws",
     "AWS_REGION": "us-east-1",
     "AWS_BACKEND_FUNCTION": "causality-hackathon-backend",

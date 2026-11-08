@@ -2,6 +2,7 @@
 export type DevelopmentAuthEnvironment = {
   DEPLOYMENT_MODE?: string;
   DEV_ACCESS_PASSWORD?: string;
+  DEV_PUBLIC_WORKSPACE?: string;
 };
 
 const identity = {
@@ -75,10 +76,11 @@ export async function authenticateDevelopmentRequest(
   if (env.DEPLOYMENT_MODE !== "standalone-dev") {
     return privateResponse("This deployment mode is not configured.", 503);
   }
-  if (
+  const publicWorkspace = env.DEV_PUBLIC_WORKSPACE === "true";
+  if (!publicWorkspace && (
     typeof env.DEV_ACCESS_PASSWORD !== "string" ||
     env.DEV_ACCESS_PASSWORD.length < 32
-  ) {
+  )) {
     return privateResponse(
       "Development access has not been configured by the operator.",
       503,
@@ -91,27 +93,29 @@ export async function authenticateDevelopmentRequest(
       403,
     );
 
-  const provided = credentials(request.headers.get("Authorization"));
-  const passwordMatches = await matchesSecret(
-    provided?.password ?? "",
-    env.DEV_ACCESS_PASSWORD,
-  );
-  if (!provided || provided.username !== "dev" || !passwordMatches) {
-    return privateResponse(
-      "Authenticate with the development workspace credentials.",
-      401,
-      true,
+  if (!publicWorkspace) {
+    const provided = credentials(request.headers.get("Authorization"));
+    const passwordMatches = await matchesSecret(
+      provided?.password ?? "",
+      env.DEV_ACCESS_PASSWORD!,
     );
+    if (!provided || provided.username !== "dev" || !passwordMatches) {
+      return privateResponse(
+        "Authenticate with the development workspace credentials.",
+        401,
+        true,
+      );
+    }
   }
 
-  if (url.pathname === "/signout-with-chatgpt") {
+  if (!publicWorkspace && url.pathname === "/signout-with-chatgpt") {
     return privateResponse(
       "Development authentication is required. Your browser may keep Basic authentication credentials until you close its private window or clear the saved credentials.",
       401,
       true,
     );
   }
-  if (url.pathname === "/signin-with-chatgpt" || url.pathname === "/callback") {
+  if (url.pathname === "/signin-with-chatgpt" || url.pathname === "/callback" || (publicWorkspace && url.pathname === "/signout-with-chatgpt")) {
     return new Response(null, {
       status: 303,
       headers: {

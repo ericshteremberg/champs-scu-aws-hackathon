@@ -2,6 +2,7 @@ declare namespace Cloudflare {
   interface Env {
     DEPLOYMENT_MODE?: string;
     DEV_ACCESS_PASSWORD?: string;
+    DEV_PUBLIC_WORKSPACE?: string;
     DATA_BACKEND?: string;
     AWS_BACKEND_FUNCTION?: string;
     EVIDENCE_BUCKET_ORIGIN?: string;

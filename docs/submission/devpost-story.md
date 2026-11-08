@@ -1,6 +1,6 @@
 # Prepared Devpost story
 
-Draft copy for review. Not saved to Devpost or published. Replace the existing About the project field with the content below once reviewed. The headline structure matches Devpost's prompt.
+Saved to the Devpost draft on November 8, 2026. Not submitted. The headline structure matches Devpost's prompt.
 
 ## Inspiration
 
@@ -51,3 +51,7 @@ Our first customers would be independent ticketing operators and event organizer
 Rentals are the next planned vertical, reusing the evidence and review workflow with booking, pickup, return, deposit, and cancellation records. Production work includes individual tenant access, onboarding hardening, quotas, retention controls, and broader evaluation.
 
 This prototype prepares evidence for merchant review. Actual Stripe submissions, refunds, and outbound customer messaging are disabled. The Send to Stripe button is a presentation-only control.
+
+## Try it
+
+Open https://causality-hackathon-dev.slidah60.workers.dev/workspace with no username or password. This is our live shared hackathon workspace, including connected business records. Actual Stripe submissions, refunds, and outbound customer messaging are disabled.

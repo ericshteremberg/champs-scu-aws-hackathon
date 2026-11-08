@@ -84,7 +84,7 @@ npm run deploy:dev
 
 `deploy:aws` builds the Lambda archive, updates the CloudFormation stack in `infra/aws-backend.json`, and uploads the backend code. Set `CAUSALITY_FRONTEND_ORIGIN` to the deployed frontend origin when provisioning or changing its S3 CORS configuration. Generated resource outputs are saved in ignored `.aws-build/deployment.json`.
 
-`deploy:dev` publishes the frontend configured by `wrangler.dev.jsonc`. It does not replace the original Sites application. Set the preview password and temporary AWS bridge credentials through the Worker secret store, never through public variables. Use `npm run sync:dev-secrets` after refreshing `.dev.vars`; deployment alone does not copy local secrets.
+`deploy:dev` publishes the frontend configured by `wrangler.dev.jsonc`. It does not replace the original Sites application. The hackathon deployment explicitly enables `DEV_PUBLIC_WORKSPACE=true`, opening the existing live shared workspace without a login. Set that flag to `false` and redeploy to restore Basic authentication using `DEV_ACCESS_PASSWORD` (at least 32 characters). Keep the password and temporary AWS bridge credentials in the Worker secret store, never in public variables. Use `npm run sync:dev-secrets` after refreshing `.dev.vars`; deployment alone does not copy local secrets.
 
 The bridge's temporary workshop credentials expire. Refresh them before the demo and run `npm run sync:dev-secrets` to update the deployed Worker secrets. Lambda uses its own execution role for DynamoDB, S3, Bedrock, and background invocation; it does not depend on copied workshop credentials internally. An expired bridge session can interrupt the UI while stored data and an already-running Lambda job remain in AWS.
 
@@ -92,7 +92,7 @@ The bridge's temporary workshop credentials expire. Refresh them before the demo
 
 | Location | Values |
 | --- | --- |
-| Frontend Worker public configuration | `DATA_BACKEND=aws`, `DEPLOYMENT_MODE=standalone-dev`, `AWS_REGION`, `AWS_BACKEND_FUNCTION`, `EVIDENCE_BUCKET_ORIGIN` |
+| Frontend Worker public configuration | `DATA_BACKEND=aws`, `DEPLOYMENT_MODE=standalone-dev`, `DEV_PUBLIC_WORKSPACE=true`, `AWS_REGION`, `AWS_BACKEND_FUNCTION`, `EVIDENCE_BUCKET_ORIGIN` |
 | Frontend Worker secrets | `DEV_ACCESS_PASSWORD`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` |
 | Lambda, provisioned by CloudFormation | `CAUSALITY_TABLE`, `EVIDENCE_BUCKET`, `BEDROCK_MODEL_ID`, `FUNCTION_NAME` |
 | App Connections, live evidence API | Public HTTPS base URL, approved external case ID, case-scoped API token; stored in the owning AWS workspace |
