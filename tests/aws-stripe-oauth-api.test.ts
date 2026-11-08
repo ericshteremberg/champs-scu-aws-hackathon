@@ -42,6 +42,22 @@ describe('Stripe Apps API boundary', () => {
   it('does not claim charge access was tested without a dispute or linked charge', async () => {
     http.mockResolvedValueOnce(Response.json({ object: 'list', data: [] })); expect(await verifyStripeOAuthRead(tokens)).toEqual({ disputeReadVerified: true, chargeReadVerified: false }); expect(http).toHaveBeenCalledTimes(1);
   });
+  it.each(['ch_fictional', 'py_fictional'])('verifies du disputes with a %s payment', async (chargeId) => {
+    http.mockResolvedValueOnce(Response.json({ object: 'list', data: [{ id: 'du_fictional', charge: chargeId, livemode: true }] }));
+    http.mockResolvedValueOnce(Response.json({ id: chargeId, livemode: true }));
+    expect(await verifyStripeOAuthRead(tokens)).toEqual({ disputeReadVerified: true, chargeReadVerified: true });
+    expect(http.mock.calls[1][0]).toBe(`https://api.stripe.com/v1/charges/${chargeId}`);
+  });
+  it.each(['https://untrusted.test/payment', 'ch_bad/path', 'pi_wrongtype'])('rejects an invalid linked payment %s before reading it', async (chargeId) => {
+    http.mockResolvedValueOnce(Response.json({ object: 'list', data: [{ id: 'du_fictional', charge: chargeId, livemode: true }] }));
+    await expect(verifyStripeOAuthRead(tokens)).rejects.toMatchObject({ code: 'provider_invalid_response' });
+    expect(http).toHaveBeenCalledTimes(1);
+  });
+  it('rejects a du dispute from the wrong environment before reading its payment', async () => {
+    http.mockResolvedValueOnce(Response.json({ object: 'list', data: [{ id: 'du_fictional', charge: 'py_fictional', livemode: false }] }));
+    await expect(verifyStripeOAuthRead(tokens)).rejects.toMatchObject({ code: 'provider_invalid_response' });
+    expect(http).toHaveBeenCalledTimes(1);
+  });
   it('rejects mismatched payment identities and mode', async () => {
     http.mockResolvedValueOnce(Response.json({ object: 'list', data: [{ id: 'dp_fictional', charge: 'ch_fictional', livemode: true }] })); http.mockResolvedValueOnce(Response.json({ id: 'ch_other', livemode: true })); await expect(verifyStripeOAuthRead(tokens)).rejects.toMatchObject({ code: 'provider_invalid_response' });
   });
