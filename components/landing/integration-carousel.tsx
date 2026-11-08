@@ -6,6 +6,7 @@ import "./integration-carousel.css";
 const integrations = [
   { name: "Stripe", asset: "stripe" },
   { name: "Gmail", asset: "gmail" },
+  { name: "Network Solutions", asset: "networksolutions" },
   { name: "Supabase", asset: "supabase" },
   { name: "Amazon Bedrock", asset: "amazonbedrock" },
   { name: "Zoho", asset: "zoho" },
