@@ -50,6 +50,20 @@ Run `npm run test:dev:smoke` for the published browser rehearsal. It uses the pr
 
 `deploy:aws` updates infrastructure and backend code. `deploy:dev` updates the separate Wrangler frontend. Neither command republishes the original Sites application. The README explains the retained local D1/R2 regression path.
 
+## Keep frontend merges connected to AWS
+
+Frontend changes must preserve same-origin `/api/` requests through `worker/index.ts` and `lib/server/aws-bridge.ts`. Deploy the preview with `wrangler.dev.jsonc`, which selects `DATA_BACKEND=aws`, the private Lambda and the S3 origin. A static frontend upload without that Worker does not provide the API connection. Keep AWS credentials server-side.
+
+| Interface flow | Existing backend contract |
+| --- | --- |
+| Load and edit workspace | `GET /api/workspace` returns workspace state; `POST` sends a supported `action` and returns updated state |
+| Investigate | `POST /api/investigations` with `action: start`, local `caseId` and `mode: bedrock` returns HTTP 202 and `{run}`; poll `GET ?caseId=...`, then reload workspace state |
+| Cancel or import | Investigation actions are `cancel` with `runId`, or `import` with `externalCaseId`; import returns `{caseId,state}` |
+| Original files | Read `/api/runtime`; AWS uses prepare-upload, signed S3 form POST, then finalize-upload. Downloads go through the authenticated evidence route |
+| Approve and archive | Approval includes the saved draft revision. `/api/investigations/archive` accepts `caseId` and that approved `revision` |
+
+Run the local browser suite for interaction regressions and the published `npm run test:dev:smoke` for the actual AWS connection. The published check asserts AWS upload mode, a real Bedrock run, a persisted unapproved draft with saved source citations, approval/export/archive, and a uniquely identified new file upload/download. An AWS configuration flag alone does not prove that Lambda is reachable. A local sample or mocked test does not establish a live backend connection.
+
 ## Before the demo
 
 1. Open the protected deployed frontend and verify its AWS runtime status.
