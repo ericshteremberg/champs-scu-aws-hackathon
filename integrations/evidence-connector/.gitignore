@@ -1,0 +1,5 @@
+node_modules/
+.private/
+*.tsbuildinfo
+.env*
+!.env.example

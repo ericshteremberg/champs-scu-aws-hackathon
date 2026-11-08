@@ -23,6 +23,8 @@ The development stack is `causality-hackathon-dev` in `us-east-1`. Its frontend 
 
 **Verification status:** Direct AWS acceptance passed with `npm run test:aws:smoke`: DynamoDB persistence and owner isolation, all three asynchronous ticket investigations, private S3 upload/validation/download, cancellation, concurrent approval preservation, approved S3 archival, and a complete real Nova investigation with validated citations and a newly unapproved draft. The model is `us.amazon.nova-2-lite-v1:0`. Published browser acceptance also passed with `npm run test:dev:smoke`: authenticated frontend, signed Lambda bridge, real Bedrock investigation, reviewed approval/export, S3 archive, and browser upload/private download, with no JavaScript errors. ATMSPHR production data and Stripe submission remain unconnected.
 
+**Guided connector verification:** `npm run check` passes 291 tests plus typechecks and frontend/AWS builds. The 17 browser checks include both setup templates, invalid mapping recovery, mobile behavior and existing review workflows. `npm run test:connectors:aws` passed actual DynamoDB setup/import/isolation/revocation and real Bedrock runs for both fictional schemas. `npm run test:connectors:browser` passed the published wizard, manifest downloads and sample imports for both businesses. Live merchant database installation remains unverified; these results use explicitly fictional source records.
+
 There are no D1 or R2 bindings in the development deployment. The temporary development D1 database was deleted. Legacy D1/R2 modules and migrations remain only for the original Sites compatibility path and local regression tests; they do not store the AWS deployment's data.
 
 ## Product behavior
@@ -31,6 +33,9 @@ There are no D1 or R2 bindings in the development deployment. The temporary deve
 - Six explicitly loaded synthetic cases include three ATMSPHR-style ticket disputes. Sample loading is idempotent and preserves edits to existing samples.
 - **Sample investigation** is deterministic, is labeled as such, and runs only on sample cases. **AWS investigation** uses Bedrock Converse tool calls. An AWS failure never becomes a sample result under an AWS label.
 - A merchant-owned API returns only selected records linked to an approved case. The model cannot choose another case, database query, or arbitrary endpoint.
+- Connections now includes a guided evidence setup: choose a ticketing or rental example, confirm table relationships and shared fields, preview allowed records and rejected case access, then save the configuration in DynamoDB. Both examples are explicitly fictional schemas and data. A saved mapping does not claim a live database connection.
+- Downloaded mapping and read-role files configure the same packaged merchant connector. It creates the HTTP endpoint without customer-written service code, verifies Stripe payment scope, and runs bounded read-only PostgreSQL queries. Database permission review, a real case grant, HTTPS hosting, and Lambda configuration remain required. See [the guided connector setup](docs/CONNECTOR_SETUP.md).
+- Each saved configuration can import its sample once into the existing AWS investigation and review workflow. Revoking that configuration prevents further imports and installation-file downloads while retaining imported evidence. It does not disable a separately deployed merchant service.
 - Investigations run asynchronously in Lambda. The browser polls persisted progress, and cancellation prevents later tool/model steps and draft publication.
 - DynamoDB conditional transactions protect case data, active runs, draft revisions, approval state, and Stripe submission claims. A stale result cannot replace newer source records or a reviewer's edits.
 - PDFs, images, UTF-8 text, CSV, JSON, and email files upload directly to private S3 using a short-lived signed form. Finalization validates the stored bytes before attaching them to a case. File downloads require case ownership.
@@ -51,6 +56,7 @@ Use Node 22.13 or newer. Install dependencies and run checks:
 
 ```sh
 npm ci
+npm run install:connectors
 npm run check
 ```
 
@@ -137,6 +143,9 @@ Those local regression tests use D1/R2 emulation and trusted test headers bound 
 | `worker/index.ts`, `lib/server/dev-auth.ts`, `lib/server/aws-bridge.ts` | Protected frontend and private Lambda bridge |
 | `aws/handler.ts`, `aws/workspace.ts`, `aws/store.ts` | AWS API, business actions, DynamoDB conditional persistence |
 | `aws/investigations.ts` | Background jobs, trace persistence, scoped evidence, cancellation and final publication |
+| `aws/connectors.ts`, `lib/evidence-connectors/` | DynamoDB setup configurations, validated mappings, bounded query plans, fictional access previews and sample imports |
+| `components/workspace/connector-setup.tsx` | Guided mapping, case preview and installation downloads in Connections |
+| `integrations/evidence-connector/` | Shared merchant-hosted PostgreSQL runtime, guided installer, private grants and live payment verification |
 | `aws/files.ts` | Signed S3 uploads, validation, private downloads and approved archives |
 | `aws/stripe.ts`, `lib/stripe/model.ts` | AWS-backed Stripe integration and submission state machine |
 | `lib/investigation/` | Portable Bedrock/sample engine, merchant wire contract and citation checks |

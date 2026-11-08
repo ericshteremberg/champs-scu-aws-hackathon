@@ -79,6 +79,14 @@ Use ATM-1044 to show that missing delivery history does not justify claiming rec
 
 ## Connect the first ATMSPHR case
 
+The Connections screen also supports a reusable guided setup. Its ATMSPHR and Rentul templates use explicitly fictional schemas to demonstrate the same query and evidence contract across two businesses. Reviewed mappings persist in DynamoDB under `evidence-connection#<id>` in the owner workspace. `GET /api/connectors` lists templates and configurations; POST actions are `preview`, `save`, `import_demo`, and `revoke`. `GET /api/connectors/install?connectionId=...` downloads public configuration files. No database credentials or case tokens enter these setup APIs.
+
+The shared runtime and installer live in `integrations/evidence-connector/`; [CONNECTOR_SETUP.md](CONNECTOR_SETUP.md) explains deployment and permissions. Customers configure that packaged service instead of implementing an endpoint. OAuth installation, automatic discovery of arbitrary schemas, and a multi-case connection registry are not implemented. The live runtime still uses approved case grants and the existing environment-based Lambda merchant connection. Template previews are not live connectivity tests, and revoking a saved setup is not revocation of an independently deployed service.
+
+Run `npm run install:connectors` after root `npm ci`. `npm run check` includes both merchant packages. `npm run test:connectors:aws` writes fictional configurations and cases to isolated AWS workspaces, verifies owner isolation and revocation, and runs real Bedrock investigations for both mappings. Browser onboarding tests use mocked connector responses against the local preview; those mocks do not establish a deployed AWS connection.
+
+Published verification passed on November 7, 2026: both mappings completed real Bedrock runs with saved case-local citations; `npm run test:connectors:browser` exercised the protected dev frontend, actual AWS setup API, downloads and imports with no JavaScript errors. Its two clearly labeled connector samples remain in the shared dev workspace for rehearsal. Private operational results/screenshots stay under ignored `.aws-build/`. After rebuilding the local frontend, restart its preview process before browser tests so its asset manifest matches the rebuilt files.
+
 The merchant evidence service is implemented locally with verified schema mappings and tests, but is not deployed or connected. See [the current implementation handoff and next steps](ATMSPHR_NEXT_STEPS.md).
 
 Eric needs to deploy and verify the merchant-owned endpoint described in [EVIDENCE_API.md](EVIDENCE_API.md). Causality does not deploy it automatically or obtain database credentials.

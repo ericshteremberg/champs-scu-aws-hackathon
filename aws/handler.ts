@@ -4,6 +4,7 @@ import { getWorkspaceState, executeAction, requireWorkspace } from './workspace.
 import { getInvestigationConfig, startInvestigation, getLatestInvestigation, cancelInvestigation, processInvestigation, importMerchantCase } from './investigations.ts';
 import { prepareUpload, completeUpload, getDownload, archiveApprovedCase } from './files.ts';
 import { configuration, listStripeIntegration, connectStripe, disconnectStripe, syncStripe, submitStripe, handleStripeWebhook } from './stripe.ts';
+import { listEvidenceConnections, executeConnectorAction, getConnectorInstallation } from './connectors.ts';
 
 const userSchema=z.object({userId:z.string().min(1).max(200),email:z.string().max(320),displayName:z.string().max(320),fullName:z.string().max(320).nullable().optional()});
 const id=z.string().min(1).max(200);
@@ -33,6 +34,12 @@ async function route(raw:unknown) {
   const user=event.user as TrustedUser;
   if(path==='/api/runtime' && event.method==='GET')return {status:200,body:{storage:'aws',uploads:'presigned'}};
   if(path==='/api/workspace')return {status:200,body:event.method==='GET'?await getWorkspaceState(user):await executeAction(user,event.body)};
+  if(path==='/api/connectors/install' && event.method==='GET')return {status:200,body:await getConnectorInstallation(user,url.searchParams.get('connectionId')||'')};
+  if(path==='/api/connectors'){
+   if(event.method==='GET')return {status:200,body:await listEvidenceConnections(user)};
+   const result=await executeConnectorAction(user,event.body);
+   return {status:200,body:'caseId' in result?{...result,state:await getWorkspaceState(user)}:result};
+  }
   if(path==='/api/investigations'){
    if(event.method==='GET')return {status:200,body:url.searchParams.has('caseId')?{run:await getLatestInvestigation(user,parse(id,url.searchParams.get('caseId')))}:{config:await getInvestigationConfig((await requireWorkspace(user)).data.id)}};
    const action=parse(investigationAction,event.body);

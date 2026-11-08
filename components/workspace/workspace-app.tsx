@@ -66,6 +66,7 @@ import {
   SubmissionReadiness,
 } from "./workspace-extra";
 import type { ScreenPreview } from "@/lib/design/fixtures";
+import { EvidenceConnectors } from "./connector-setup";
 import "./workspace.css";
 
 type View =
@@ -1366,6 +1367,11 @@ export default function WorkspaceApp({
                   stripeAction={stripeAction}
                   requestAccess={() => setModal("access")}
                   navigate={navigate}
+                  onConnectorImported={(nextState, caseId) => {
+                    setState(nextState);
+                    navigate("cases", caseId, { tab: "investigation" });
+                  }}
+                  isDesignPreview={!!preview}
                 />
               )}
               {view === "integrations" && detail.source && (
@@ -3610,6 +3616,8 @@ function Integrations({
   stripeAction,
   requestAccess,
   navigate,
+  onConnectorImported,
+  isDesignPreview,
 }: {
   state: WorkspaceState;
   stripe: StripeStatus | null;
@@ -3621,6 +3629,8 @@ function Integrations({
     body?: object,
   ) => Promise<void>;
   requestAccess: () => void;
+  onConnectorImported: (state: WorkspaceState, caseId: string) => void;
+  isDesignPreview?: boolean;
   navigate: (
     view: string,
     id?: string,
@@ -3644,6 +3654,7 @@ function Integrations({
           Workspace-scoped
         </span>
       </div>
+      {!isDesignPreview && <EvidenceConnectors onImported={onConnectorImported} />}
       <div className="cw-integration-grid">
         <section className="cw-panel cw-integration">
           <div className="cw-integration-head">
@@ -3865,15 +3876,15 @@ function Integrations({
           </p>
           <div className="cw-rule" />
           <p>
-            Import an approved case through your business’s evidence API. It
-            verifies the case, follows linked records, and returns only
+            Import an approved case through your installed evidence connector.
+            It verifies the case, follows linked records, and returns only
             permitted fields. Database credentials stay with the business.
           </p>
           {!investigationConfig?.merchantConfigured && (
             <p className="cw-caption">
-              Configure the merchant endpoint and scoped access token on the
-              server to enable import. You can still add selected evidence
-              manually.
+              Start with guided setup above to review your mapping and get
+              installation files. Live import becomes available after your
+              deployed connector is configured on the server.
             </p>
           )}
           <div className="cw-actions">
