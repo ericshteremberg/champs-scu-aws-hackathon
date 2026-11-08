@@ -16,7 +16,7 @@ npm ci
 npm run deploy:dev
 ```
 
-This connector reads existing sent-email metadata and captures signed delivery events. It has no email-send, resend, delete, or broadcast action. It does not connect a mailbox or prove attendance. Resend currently offers Full access or Sending access keys; the approved Full access credential is held only in AWS Secrets Manager. Runtime requests are restricted to GET `/domains` and GET `/emails/{uuid}`.
+This connector reads existing sent-email metadata and captures signed delivery events. It has no email-send, resend, delete, or broadcast action. It does not connect a mailbox or prove attendance. Resend currently offers Full access or Sending access keys; the approved Full access credential is held only in AWS Secrets Manager. Runtime requests are restricted to GET `/domains`, GET `/emails/{uuid}`, and bounded GET `/emails?limit=100&after={uuid}` metadata pagination.
 
 ## Development configuration
 
@@ -36,12 +36,13 @@ The receiver drops events from unrelated sender domains. It stores only the prov
 
 ## Importing evidence
 
-Open Connections → Resend → Verify access → Import email evidence. Choose a real case and enter its specific Resend email UUID. Preview before attaching.
+Open Connections → Resend → Verify access → Import email evidence. Choose a real case. The app finds explicit Resend references already attached to it, including structured `message_log.provider_id` evidence. A single linked reference is retrieved and verified automatically for preview. If no reference exists, it scans one page of sent-email metadata, filters to the exact case recipient and approved sender domains, and offers candidate previews. **Search older Resend emails** advances one page at a time. The manual UUID input is an Advanced fallback. Preview before attaching.
 
 The private API `/api/providers/resend` supports:
 
 - GET: public configuration/verification status, never credentials.
 - POST `{ "action": "verify" }`: read configured domain metadata and save an audit event.
+- POST `{ "action": "find", "caseId": "..." }`: resolve case-linked Resend IDs first, otherwise search up to 100 sent-email metadata records. Optional `recent: true` bypasses existing references; `after` advances a validated UUID cursor. Only matching recipient/sender summaries leave the backend. No bodies are downloaded by listing.
 - POST `{ "action": "preview", "caseId": "...", "emailId": "..." }`: retrieve one message and its captured events.
 - POST `{ "action": "import", "caseId": "...", "emailId": "...", "confirmed": true }`: attach the previewed source, or refresh it if its status changed.
 
@@ -65,3 +66,9 @@ npm run build:aws
 The browser-based Resend setup and AWS backend deployment are separate from the Cloudflare UI release. The shared site uses the account in `wrangler.dev.jsonc`; do not switch it to a personal Cloudflare account to get around missing access. Deploy the frontend using the team account's authorized session with `npm run deploy:dev`. The private AWS routes are already callable through the site's existing authenticated API bridge once the backend is deployed.
 
 Rollback: remove/disable the dedicated webhook in Resend, revoke the dedicated API key, and clear the Resend environment/stack parameters if retiring the integration. Do not revoke other applications' existing Resend keys. Previously imported evidence remains part of its case until handled through the normal retention process.
+
+## Case-driven search limitations
+
+Case references are discovery hints, not trusted proof. Preview/import still re-read the exact Resend record and require configured sender, single exact recipient and exact order matching. Arbitrary UUIDs in case text are not treated as Resend IDs. A manually attached `Resend <uuid>` reference is supported, as are reviewed structured provider IDs. This does not query an unapproved Supabase message-log table in the background. Import scoped linked records first when their IDs are not yet on the case, or use paginated recipient discovery. Resend's [sent-email list API](https://resend.com/docs/api-reference/emails/list-emails) supplies metadata and pagination; the app does not invent a server-side recipient filter. A page with no matches is not proof of non-delivery or a complete history.
+
+The **Get evidence** panel invokes this same case-driven lookup alongside Stripe, Supabase and IMAP, preserving independent errors and review requirements. It automatically previews a sole case-linked Resend record but never attaches it without the individual review/import flow.

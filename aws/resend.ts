@@ -9,6 +9,7 @@ type DeliveryEvent = { emailId: string; event: string; occurredAt: string; recei
 const eventPrefix = (emailId: string) => `resend-event#${emailId}#`;
 const actionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('verify') }).strict(),
+  z.object({ action: z.literal('find'), caseId: z.string().min(1).max(200), recent: z.boolean().optional(), after: emailIdSchema.optional() }).strict(),
   z.object({ action: z.literal('preview'), caseId: z.string().min(1).max(200), emailId: emailIdSchema }).strict(),
   z.object({ action: z.literal('import'), caseId: z.string().min(1).max(200), emailId: emailIdSchema, confirmed: z.literal(true) }).strict(),
 ]);
@@ -25,6 +26,21 @@ function orderLinked(email: z.infer<typeof sentEmailSchema>, orderRef: string) {
   const pattern = new RegExp(`(^|[^A-Za-z0-9_-])${escaped}($|[^A-Za-z0-9_-])`, 'i');
   return pattern.test(email.subject) || pattern.test(email.text || '') || pattern.test((email.html || '').replace(/<[^>]*>/g, ' ')) || (email.tags || []).some(t => ['order_id', 'order_ref', 'order_number'].includes(t.name) && t.value === orderRef);
 }
+export function linkedResendIds(evidence: EvidenceDoc[]) {
+  const ids = new Set<string>();
+  for (const item of evidence) {
+    const fields = item.provenance?.fields || {};
+    for (const value of [fields.emailId, fields.resend_email_id, fields.resend_id, ...(item.provenance?.section === 'delivery' || /message_log/i.test(item.reference || '') ? [fields.provider_id] : [])]) {
+      if (emailIdSchema.safeParse(value).success) ids.add(String(value).toLowerCase());
+    }
+    // Explicit provider labels only. Never treat arbitrary order/ticket UUIDs as email IDs.
+    for (const text of [item.reference || '', item.content]) {
+      const pattern = /\bresend(?:[ _-]+email)?(?:[ _-]+id)?[\s:#/="'-]{0,12}([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})\b/gi;
+      for (const match of text.matchAll(pattern)) if (emailIdSchema.safeParse(match[1]).success) ids.add(match[1].toLowerCase());
+    }
+  }
+  return [...ids];
+}
 export async function resendAction(user: TrustedUser, input: unknown) {
   const parsed = actionSchema.safeParse(input); if (!parsed.success) throw new ApiError(400, 'Choose a valid Resend action.');
   const wid = (await requireWorkspace(user)).data.id;
@@ -40,6 +56,22 @@ export async function resendAction(user: TrustedUser, input: unknown) {
   }
   const row = await ownedCase(wid, action.caseId); assertMutableCase(row.data);
   if (row.data.source === 'demo') throw new ApiError(409, 'Use a real case for live email evidence.');
+  if (action.action === 'find') {
+    if (!z.string().email().safeParse(row.data.email).success || !row.data.orderRef || row.data.orderRef.length < 4) throw new ApiError(409, 'Save a customer email and exact order reference on this case first.', 'resend_case_details_required');
+    if (!action.recent && !action.after) {
+      const records = await listEvidence(wid, row.data.id), ids = linkedResendIds(records.map(r => r.data));
+      if (ids.length) {
+        await commit(wid, [{ key: row.key, expectedVersion: row.version, check: true }]);
+        return { candidates: ids.slice(0, 20).map(emailId => ({ emailId, subject: 'Email referenced by this case', source: 'case_reference' })), moreAvailable: false, linkedTruncated: ids.length > 20, searchedEmail: row.data.email, orderRef: row.data.orderRef };
+      }
+    }
+    const listSchema = z.object({ has_more: z.boolean(), data: z.array(sentEmailSchema.pick({ id: true, from: true, to: true, subject: true, created_at: true })).max(100) });
+    const list = listSchema.safeParse(await readResend(`/emails?limit=100${action.after ? `&after=${action.after}` : ''}`));
+    if (!list.success || (list.data.has_more && !list.data.data.length)) throw new ApiError(502, 'Resend returned an invalid email list.');
+    const candidates = list.data.data.filter(e => allowedSender(e.from) && e.to.length === 1 && e.to[0].toLowerCase() === row.data.email.toLowerCase()).map(e => ({ emailId: e.id, subject: e.subject, createdAt: e.created_at, source: 'resend_recipient' }));
+    await commit(wid, [{ key: row.key, expectedVersion: row.version, check: true }]);
+    return { candidates, moreAvailable: list.data.has_more, nextCursor: list.data.has_more ? list.data.data.at(-1)!.id : null, searchedEmail: row.data.email, orderRef: row.data.orderRef, scanned: list.data.data.length };
+  }
   const parsedEmail = sentEmailSchema.safeParse(await readResend(`/emails/${action.emailId}`));
   if (!parsedEmail.success) throw new ApiError(502, 'Resend returned an unsupported email record.');
   const email = parsedEmail.data;

@@ -36,6 +36,11 @@ beforeEach(async () => {
   caseId = state.cases[0].id;
 });
 describe('IMAP customer connection and evidence boundary', () => {
+  it('searches the stored email across all folders when requested and reports the address', async () => {
+    await connect();
+    expect(await action('search', { scope: 'all' })).toMatchObject({ searchedEmail: 'customer@example.test', scope: 'all', folders: ['INBOX'] });
+    expect(fixture.search).toHaveBeenCalledWith(settings, 'customer@example.test', 'all');
+  });
   it('requires authenticated user and explicit credential storage consent', async () => {
     expect(await handler({ kind: 'api', path: '/api/providers/imap', method: 'POST', body: { action: 'connect', settings, confirmed: true } })).toMatchObject({ status: 401 });
     await expect(imapProviderAction(user, { action: 'connect', settings })).rejects.toMatchObject({ code: 'invalid_request' });
@@ -78,7 +83,7 @@ describe('IMAP customer connection and evidence boundary', () => {
     await connect();
     await expect(action('import', { messageId: message.id, confirmed: true })).rejects.toMatchObject({ code: 'imap_preview_expired' });
     await expect(action('preview', { messageId: message.id })).rejects.toMatchObject({ code: 'imap_selection_expired' });
-    await action('search'); expect(fixture.search).toHaveBeenCalledWith(settings, 'customer@example.test');
+    await action('search'); expect(fixture.search).toHaveBeenCalledWith(settings, 'customer@example.test', 'recent');
     await expect(action('preview', { messageId: 'SU5CT1g.7.999' })).rejects.toMatchObject({ code: 'imap_selection_expired' });
     await executeAction(user, { action: 'addEvidence', caseId, source: 'manual', title: 'Order', content: 'Order was received', reference: 'ORDER-1', occurredAt: '2026-11-01T00:00:00Z' });
     await executeAction(user, { action: 'generateDraft', caseId });

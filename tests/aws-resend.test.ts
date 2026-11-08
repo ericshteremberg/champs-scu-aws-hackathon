@@ -72,3 +72,30 @@ describe('Signed Resend webhook',()=>{
   });
   it('exposes no reads through the public function URL',async()=>{expect(await resendWebhookHandler({requestContext:{http:{method:'GET'}},rawPath:'/'})).toMatchObject({statusCode:404});expect(await resendWebhookHandler({requestContext:{http:{method:'POST'}},rawPath:'/api/workspace',body:'{}'})).toMatchObject({statusCode:404});});
 });
+
+describe('Resend lookup from case context', () => {
+  it('discovers explicit Resend and message-log IDs without asking for a UUID or listing unrelated mail', async () => {
+    const evidenceId = 'linked';
+    fixture.rows.set(`${wid}|evidence#${caseId}#${evidenceId}`, { key: `evidence#${caseId}#${evidenceId}`, version: 1, data: { id: evidenceId, caseId, source: 'database', title: 'Ticket receipt', content: `Order UUID 22222222-2222-4222-8222-222222222222.`, reference: `Resend ${emailId} / message_log`, occurredAt: '2026-11-01', createdAt: '2026-11-01' } });
+    const result = await resendAction(user, { action: 'find', caseId });
+    expect(result).toMatchObject({ candidates: [{ emailId, source: 'case_reference' }], searchedEmail: 'buyer@example.test' });
+    expect(fixture.read).not.toHaveBeenCalled();
+  });
+  it('filters recent metadata to the case recipient and allowed sender, then paginates explicitly', async () => {
+    fixture.read.mockResolvedValue({ has_more: true, data: [email(), { ...email(), id: '22222222-2222-4222-8222-222222222222', to: ['other@example.test'] }, { ...email(), id: '33333333-3333-4333-8333-333333333333', from: 'bad@unrelated.test' }] });
+    const result = await resendAction(user, { action: 'find', caseId });
+    expect(result).toMatchObject({ candidates: [{ emailId, source: 'resend_recipient' }], moreAvailable: true, nextCursor: '33333333-3333-4333-8333-333333333333' });
+    expect(fixture.read).toHaveBeenCalledWith('/emails?limit=100');
+    await resendAction(user, { action: 'find', caseId, after: emailId });
+    expect(fixture.read).toHaveBeenLastCalledWith(`/emails?limit=100&after=${emailId}`);
+    fixture.read.mockResolvedValue({ ...email(), subject: 'Other order', text: 'Other order' });
+    await expect(resendAction(user, { action: 'preview', caseId, emailId })).rejects.toMatchObject({ status: 409 });
+  });
+  it('fails closed on malformed lists, case changes and unrelated workspace reads', async () => {
+    fixture.read.mockResolvedValue({ has_more: true, data: [] });
+    await expect(resendAction(user, { action: 'find', caseId })).rejects.toMatchObject({ status: 502 });
+    fixture.read.mockImplementationOnce(async () => { await executeAction(user, { action: 'updateCase', caseId, title: 'Changed' }); return { has_more: false, data: [email()] }; });
+    await expect(resendAction(user, { action: 'find', caseId })).rejects.toMatchObject({ status: 409 });
+    await expect(resendAction(other, { action: 'find', caseId })).rejects.toMatchObject({ status: 403 });
+  });
+});

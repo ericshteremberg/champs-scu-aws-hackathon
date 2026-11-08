@@ -1,20 +1,22 @@
 "use client";
 
 import { useState, type FormEvent } from 'react';
+import { CustomerLookup } from './customer-lookup';
 import { Mail, Search, Unplug } from 'lucide-react';
 import type { WorkspaceState } from '../../lib/domain';
 import type { ImapConnection, ImapDiscovery, ImapMessage, ImapPreview, ProviderStatus } from '../../lib/providers/types';
 
-export function ImapConnector({ status, cases, onChange, onImported }: { status: ProviderStatus['imap']; cases: WorkspaceState['cases']; onChange: (connection: ImapConnection | null) => void; onImported: (state: WorkspaceState, caseId: string) => void }) {
+export function ImapConnector({ status, cases, onChange, onImported, onScopeChanged }: { status: ProviderStatus['imap']; onScopeChanged?: () => Promise<void>; cases: WorkspaceState['cases']; onChange: (connection: ImapConnection | null) => void; onImported: (state: WorkspaceState, caseId: string) => void }) {
   const [setup, setSetup] = useState(false), [email, setEmail] = useState(''), [host, setHost] = useState(''), [password, setPassword] = useState(''), [sentFolder, setSentFolder] = useState(''), [consent, setConsent] = useState(false);
   const [discovery, setDiscovery] = useState<ImapDiscovery | null>(null), [advanced, setAdvanced] = useState(false), [includeSent, setIncludeSent] = useState(true);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [caseId, setCaseId] = useState(''), [messages, setMessages] = useState<ImapMessage[]>([]), [preview, setPreview] = useState<ImapPreview | null>(null), [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const [scope, setScope] = useState<'recent' | 'all'>('all'), [resolvedEmails, setResolvedEmails] = useState<Record<string, string>>({});
   const connection = status?.connection, authorized = connection?.status === 'authorized';
   const selected = cases.find(c => c.id === caseId);
   async function request(body: unknown) {
     const response = await fetch('/api/providers/imap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' });
-    const result = await response.json() as { error?: string; discovery?: ImapDiscovery; connection?: ImapConnection; messages?: ImapMessage[]; preview?: ImapPreview; moreAvailable?: boolean; scanLimited?: boolean };
+    const result = await response.json() as { error?: string; discovery?: ImapDiscovery; connection?: ImapConnection; messages?: ImapMessage[]; preview?: ImapPreview; moreAvailable?: boolean; scanLimited?: boolean; searchedEmail?: string; folders?: string[] };
     if (!response.ok) throw new Error(result.error || 'The mailbox request could not be completed.');
     return result;
   }
@@ -43,9 +45,9 @@ export function ImapConnector({ status, cases, onChange, onImported }: { status:
     setBusy(true); setError(''); setNotice('');
     if (action === 'search') { setPreview(null); setMessages([]); }
     try {
-      const result = await request({ action, ...(action === 'disconnect' ? {} : { caseId }), ...(messageId ? { messageId } : {}), ...(action === 'import' ? { confirmed: true } : {}) });
+      const result = await request({ action, ...(action === 'disconnect' ? {} : { caseId }), ...(messageId ? { messageId } : {}), ...(action === 'import' ? { confirmed: true } : {}), ...(action === 'search' ? { scope } : {}) });
       if (action === 'disconnect') { onChange(result.connection || null); setPreview(null); setMessages([]); setConfirmDisconnect(false); setNotice('Saved login removed. Revoke an app password with your provider separately. Imported evidence remains on its case.'); }
-      if (action === 'search') { setMessages(result.messages || []); setNotice(`${result.messages?.length ? 'Review messages before importing. Matching an email address alone does not prove relevance.' : 'No matching emails found in the searched folders.'}${result.scanLimited ? ' Search covered only the newest 500 messages per selected folder.' : ''}${result.moreAvailable ? ' More matches may exist; up to ten are shown.' : ''}`); }
+      if (action === 'search') { setMessages(result.messages || []); setNotice(`Searched ${result.searchedEmail || resolvedEmails[caseId] || selected?.email || 'the case email'} in ${(result.folders || connection?.folders || []).join(', ')}. ${result.messages?.length ? 'Review messages before importing. Matching an email address alone does not prove relevance.' : 'No matching mailbox emails found. A Resend-sent ticket may not be saved in this mailbox. Choose this case in the Resend tool to find its sent-email record automatically.'}${result.scanLimited ? ' Search covered only the newest 500 messages per selected folder.' : ''}${result.moreAvailable ? ' More matches may exist; up to ten are shown.' : ''}`); }
       if (action === 'preview') setPreview(result.preview || null);
       if (action === 'import') {
         setPreview(null); setMessages([]); setNotice('Reviewed email imported. Prior draft approval was cleared.');
@@ -79,7 +81,7 @@ export function ImapConnector({ status, cases, onChange, onImported }: { status:
         </details>
         {!!host.trim() && <>
           <label className="cw-field"><span>Mailbox or app password</span><input type="password" autoComplete="off" required maxLength={1024} value={password} disabled={busy} onChange={e => setPassword(e.target.value)} /></label>
-          <p className="cw-provider-note">INBOX is included.{sentFolder.trim() ? ' Your selected Sent folder is included.' : includeSent ? ' We will also include Sent if your provider identifies it. You can change this under Advanced settings.' : ' Only INBOX will be searched.'} Searches check the newest 500 messages per folder and show up to ten matches.</p>
+          <p className="cw-provider-note">INBOX is included.{sentFolder.trim() ? ' Your selected Sent folder is included.' : includeSent ? ' We will also include Sent if your provider identifies it. You can change this under Advanced settings.' : ' Only INBOX will be searched.'} Search all messages or choose the newest 500 per folder for a faster check. Up to ten matches are shown.</p>
           <p className="cw-provider-note">Your login is stored privately in AWS with encryption at rest. Causality opens folders read-only and does not send, delete or mark mail as read. Use an app password when available. This team preview shares connections with everyone using the team login.</p>
           <label className="cw-imap-consent"><input type="checkbox" checked={consent} disabled={busy} onChange={e => setConsent(e.target.checked)} />I authorize Causality to store this login and read the selected mailbox folders.</label>
           <button className="cw-button primary" disabled={busy || !consent}>{busy ? 'Checking mailbox…' : 'Test and connect mailbox'}</button>
@@ -88,8 +90,12 @@ export function ImapConnector({ status, cases, onChange, onImported }: { status:
       <button type="button" className="cw-button" disabled={busy} onClick={() => { setSetup(false); setPassword(''); setConsent(false); }}>Cancel setup</button>
     </form>)}
     {authorized && <>
-      <label className="cw-field"><span>Case for IMAP evidence</span><select disabled={busy} value={caseId} onChange={e => { setCaseId(e.target.value); setMessages([]); setPreview(null); setNotice(''); setError(''); }}><option value="">Choose a case</option>{cases.filter(c => ['needs_review', 'investigating', 'ready'].includes(c.status)).map(c => <option value={c.id} key={c.id}>{c.title} ({c.email})</option>)}</select></label>
-      {selected && <p className="cw-provider-note">Search: mail from or to {selected.email} in {connection.folders?.join(', ')}.</p>}
+      <label className="cw-field"><span>Case for IMAP evidence</span><select disabled={busy} value={caseId} onChange={e => { setCaseId(e.target.value); setMessages([]); setPreview(null); setNotice(''); setError(''); }}><option value="">Choose a case</option>{cases.filter(c => ['needs_review', 'investigating', 'ready'].includes(c.status)).map(c => <option value={c.id} key={c.id}>{c.customerName} · {c.title} ({resolvedEmails[c.id] || c.email || 'email missing'})</option>)}</select></label>
+      {selected && <>
+        <p className="cw-provider-note">Search address: <strong>{resolvedEmails[caseId] || selected.email || 'No email saved'}</strong>. IMAP searches From/To addresses, not customer names, in {connection.folders?.join(', ')}.</p>
+        <CustomerLookup onBusyChange={setBusy} onMappingSaved={onScopeChanged} key={caseId} caseId={caseId} customerName={selected.customerName} currentEmail={resolvedEmails[caseId] || selected.email} disabled={busy} onResolved={async email => { setResolvedEmails(v => ({ ...v, [caseId]: email })); setPreview(null); setMessages([]); await run('search'); }} />
+        <label className="cw-field"><span>Mailbox search range</span><select disabled={busy} value={scope} onChange={e => { setScope(e.target.value as 'recent' | 'all'); setMessages([]); setPreview(null); setNotice(''); }}><option value="all">All messages in selected folders</option><option value="recent">Newest 500 messages per folder (faster)</option></select></label>
+      </>}
       <button className="cw-button" disabled={busy || !caseId} onClick={() => void run('search')}><Search size={16} />Find customer emails via IMAP</button>
       {!!messages.length && <ul className="cw-gmail-results">{messages.map(m => <li key={m.id}><div><strong>{m.subject || '(No subject)'}</strong><p>{m.from}<br />{m.folder} · {new Date(m.occurredAt).toLocaleString()}</p></div><button className="cw-button" disabled={busy} onClick={() => { setPreview(null); void run('preview', m.id); }}>Preview email <span className="sr-only">{m.subject}</span></button></li>)}</ul>}
       {preview && <section className="cw-gmail-preview" aria-label="IMAP message preview"><h4>{preview.subject || '(No subject)'}</h4><p>From: {preview.from}<br />To: {preview.to}<br />Folder: {preview.folder}</p><pre>{preview.text}</pre><p className="cw-provider-note">Plain text only. HTML and attachments are excluded.{preview.truncated && ' Excerpt truncated to 20,000 characters.'} The preview expires after ten minutes; AWS deletion may take longer. Imported evidence is retained with the case.</p><p>Confirm this email is relevant to <strong>{selected?.title}</strong>. Importing clears previous draft approval.</p><button className="cw-button primary" disabled={busy} onClick={() => void run('import', preview.id)}>Import reviewed IMAP email</button></section>}

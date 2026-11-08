@@ -48,3 +48,6 @@ export type ImapDiscovery =
   | { kind: 'imap'; provider: string; host: string; source: 'provider_dns' | 'imaps_srv' }
   | { kind: 'oauth'; provider: 'Google' | 'Microsoft' }
   | { kind: 'manual'; reason: 'unknown' | 'unavailable' };
+
+export type CustomerLookupMapping = { table: string; idColumn: string; nameColumn: string; emailColumn: string };
+export type CustomerMatch = { id: string; sourceId: string; name: string; email: string };

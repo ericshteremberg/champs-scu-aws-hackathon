@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Database, Link2, LoaderCircle, ShieldCheck, Unplug } from 'lucide-react';
 import type { ProviderStatus, SchemaTable, SupabaseConnection, SupabaseProject } from '../../lib/providers/types';
 import './provider-connectors.css';
+import { EvidenceCollector } from './evidence-collector';
 import { ImapConnector } from './imap-provider';
 import { GmailConnector } from './gmail-provider';
 import type { WorkspaceState } from '../../lib/domain';
@@ -108,6 +109,7 @@ export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceStat
     {error && <p className="cw-banner error" role="alert">{error}</p>}
     {notice && <p className="cw-banner neutral" role="status">{notice}</p>}
     <div className="cw-provider-grid">
+      <EvidenceCollector cases={cases} />
       <article className="cw-provider-card" aria-label="Supabase account">
         <h3><Database size={20} />Supabase <span className={`cw-pill${authorized ? ' green' : ''}`}>{authorized ? 'Authorized' : connection?.status === 'reconnect_required' ? 'Reconnect required' : 'Not connected'}</span></h3>
         <p>Choose a project and review its tables.</p>
@@ -126,7 +128,7 @@ export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceStat
       <StripeAccountConnector status={status?.stripe} onChange={connection => setStatus(current => current ? { ...current, stripe: { ...current.stripe, connection } } : current)} />
       <GmailConnector status={status?.gmail} cases={cases} onImported={onImported} onChange={connection => setStatus(current => current ? { ...current, gmail: { configured: current.gmail?.configured || false, connection } } : current)} />
       <ResendConnector />
-      <ImapConnector status={status?.imap} cases={cases} onImported={onImported} onChange={connection => setStatus(current => current ? { ...current, imap: { configured: current.imap?.configured || false, connection } } : current)} />
+      <ImapConnector onScopeChanged={async () => { setStatus(await api<ProviderStatus>('/api/providers')); }} status={status?.imap} cases={cases} onImported={onImported} onChange={connection => setStatus(current => current ? { ...current, imap: { configured: current.imap?.configured || false, connection } } : current)} />
       {status && <ProviderEvidence key={`${status.supabase.connection?.updatedAt}:${status.stripe.connection?.updatedAt}`} status={status} cases={cases} onImported={onImported} />}
     </div>
   </section>;

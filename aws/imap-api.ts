@@ -96,15 +96,15 @@ export async function verifyImap(settings: ImapSettings, detectSent = false): Pr
     return folders;
   });
 }
-export async function searchImap(settings: ImapSettings, email: string) {
+export async function searchImap(settings: ImapSettings, email: string, scope: 'recent' | 'all' = 'recent') {
   if (!z.string().email().max(254).safeParse(email).success) throw new ApiError(400, 'This case needs a valid customer email before searching.', 'imap_email_required');
   return withMailbox(settings, async client => {
     const messages: ImapMessage[] = []; let moreAvailable = false; let scanLimited = false;
     for (const path of settings.folders) {
       const box = await openReadOnly(client, path);
       if (!box.exists) continue;
-      scanLimited ||= box.exists > MAX_SCAN;
-      const found = await client.search({ seq: `${Math.max(1, box.exists - MAX_SCAN + 1)}:${box.exists}`, deleted: false, or: [{ from: email }, { to: email }] }, { uid: true });
+      scanLimited ||= scope === 'recent' && box.exists > MAX_SCAN;
+      const found = await client.search({ ...(scope === 'recent' ? { seq: `${Math.max(1, box.exists - MAX_SCAN + 1)}:${box.exists}` } : {}), deleted: false, or: [{ from: email }, { to: email }] }, { uid: true });
       if (!found || !found.length) continue;
       const ids = found.sort((a, b) => b - a).slice(0, 10);
       moreAvailable ||= found.length > 10;
