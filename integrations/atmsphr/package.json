@@ -1,0 +1,21 @@
+{
+  "name": "atmsphr-evidence-adapter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --root ../.. --config integrations/atmsphr/vitest.config.ts",
+    "start": "tsx server.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.15",
+    "@types/pg": "8.23.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.12"
+  },
+  "dependencies": {
+    "pg": "8.23.1",
+    "tsx": "4.23.15",
+    "zod": "4.6.7"
+  }
+}

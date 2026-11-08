@@ -65,6 +65,8 @@ Use ATM-1044 to show that missing delivery history does not justify claiming rec
 
 ## Connect the first ATMSPHR case
 
+The merchant evidence service is implemented locally with verified schema mappings and tests, but is not deployed or connected. See [the current implementation handoff and next steps](ATMSPHR_NEXT_STEPS.md).
+
 Eric needs to deploy and verify the merchant-owned endpoint described in [EVIDENCE_API.md](EVIDENCE_API.md). Causality does not deploy it automatically or obtain database credentials.
 
 Verify the actual organizer, Stripe account and mode, payment, order, and selected support thread. Do not join solely on an email address. Configure `MERCHANT_EVIDENCE_URL`, `MERCHANT_EVIDENCE_TOKEN`, and `MERCHANT_WORKSPACE_ID` on Lambda. Import the approved external case ID, inspect the verified summary mapping, then investigate and review the result.
@@ -83,11 +85,14 @@ The current limits are 90 evidence records per case, 300 KB per database item, 3
 
 ## Division of work
 
+The four role branches and detailed startup instructions are in [the team handoffs](handoffs/README.md). Each branch shares the verified application baseline and includes all four role documents.
+
 | Owner | Next responsibility |
 | --- | --- |
-| Eric | Deploy the case endpoint, confirm the real complaint and account routing, select corroborated support records, rehearse the business story |
-| Aiden | Maintain credentials and reproducible deployments, rehearse the verified browser flow, and preserve cancellation and source/revision safeguards |
-| Both | Review original sources, measure current preparation time, record the demo, and complete submission |
+| Aiden | Connect the merchant client to AWS, improve claim-specific investigation quality, preserve safeguards, and coordinate integration/deployment |
+| Eric | Polish the organizer review workflow and give the integration teammate the actual backend access and case context |
+| Teammate 2 | Implement and verify the merchant-owned, case-scoped ATMSPHR evidence API |
+| Teammate 3 | Evaluate sourced reports, prepare the pitch and recording, and assemble submission materials |
 
 ## Submission
 
