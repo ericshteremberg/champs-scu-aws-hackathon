@@ -13,7 +13,7 @@ SHA is in Eric's return message. No merge into main or shared deployment was mad
 
 **Supabase developer registration: COMPLETE.**
 **Stripe app registration and external testing: COMPLETE.**
-**Stripe developer credential storage: approved by Eric; awaiting Stripe email identity verification before key creation.**
+**Stripe developer credential storage: COMPLETE; saved and verified in team AWS Secrets Manager.**
 **Customer OAuth end-to-end: NOT TESTED; implementation pending on Aiden's computer.**
 
 Registration does not establish a customer connection. Neither provider's
@@ -73,15 +73,38 @@ the registration contract. `DescribeSecret` confirmed the secret was absent
 before creation. No existing credentials were overwritten or rotated.
 
 `integrations/oauth/secrets-read-policy.json` contains a **proposed, unapplied**
-IAM policy granting only `secretsmanager:GetSecretValue` on this exact ARN.
+IAM policy granting only `secretsmanager:GetSecretValue` on the two exact provider ARNs.
 Aiden must wire this into the appropriate backend role and implement secret
 loading. The Lambda roles and shared stack were not modified. A working workshop
-profile proves developer access, not Lambda access. Add the Stripe ARN only after its credential is securely stored and verified.
+profile proves developer access, not Lambda access.
 
 No secret values, authorization links, or customer tokens are in this branch.
 The temporary `.env.oauth.local` was ignored by Git and mode `0600` before removal.
 The AWS secret is the cross-computer credential handoff; no local file transfer
-is necessary for Supabase.
+is necessary for either provider.
+
+### Stripe credential
+
+Secret name: `causality/dev/oauth/stripe`
+
+Secret ARN: `arn:aws:secretsmanager:us-east-1:156129572861:secret:causality/dev/oauth/stripe-gFclXy`
+
+Region: `us-east-1`; account: `156129572861`.
+
+Stored JSON fields: `clientId`, `developerApiKey`, `authorizeUrl`, `mode`,
+`redirectUri`. All five fields are present, match the captured registration,
+and were verified without displaying values. The stored mode is `live`.
+The private external-test URL is in `authorizeUrl`; never commit or publicly
+share it. `stripe-secret-location.json` contains only nonsecret location metadata.
+
+Before creation, STS identity and ownership of the existing stack were rechecked;
+`DescribeSecret` returned ResourceNotFound. No previous secret was overwritten.
+The new key is named **Causality OAuth developer**. Eric completed Stripe's
+required identity verification himself and approved key creation and secure
+storage. The key was captured directly from the one-time display into an ignored
+mode-0600 staging file, then stored in AWS and compared privately against the
+captured value. The staging file was removed after successful verification.
+Stripe's saved key note records the AWS secret location, without the key value.
 
 ## Stripe registration
 
@@ -103,22 +126,25 @@ live mode, explicitly selected by Eric.
 | Testers / installs | 0 of 25 testers / 0 installations |
 | Permissions | `dispute_read`, `charge_read` only |
 | Callback | `https://causality-hackathon-dev.slidah60.workers.dev/api/providers/stripe/callback` |
-| Developer credential | Creation and AWS storage approved; Stripe requires Eric to complete email verification first |
-| Authorization link location | Temporary ignored mode-0600 `.env.oauth.local`; not yet available cross-computer |
+| Developer credential | Dedicated standard live key created, securely stored and verified |
+| Authorization link location | AWS `causality/dev/oauth/stripe`, JSON field `authorizeUrl` |
 
 Eric reviewed and accepted the Stripe Apps developer agreement himself, then
 explicitly approved setting 0.1.0 as the external-test version. The exact link
 was copied from **External testing → Test OAuth → Live mode link**, not the
 ordinary public install links that require Marketplace publication. It opened
-Causality's **Test version** invitation, then the account selector. Account
-selection and the final customer consent permissions screen remain unverified;
-no installation was performed against the not-yet-implemented callback.
+Causality's **Test version** invitation. Selecting the already-approved Black
+Label Creators LLC developer account for a preview showed exactly **Charges and
+Refunds — Read-only** and **Payment Disputes — Read-only**. The Install app action
+was not submitted; the preview was exited using Back. No customer installation
+was performed against the not-yet-implemented callback. Stripe also notes that
+Connect webhooks are not sent to apps installed on the publishing account;
+ATMSPHR remains a separate later customer connection.
 
 The manifest requests no writes. `charge_read` also covers refund reads.
 `connected_account_read` was not added because no implemented verification
-endpoint demonstrated a need. Eric explicitly approved creating a dedicated standard live key and storing it
-in the verified AWS secret. Stripe then required email identity verification
-before creation; no new key has been issued or stored yet.
+endpoint demonstrated a need. The dedicated developer key was created and
+stored after Eric completed provider verification, as recorded above.
 
 Standard developer credentials have full access
 to the developer account; these are separate from customer OAuth grants, which
@@ -147,6 +173,7 @@ The older proposed `registration.json` has been replaced by the validated manife
 - `integrations/stripe-app/stripe-app.json`: actual uploaded manifest.
 - `integrations/stripe-app/package.json`, `package-lock.json`, `.gitignore`: upload workspace.
 - `integrations/oauth/stripe-registration.json`: nonsecret registered metadata.
+- `integrations/oauth/stripe-secret-location.json`: nonsecret credential location and fields.
 - `integrations/stripe-app/icon.svg`, `icon.png`: existing Causality branding.
 - `integrations/stripe-app/README.md`: reproducible setup contract and unblock steps.
 - `integrations/oauth/supabase-registration.json`: nonsecret registered metadata.
@@ -156,7 +183,8 @@ The older proposed `registration.json` has been replaced by the validated manife
 Checks passed: JSON parsing; exact callback/read-scope assertions; IAM action and
 exact secret ARN matching; PNG header and 300 × 300 dimensions; `git diff --check`;
 ignored-file and mode check; actual AWS secret field-presence verification;
-reopened Supabase saved settings. These are registration/configuration checks,
+reopened Supabase saved settings; Stripe consent preview confirmed the two
+read-only permission groups; dedicated Stripe key listing verified. These are registration/configuration checks,
 not customer OAuth tests. Stripe CLI upload validation passed separately as recorded above. No application code changed,
 so application builds, Bedrock runs, and synthetic data mutation suites were not run.
 
@@ -164,7 +192,7 @@ so application builds, Bedrock runs, and synthetic data mutation suites were not
 
 1. Fetch this return branch and review the containing commit. Integrate only the
    registration artifacts you need into `codex/aiden-aws-harness`.
-2. Load the Supabase secret from the ARN above in `us-east-1`; implement narrow
+2. Load both provider secrets from the ARNs above in `us-east-1`; implement narrow
    runtime IAM access. Do not paste the secret into Git, logs, frontend variables,
    or chat. No DB password, service-role key, SQL role, schema, or RLS change was needed.
 3. Implement Supabase start/callback routes with authenticated workspace binding,
@@ -173,10 +201,11 @@ so application builds, Bedrock runs, and synthetic data mutation suites were not
    callback and read-only Management API query endpoint. Enforce approved tables,
    columns, merchant/case filters, and bounded parameterized queries server-side;
    OAuth read scope itself is broader than one case.
-4. Finish secure Stripe developer key storage after Eric completes provider verification, then
-   implement Stripe OAuth using the registered app and exact private live test
-   URL. Preserve denial, replay, wrong-workspace, refresh and disconnect checks.
-   Complete the customer consent permission review with Eric before installation.
+4. Implement Stripe OAuth using the registered app, stored developer credential
+   and exact private live test URL. Preserve denial, replay, wrong-workspace,
+   refresh and disconnect checks. The developer-account consent preview passed;
+   confirm the intended customer account and permissions with Eric during the
+   later actual customer installation.
 5. Deploy backend and frontend together when ready. Only then ask Eric to use the
    Connections page for actual customer consent and an explicitly selected live
    dispute. The callbacks are still implementation targets, not verified routes.

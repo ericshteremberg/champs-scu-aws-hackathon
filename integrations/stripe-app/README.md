@@ -58,16 +58,18 @@ agreement himself and explicitly approved setting the external-test version.
 
 ## Credential and implementation boundary
 
-The intended private AWS secret is `causality/dev/oauth/stripe` in account
+The verified private AWS secret is `causality/dev/oauth/stripe` in account
 `156129572861`, `us-east-1`. Fields: `clientId`, `developerApiKey`, `authorizeUrl`,
-`mode` (`live`), `redirectUri`. See the results handoff for actual storage status.
+`mode` (`live`), `redirectUri`. Secret ARN: `arn:aws:secretsmanager:us-east-1:156129572861:secret:causality/dev/oauth/stripe-gFclXy`. All fields were verified after storage; temporary local credential staging was removed.
 The standard live developer key has full developer-account API access. Customer
 OAuth grants are separately limited by this app's read permissions. Never use a
 CLI token, customer key, or restricted key in its place, and never put it in
 frontend code, Git, logs, or the legacy `STRIPE_RESTRICTED_KEY` setting.
 
-The exact Dashboard external-test link opened Causality's Test version invite
-and account selector. Customer installation was not completed. Callback routes,
+The exact Dashboard external-test link opened Causality's Test version invite.
+The consent preview for the approved developer account showed only Charges and
+Refunds (Read-only) and Payment Disputes (Read-only). We exited without submitting
+Install app. Customer installation was not completed. Callback routes,
 OAuth exchange/refresh, protected customer tokens and end-to-end verification
 remain Aiden's implementation work; registration alone is not a working connector.
 

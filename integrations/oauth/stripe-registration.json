@@ -22,5 +22,10 @@
   ],
   "redirectUri": "https://causality-hackathon-dev.slidah60.workers.dev/api/providers/stripe/callback",
   "uploadStatus": "UPLOAD_COMPLETED",
-  "customerOAuthTested": false
+  "customerOAuthTested": false,
+  "consentPreviewVerified": true,
+  "consentPreviewPermissions": {
+    "Charges and Refunds": "Read-only",
+    "Payment Disputes": "Read-only"
+  }
 }
