@@ -1056,11 +1056,6 @@ export default function WorkspaceApp({
           .toLowerCase()
           .includes(search.toLowerCase()),
     ) ?? [];
-  const seed = () =>
-    mutate(
-      { action: "seedDemo" },
-      "Sample cases added. They are clearly labeled and do not connect to Stripe.",
-    );
 
   return (
     <div className="cw cw-shell" data-design-screen={preview?.id}>
@@ -1223,9 +1218,7 @@ export default function WorkspaceApp({
               {view === "overview" && (
                 <Overview
                   state={state}
-                  busy={busy}
                   navigate={navigate}
-                  seed={seed}
                   addCase={() => setModal("case")}
                 />
               )}
@@ -2053,20 +2046,14 @@ function Onboarding({
 
 function Overview({
   state,
-  busy,
   navigate,
-  seed,
   addCase,
 }: {
   state: WorkspaceState;
-  busy: boolean;
   navigate: (view: View, id?: string) => void;
-  seed: () => Promise<boolean>;
   addCase: () => void;
 }) {
-  const realCases = state.cases.filter((c) => c.source !== "demo"),
-    sampleOnly = !realCases.length && !!state.cases.length,
-    cases = realCases.length ? realCases : state.cases;
+  const cases = state.cases;
   const open = cases.filter((c) => !["won", "lost"].includes(c.status));
   const currencies = [...new Set(open.map((c) => c.currency))];
   const amounts = currencies.length
@@ -2092,31 +2079,17 @@ function Overview({
           <h1 style={{ marginTop: 8 }}>Overview</h1>
         </div>
         <div className="cw-actions">
-          {state.cases.length > 0 && (
-            <Button onClick={() => void seed()} disabled={busy}>
-              <Sparkles size={18} />
-              Load sample cases
-            </Button>
-          )}
           <Button primary onClick={addCase}>
             <Plus size={18} />
             New case
           </Button>
         </div>
       </div>
-      {sampleOnly && (
-        <div className="cw-banner neutral">
-          <Sparkles size={20} />
-          <p>
-            Sample data · No live Stripe records
-          </p>
-        </div>
-      )}
       <div className="cw-grid">
         <div className="cw-stat accent">
           <div className="cw-stat-label">
             <span>
-              {sampleOnly ? "Sample amount disputed" : "Amount disputed"}
+              Amount disputed
             </span>
             <CreditCard size={20} />
           </div>
@@ -2150,7 +2123,7 @@ function Overview({
         </div>
       </div>
       {!state.cases.length ? (
-        <div className="cw-two-col">
+        <div>
           <div className="cw-panel">
             <Empty
               title="No cases yet"
@@ -2166,25 +2139,7 @@ function Overview({
               </Button>
             </Empty>
           </div>
-          <div className="cw-panel">
-            <div className="cw-panel-body">
-              <span className="cw-icon-well">
-                <Sparkles size={24} />
-              </span>
-              <h2 style={{ margin: "16px 0 12px" }}>Try a sample case</h2>
-              <p>
-                Explore fictional payment, delivery and customer records.
-              </p>
-              <Button
-                className="full"
-                onClick={() => void seed()}
-                disabled={busy}
-              >
-                <Sparkles size={18} />
-                {busy ? "Loading…" : "Load sample cases"}
-              </Button>
-            </div>
-          </div>
+
         </div>
       ) : (
         <div className="cw-panel-stack">
@@ -2488,8 +2443,8 @@ function CaseDetail({
   );
   const canInvestigate =
     !busy && !resendBusy && !frozen && !investigating && current.evidence.length > 0;
-  const mode = investigationConfig?.bedrockConfigured ? "bedrock" : "sample";
-  const canUseMode = mode === "bedrock" || current.source === "demo";
+  const mode = investigationConfig?.bedrockConfigured || current.source !== "demo" ? "bedrock" : "sample";
+  const canUseMode = Boolean(investigationConfig?.bedrockConfigured) || current.source === "demo";
   const confirmReplace = () =>
     !dirty ||
     window.confirm("Replace your unsaved response edits with a new draft?");

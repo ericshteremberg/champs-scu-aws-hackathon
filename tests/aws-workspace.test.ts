@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CaseDoc, DraftDoc, StoreChange, Stored, TrustedUser } from '../aws/types.ts';
 
 const fixture = vi.hoisted(() => ({ rows: new Map<string, Stored<unknown>>(), beforeCommit: undefined as undefined | (() => void) }));
@@ -32,6 +32,7 @@ const wid = workspaceIdForUser(user.userId);
 const create = () => executeAction(user, { action: 'createWorkspace', name: 'Ticket business' });
 const samples = async () => { await create(); return executeAction(user, { action: 'seedDemo' }); };
 
+afterEach(() => vi.unstubAllEnvs());
 beforeEach(() => { fixture.rows.clear(); fixture.beforeCommit = undefined; });
 describe('AWS workspace ownership and approval lifecycle', () => {
   it('isolates owners and does not accept foreign cases', async () => {
@@ -86,5 +87,29 @@ describe('AWS workspace ownership and approval lifecycle', () => {
     await expect(executeAction(user, { action: 'saveDraft', caseId: item.id, revision: 1, content: 'Unsupported source reference [someone_elses_record]' })).rejects.toMatchObject({ code: 'invalid_citation' });
     const saved = await executeAction(user, { action: 'saveDraft', caseId: item.id, revision: 1, content: `${draft.content}\nReviewer checked the original.` });
     expect(saved.cases.find(record => record.id === item.id)!.draft).toMatchObject({ method: 'sample_investigator', revision: 2, sourceStale: false });
+  });
+});
+
+
+describe('production workspaces exclude fixtures', () => {
+  it('hides old demo cases, evidence and activity while retaining real records', async () => {
+    const seeded = await samples();
+    await executeAction(user, { action: 'addCase', title: 'Actual disputed order', customerName: 'Merchant customer', amount: 1200, reason: 'product_not_received', dueAt: '2026-12-13' });
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('CAUSALITY_TEST_FIXTURES', 'true');
+    const visible = await getWorkspaceState(user);
+    expect(visible.cases).toHaveLength(1);
+    expect(visible.cases[0].source).toBe('manual');
+    expect(visible.cases[0].evidence).toEqual([]);
+    expect(visible.activity.some(event => event.action === 'demo.loaded')).toBe(false);
+    await expect(ownedCase(wid, seeded.cases[0].id)).rejects.toMatchObject({ status: 404 });
+    await expect(executeAction(user, { action: 'seedDemo' })).rejects.toMatchObject({ status: 404 });
+  });
+  it('leaves ordinary local workspaces empty and refuses seeding', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('CAUSALITY_TEST_FIXTURES', '');
+    const state = await create();
+    expect(state.cases).toEqual([]);
+    await expect(executeAction(user, { action: 'seedDemo' })).rejects.toMatchObject({ status: 404 });
   });
 });

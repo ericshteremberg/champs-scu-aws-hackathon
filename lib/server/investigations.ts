@@ -1,3 +1,4 @@
+import { sampleDataEnabled } from './sample-data';
 import { env } from 'cloudflare:workers';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/db';
@@ -64,7 +65,7 @@ export function evidenceForClient(row: EvidenceRow): Evidence {
 
 async function getOwnedCase(workspaceId: string, id: string) {
   const row = await getDb().select().from(cases).where(and(eq(cases.workspaceId, workspaceId), eq(cases.id, id))).get();
-  if (!row) throw new ApiError(404, 'Case not found.');
+  if (!row || (!sampleDataEnabled() && row.source === 'demo')) throw new ApiError(404, 'Case not found.');
   return row;
 }
 
