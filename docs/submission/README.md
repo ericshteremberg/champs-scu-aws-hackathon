@@ -1,6 +1,6 @@
 # Causality submission preparation
 
-Status: Devpost remains DRAFT, 4/5 steps, not submitted. On November 8, 2026, saved the current Opus story, elevator pitch, built-with tags and live application link. Both AWS prizes remain selected. GitHub is now public, changed by the user. Video link is pending from the team. Eric reports that he cannot remove Zach from the judging portal; organizer assistance is needed. No final submission or customer-report update was performed.
+Status: Devpost remains DRAFT, 4/5 steps, not submitted. On November 8, 2026, saved the current Opus story, elevator pitch, built-with tags and live application link. Both AWS prizes remain selected. GitHub is now public, changed by the user. The team has added a YouTube demo link and seven gallery screenshots. A follow-up review removed Markdown heading markers and verified the rendered story, four team members, both AWS prize selections, repository link and direct live workspace link. Eric reports that he cannot remove Zach from the judging portal; organizer assistance is needed. No final submission or customer-report update was performed.
 
 ## Deadline and required actions
 
@@ -27,8 +27,8 @@ The 2:55 AM announcement from Chris Shobe in [Discord announcements](https://dis
 | Devpost story | Current Opus workflow saved | [Current copy](devpost-story.md). Final submission still pending. |
 | Devpost built-with tags | Current AWS/Claude and connector tags saved; amazon-nova removed | Complete. |
 | Demo link | Live app URL saved alongside GitHub | Public shared workspace, no username/password. |
-| Thumbnail/gallery | Placeholder thumbnail; no gallery images observed | Use Causality logo and current screenshots. Alex. |
-| Video | Empty | Record the current application and final PDF. The historical Casework video is not this app. Eric/Ayan. |
+| Thumbnail/gallery | Seven gallery screenshots are present | Gallery preserved during formatting review. |
+| Video | https://youtu.be/rm6GlSNpbKk is saved; embedded preview loads | Team video preserved. Full playback/content was not reviewed in this formatting pass. |
 | Slides | No submission slide link observed | Add the team's final deck if available. Recommended, not listed as mandatory. |
 
 The official [Devpost requirements](https://a10-x-aws-hack-26.devpost.com/) require a repository link and all teammates on the project. A short video, slides, screenshots, and logo thumbnail are recommended. The forms require project name, elevator pitch, story, and built-with tags. Media accepts JPG/PNG/GIF, 5 MB each, recommended 3:2 ratio, up to 15 gallery images. A precise video or presentation time limit was not found in the reviewed requirements. Aim for a 2 to 3 minute video, ideally about 2.5 minutes. The current Google Docs script is about 3:30; treat that as the team's plan, not an organizer rule.
