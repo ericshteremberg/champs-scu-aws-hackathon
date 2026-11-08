@@ -1,3 +1,4 @@
+import { evidenceSections } from '../lib/investigation/sections.ts';
 import { withSavedEmailContext } from './resend-history.ts';
 import { createHash, randomUUID } from 'node:crypto';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
@@ -124,23 +125,11 @@ export async function startInvestigation(user: TrustedUser, caseId: string, mode
   return serializeInvestigation(wid, run);
 }
 
-function classify(row: Evidence): EvidenceSection {
-  if (row.provenance && EVIDENCE_SECTIONS.includes(row.provenance.section as EvidenceSection)) return row.provenance.section as EvidenceSection;
-  if (row.source === 'stripe') return 'summary';
-  if ((row.source === 'gmail' || row.source === 'imap')) return 'support';
-  if (row.source === 'policy') return 'policy';
-  const text = `${row.title} ${row.content}`;
-  if (/scan|admission|attendance/i.test(text)) return 'attendance';
-  if (/recover|resend|transfer|replac/i.test(text)) return 'history';
-  if (/deliver|dispatch|email|sms|bounce|mailbox/i.test(text)) return 'delivery';
-  if (/ticket.*issu|issu.*ticket/i.test(text)) return 'tickets';
-  return 'order';
-}
 export function localEvidence(item: CaseDoc, records: Evidence[], section: EvidenceSection): EvidenceEnvelope {
-  const selected = records.filter(record => classify(record) === section).map(record => withSavedEmailContext(record, item.orderRef));
+  const selected = records.filter(record => evidenceSections(record).includes(section)).map(record => withSavedEmailContext(record, item.orderRef));
   const limitations = [...new Set(selected.flatMap(record => record.provenance?.limitations || []))];
   for (const record of selected) if (record.fileName && !record.content) limitations.push(`The attachment ${record.fileName} requires manual review. Its contents have not been extracted.`);
-  if (!selected.length) limitations.push(`No ${section} records are attached to this case. This does not establish that an event did not occur.`);
+  if (!selected.length) limitations.push(`No attached records were classified under ${section}. Related facts may appear in other source records.`);
   if (section === 'attendance') limitations.push('Missing scan records do not establish nonattendance. A scan alone does not establish cardholder identity.');
   if (section === 'policy') limitations.push('Current terms do not establish which disclosures were shown at purchase time.');
   return { caseId: item.id, section, sourceMode: item.source === 'demo' ? 'synthetic' : 'attached', fetchedAt: now(), status: !selected.length ? 'unavailable' : limitations.length ? 'partial' : 'available', limitations,

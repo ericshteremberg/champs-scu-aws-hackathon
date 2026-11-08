@@ -274,156 +274,19 @@ describe("AWS Stripe integration guards and synchronization", () => {
   });
 });
 
-describe("AWS atomic Stripe submission", () => {
-  it("allows exactly one parallel claim and sends the exact approved revision with an idempotency key", async () => {
+describe("AWS review-only submission boundary", () => {
+  it.each(["true", "false"])("blocks submissions even with legacy enable flag %s", async (flag) => {
     const h = harness();
     await h.ready();
-    const results = await Promise.allSettled([submit(h), submit(h)]);
-    expect(
-      results.filter((result) => result.status === "fulfilled"),
-    ).toHaveLength(1);
-    expect(h.update).toHaveBeenCalledTimes(1);
-    expect(h.update).toHaveBeenCalledWith(
-      h.current.id,
-      {
-        evidence: {
-          uncategorized_text:
-            "Reviewed response with the original source citation.",
-        },
-        submit: true,
-      },
-      { idempotencyKey: `causality:${workspace}:${caseId}:revision:3` },
-    );
-    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe("submitted");
-  });
-
-  it("blocks a claim when evidence changes between validation and the atomic write", async () => {
-    const h = harness();
-    await h.ready();
-    h.beforeCommit((changes) => {
-      if (
-        !changes.some(
-          (change) =>
-            (change.data as CaseDoc | undefined)?.status === "submitting",
-        )
-      )
-        return;
-      h.beforeCommit();
-      const row = h.read<CaseDoc>(keys.case(caseId))!;
-      h.put(row.key, { ...row.data, dataRevision: row.data.dataRevision + 1 });
-    });
-    await expect(submit(h)).rejects.toMatchObject({ code: "stale_submission" });
+    h.env.STRIPE_ENABLE_SUBMISSION = flag;
+    const before = structuredClone([...h.records]);
+    h.commit.mockClear(); h.client.mockClear();
+    expect(h.service.configuration(workspace).submissionEnabled).toBe(false);
+    await expect(submit(h)).rejects.toMatchObject({ status: 409, code: "submission_disabled" });
     expect(h.update).not.toHaveBeenCalled();
-  });
-
-  it("blocks a claim when the connection changes during validation", async () => {
-    const h = harness();
-    await h.ready();
-    h.beforeCommit((changes) => {
-      if (
-        !changes.some(
-          (change) =>
-            (change.data as CaseDoc | undefined)?.status === "submitting",
-        )
-      )
-        return;
-      h.beforeCommit();
-      h.put(keys.stripe, { ...h.connection, connected: false });
-    });
-    await expect(submit(h)).rejects.toMatchObject({ code: "stale_submission" });
-    expect(h.update).not.toHaveBeenCalled();
-  });
-
-  it("keeps an uncertain submission locked and does not resend it", async () => {
-    const h = harness();
-    await h.ready();
-    h.update.mockRejectedValue(new Error("Network result is unknown"));
-    await expect(submit(h)).rejects.toMatchObject({
-      status: 502,
-      code: "submission_verification_required",
-    });
-    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe("submitting");
-    await expect(submit(h)).rejects.toThrow("submission is being verified");
-    expect(h.update).toHaveBeenCalledTimes(1);
-    expect(
-      [...h.records.values()].some(
-        (row) =>
-          (row.data as { action?: string }).action ===
-          "stripe.submission_verification_required",
-      ),
-    ).toBe(true);
-    // A needs_response sync must not unfreeze or rewrite evidence from the pending attempt.
-    h.list.mockResolvedValue({
-      data: [fixture({ amount: 14000 })],
-      has_more: false,
-    });
-    await h.service.syncStripe(workspace, "Reviewer");
-    expect(h.read<CaseDoc>(keys.case(caseId))?.data).toMatchObject({
-      status: "submitting",
-      dataRevision: 1,
-    });
-  });
-
-  it("keeps the claim locked if Stripe succeeds but persistence cannot settle", async () => {
-    const h = harness();
-    await h.ready();
-    h.beforeCommit((changes) => {
-      if (
-        changes.some(
-          (change) =>
-            (change.data as CaseDoc | undefined)?.status === "submitted",
-        )
-      )
-        throw new Error("DynamoDB temporarily unavailable");
-    });
-    await expect(submit(h)).rejects.toMatchObject({
-      code: "submission_verification_required",
-    });
-    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe("submitting");
-    expect(h.update).toHaveBeenCalledTimes(1);
-  });
-
-  it.each([
-    "source_revision",
-    "unapproved",
-    "wrong_revision",
-    "unconfirmed",
-    "attachment",
-    "expired",
-    "wrong_mode",
-    "wrong_owner",
-    "disabled",
-  ] as const)("rejects %s before sending", async (scenario) => {
-    const h = harness();
-    await h.ready();
-    const draft = h.read<DraftDoc>(keys.draft(caseId))!;
-    if (scenario === "source_revision")
-      h.put(draft.key, { ...draft.data, sourceRevision: 0 });
-    if (scenario === "unapproved")
-      h.put(draft.key, { ...draft.data, status: "draft" });
-    if (scenario === "attachment")
-      h.put(keys.evidence(caseId, "file"), {
-        id: "file",
-        caseId,
-        fileKey: "private/attachment.pdf",
-      });
-    if (scenario === "expired")
-      h.retrieve.mockResolvedValue(
-        fixture({
-          evidence_details: { ...h.current.evidence_details, past_due: true },
-        }),
-      );
-    if (scenario === "wrong_mode")
-      h.retrieve.mockResolvedValue(fixture({ livemode: true }));
-    if (scenario === "disabled") h.env.STRIPE_ENABLE_SUBMISSION = "false";
-    await expect(
-      h.service.submitStripe(workspace, "Reviewer", {
-        caseId: scenario === "wrong_owner" ? "another_workspace_case" : caseId,
-        confirmed: scenario !== "unconfirmed",
-        draftRevision: scenario === "wrong_revision" ? 2 : 3,
-      }),
-    ).rejects.toBeInstanceOf(Error);
-    expect(h.update).not.toHaveBeenCalled();
+    expect(h.client).not.toHaveBeenCalled();
+    expect(h.commit).not.toHaveBeenCalled();
+    expect([...h.records]).toEqual(before);
   });
 });
 

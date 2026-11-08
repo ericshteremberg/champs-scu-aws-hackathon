@@ -53,3 +53,6 @@ yarn-error.log*
 
 # Downloaded Google OAuth client credentials
 client_secret*.json
+
+# Private locally generated customer evidence packets
+/output/pdf/

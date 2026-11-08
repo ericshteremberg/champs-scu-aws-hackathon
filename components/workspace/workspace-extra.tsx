@@ -26,6 +26,7 @@ import type {
   WorkspaceAction,
   WorkspaceState,
 } from "@/lib/domain";
+import { EvidencePacket } from './evidence-packet';
 import { formatMoney } from "@/lib/money";
 
 type Nav = (view: string, id?: string, detail?: Record<string, string>) => void;
@@ -51,15 +52,6 @@ const day = (s?: string) =>
         timeZone: "UTC",
       })
     : "Not recorded";
-const sourceLabel = (s: string) =>
-  ({
-    stripe: "Stripe",
-    gmail: "Customer email",
-    imap: "Customer email (IMAP)",
-    database: "Company record",
-    manual: "Manual evidence",
-    policy: "Company policy",
-  })[s] ?? s;
 function Action({
   children,
   onClick,
@@ -222,7 +214,7 @@ export function SetupChecklist({
           </Action>
           <div className="cw-rule" />
           <p className="cw-caption">
-            Review and confirm before submitting to Stripe.
+            Review and download your evidence PDF. Submissions are disabled.
           </p>
         </aside>
       </div>
@@ -403,7 +395,7 @@ export function ConnectionDetail({
   stripe: StripeConnectionStatus | null;
   busy: boolean;
   action: (
-    action: "connect" | "sync" | "disconnect" | "submit",
+    action: "connect" | "sync" | "disconnect",
     body?: object,
   ) => Promise<void>;
   navigate: Nav;
@@ -592,7 +584,7 @@ export function ConnectionDetail({
           </h2>
           <p>
             {isStripe
-              ? "Approval does not submit evidence. Submission requires a separate confirmation."
+              ? "Approval records your review. Submissions are disabled."
               : isEmail
                 ? "Connect Gmail to search by customer email and preview messages before import."
                 : "Your endpoint limits access to approved cases and fields. Database credentials stay with you."}
@@ -978,7 +970,6 @@ export function ReportPreview({
   dirty,
   exportEnabled = false,
   exportReport,
-  openEvidence,
 }: {
   current: DisputeCase;
   draft: string;
@@ -999,7 +990,7 @@ export function ReportPreview({
           </p>
         </div>
         <Action disabled={!exportEnabled} onClick={exportReport}>
-          Export TXT
+          Download evidence PDF
           <ArrowRight size={18} />
         </Action>
       </div>
@@ -1015,64 +1006,11 @@ export function ReportPreview({
             : current.draft?.sourceStale
               ? "Evidence changed · investigate and review again"
               : current.draft?.status === "approved"
-                ? "Approved for review · submission is separate"
+                ? "Reviewed copy · submissions disabled"
                 : "Draft · merchant review required"}
         </span>
       </div>
-      <section>
-        <h3>Customer allegation</h3>
-        <p style={{ marginTop: 10 }}>{current.reason}</p>
-      </section>
-      <section>
-        <h3>Findings</h3>
-        <div className="cw-findings" style={{ marginTop: 16 }}>
-          {current.findings.map((f, i) => (
-            <div key={i} className="cw-finding">
-              <h3>{f.title}</h3>
-              <p>{f.detail}</p>
-              <div className="cw-citations">
-                {f.evidenceIds.map((id) => (
-                  <button key={id} onClick={() => openEvidence(id)}>
-                    {current.evidence.find((e) => e.id === id)?.title ??
-                      "Source unavailable"}
-                    <ArrowRight size={14} />
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-      <section>
-        <h3>Response text</h3>
-        <div className="cw-report-document">
-          {draft ||
-            "Prepare a draft from the source records before exporting a response."}
-        </div>
-      </section>
-      <section>
-        <h3>Source register</h3>
-        <div className="cw-source-register">
-          {current.evidence.map((e, i) => (
-            <button key={e.id} onClick={() => openEvidence(e.id)}>
-              <span className="cw-source-index">
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <span>
-                <strong>{e.title}</strong>
-                <p>
-                  {sourceLabel(e.source)} · {e.reference || e.id}
-                </p>
-              </span>
-              <ArrowRight size={17} />
-            </button>
-          ))}
-        </div>
-      </section>
-      <Notice>
-        Review every claim against its source. This report includes
-        contradictions and gaps; it does not determine the bank’s decision.
-      </Notice>
+      <EvidencePacket current={current} content={draft} />
     </div>
   );
 }

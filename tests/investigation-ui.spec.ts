@@ -65,6 +65,7 @@ async function runSample(page: Page) {
     page.getByRole("heading", { name: "Investigation complete", exact: true }),
   ).toBeVisible();
   await page.getByRole("tab", { name: "Report", exact: true }).click();
+  await page.getByText("Investigation details and source review", { exact: true }).click();
   await expect(
     page.getByText("Deterministic sample. No AWS model was called.", {
       exact: true,
@@ -87,8 +88,12 @@ test("a sample investigation preserves source inspection and revision-bound revi
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Export report", exact: true }),
-  ).toBeDisabled();
+    page.getByRole("button", { name: "Download evidence PDF", exact: true }),
+  ).toBeEnabled();
+  const beforeReview = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download evidence PDF", exact: true }).click();
+  const draftPdf = await readFile((await (await beforeReview).path())!);
+  expect(draftPdf.subarray(0, 5).toString()).toBe("%PDF-");
   const citation = page
     .locator(".cw-citation")
     .filter({ hasText: "Customer acknowledged finding both tickets" })
@@ -119,17 +124,14 @@ test("a sample investigation preserves source inspection and revision-bound revi
     .getByRole("button", { name: "Approve draft", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Approved for submission", exact: true }),
+    page.getByRole("heading", { name: "Reviewed copy", exact: true }),
   ).toBeVisible();
   const textDownload = page.waitForEvent("download");
   await page
-    .getByRole("button", { name: "Export report", exact: true })
+    .getByRole("button", { name: "Download evidence PDF", exact: true })
     .click();
-  const text = await readFile((await (await textDownload).path())!, "utf8");
-  expect(text).toContain(
-    "Reviewed by the organizer against the source records.",
-  );
-  expect(text).toContain("SYNTHETIC SAMPLE: NOT FOR SUBMISSION");
+  const pdf = await readFile((await (await textDownload).path())!);
+  expect(pdf.subarray(0, 5).toString()).toBe("%PDF-");
   const jsonDownload = page.waitForEvent("download");
   await page
     .getByRole("button", { name: "Evidence JSON", exact: true })
@@ -142,7 +144,7 @@ test("a sample investigation preserves source inspection and revision-bound revi
   expect(packet.draft.analysis.evidenceIds.length).toBeGreaterThan(0);
   await draft.fill(`${await draft.inputValue()}\nAn unsaved change.`);
   await expect(
-    page.getByRole("button", { name: "Export report", exact: true }),
+    page.getByRole("button", { name: "Download evidence PDF", exact: true }),
   ).toBeDisabled();
   expect(errors).toEqual([]);
 });
@@ -415,8 +417,8 @@ test("an asynchronous AWS response reloads the draft even when the first poll is
     page.getByRole("textbox", { name: /Merchant response draft/ }),
   ).toHaveValue(content);
   await expect(
-    page.getByRole("button", { name: "Export report", exact: true }),
-  ).toBeDisabled();
+    page.getByRole("button", { name: "Download evidence PDF", exact: true }),
+  ).toBeEnabled();
 });
 
 test.describe("AWS attachment upload controls", () => {
@@ -706,7 +708,7 @@ test("unsaved navigation protection and report preview preserve reviewed export 
     page.getByRole("heading", { name: "Report preview", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Export TXT", exact: true }),
+    page.getByRole("button", { name: "Download evidence PDF", exact: true }),
   ).toBeDisabled();
   page.once("dialog", (dialog) => {
     expect(dialog.message()).toContain("without saving");
@@ -768,4 +770,18 @@ test("all upstream synthetic design screens render without reading or writing wo
   }
   expect(apiRequests).toEqual([]);
   expect(errors).toEqual([]);
+});
+
+test('review packages never offer submission and the API rejects direct submission', async ({ page }) => {
+  const { state, headers } = await setup(page);
+  const item = state.cases.find(c => c.orderRef === 'ATM-1042')!;
+  await page.goto(`/workspace?view=cases&case=${encodeURIComponent(item.id)}&tab=submission`);
+  await expect(page.getByRole('heading', { name: 'Review package', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /submit|review submission/i })).toHaveCount(0);
+  const response = await page.request.post(`${base}/api/stripe/submit`, {
+    headers: { ...headers, Origin: base },
+    data: { caseId: 'nonexistent_submission_boundary_probe', confirmed: true, draftRevision: 1 },
+  });
+  expect(response.status()).toBe(409);
+  expect((await response.json()).code).toBe('submission_disabled');
 });

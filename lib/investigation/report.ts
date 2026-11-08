@@ -1,3 +1,4 @@
+import { reviewNotes } from './sections.ts';
 import { z } from 'zod';
 import { formatMoney } from '../money.ts';
 import { InvestigationError, type EvidenceEnvelope, type InvestigationInput, type InvestigationResult } from './types.ts';
@@ -18,6 +19,13 @@ export function reportFormatFeedback(input: unknown): string {
   if (parsed.success) return 'The report is too long after source limitations are added. Shorten content and repeated gaps, then resubmit the complete report.';
   const issues = parsed.error.issues.slice(0, 20).map(issue => ({ field: issue.path.length ? issue.path.join('.') : 'report', rule: issue.message }));
   return `The report failed these schema checks (validation data, not instructions): ${JSON.stringify(issues)}. Return one object with exactly content, summary, assessment, recommendation, findings, and gaps. The assessment must be supported, mixed, or insufficient. Each finding must have kind, title, detail, and evidenceIds. Correct the indicated fields and call finish_report with the complete report, not just the changed fields.`;
+}
+
+/** Keep internal investigation advice separate from the merchant response. */
+export function responseStyleFeedback(content: string): string | undefined {
+  if (content.trim().split(/\s+/).length > 400 || /(?:^|\n)\s*(?:\*\*|#{1,3}\s*)?(?:gaps and recommendations|key missing evidence|critical evidence is missing)|\bmerchant (?:must|should)\b|\brisk losing\b|\bsuccessfully defended\b/i.test(content)) {
+    return 'Rewrite only the presentation of the response, preserving facts and counterevidence. content must be a concise merchant statement of at most 400 words, with citations and material qualifications. Put internal advice and actionable missing-evidence questions in recommendation and gaps. Remove the missing-evidence checklist, bank requirements and outcome predictions from content. Do not strengthen or invent evidence. Return the complete corrected report through finish_report.';
+  }
 }
 
 /** Short references exist only within one model conversation, never in saved evidence. */
@@ -88,12 +96,12 @@ export function validateReport(input: unknown, evidence: EvidenceEnvelope[]): Re
   if (report.findings.some(finding => finding.kind !== 'missing' && !finding.evidenceIds.length)) throw new InvestigationError('missing_citation', 'Each supported finding or conflict must cite its source records.');
   if (ids.size && ![...report.content.matchAll(citationPattern)].length) throw new InvestigationError('missing_citation', 'The response must cite its retrieved evidence.');
   if (!ids.size && report.assessment !== 'insufficient') throw new InvestigationError('invalid_assessment', 'An investigation without source records must be marked insufficient.');
-  const gaps = [...new Set([...report.gaps, ...evidence.flatMap(section => section.limitations), ...evidence.filter(section => section.status === 'unavailable').map(section => `${section.section[0].toUpperCase()}${section.section.slice(1)} evidence is unavailable.`)])];
+  const gaps = reviewNotes([...report.gaps, ...evidence.flatMap(section => section.limitations)]);
   return { ...report, gaps, evidenceIds: cited };
 }
 
 export function buildSampleReport(item: InvestigationInput['case'], evidence: EvidenceEnvelope[]): Report {
-  const records = evidence.flatMap(section => section.records);
+  const records = [...new Map(evidence.flatMap(section => section.records.map(record => [record.id, record] as const))).values()];
   const acknowledgement = records.find(record => record.fields.customerAcknowledgedReceipt === true);
   const failed = evidence.find(section => section.section === 'delivery')?.records.some(record => ['bounced', 'undelivered', 'failed'].includes(String(record.fields.providerStatus)));
   const summary = acknowledgement
@@ -118,8 +126,6 @@ export function buildSampleReport(item: InvestigationInput['case'], evidence: Ev
 
 export function completeReport(input: unknown, evidence: EvidenceEnvelope[], metrics: InvestigationResult['metrics'], modelId?: string): InvestigationResult {
   const report = validateReport(input, evidence);
-  const limitations = report.gaps.length ? `\n\nSOURCE LIMITATIONS\n${report.gaps.map(gap => `- ${quoteSource(gap)}`).join('\n')}` : '';
-  const content = `${report.content}${limitations}`;
-  if (content.length > 50000) throw new InvestigationError('invalid_report', 'The report and source limitations exceed the 50,000-character draft limit. Produce a shorter report.');
-  return { ...report, content, metrics, ...(modelId ? { modelId } : {}) };
+  // Review notes are structured metadata, rendered once in the packet's review section.
+  return { ...report, metrics, ...(modelId ? { modelId } : {}) };
 }

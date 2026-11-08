@@ -1,0 +1,52 @@
+import assert from 'node:assert/strict';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { chromium, expect } from '@playwright/test';
+import { PDFDocument } from 'pdf-lib';
+
+const base = 'https://causality-hackathon-dev.slidah60.workers.dev';
+const caseId = process.env.CAUSALITY_SMOKE_CASE_ID;
+assert.ok(caseId, 'Set CAUSALITY_SMOKE_CASE_ID to an authorized case.');
+const password = readFileSync('.dev-worker-access.txt', 'utf8').match(/^Password: (.+)$/m)?.[1];
+assert.ok(password);
+const headers = { Authorization: `Basic ${Buffer.from(`dev:${password}`).toString('base64')}` };
+const readCase = async () => {
+  const response = await fetch(`${base}/api/workspace`, { headers });
+  assert.equal(response.status, 200);
+  return (await response.json()).cases.find(value => value.id === caseId);
+};
+const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const before = await readCase(); assert.ok(before?.draft);
+const browser = await chromium.launch({ channel: process.env.CI ? undefined : 'chrome', headless: true });
+try {
+  const context = await browser.newContext({ httpCredentials: { username: 'dev', password, origin: base }, viewport: { width: 1440, height: 1000 } });
+  const page = await context.newPage(), errors = [], writes = [];
+  page.on('pageerror', error => errors.push(error.name));
+  page.on('request', request => { if (request.method() === 'POST') writes.push(new URL(request.url()).pathname); });
+  await page.goto(`${base}/workspace?view=cases&case=${encodeURIComponent(caseId)}&tab=report`);
+  const preview = page.getByRole('article', { name: 'Evidence packet preview' });
+  await expect(preview).toBeVisible();
+  await expect(page.getByRole('button', { name: /submit|review submission/i })).toHaveCount(0);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download evidence PDF', exact: true }).click();
+  const file = await download;
+  mkdirSync('.aws-build/pdf-review', { recursive: true });
+  const path = '.aws-build/pdf-review/download.pdf'; await file.saveAs(path);
+  const bytes = readFileSync(path);
+  assert.equal(bytes.subarray(0, 5).toString(), '%PDF-');
+  const pdf = await PDFDocument.load(bytes);
+  assert.ok(pdf.getPageCount() > 0);
+  assert.equal(pdf.getTitle(), `Evidence packet | ${before.orderRef || before.id}`);
+  await page.screenshot({ path: '.aws-build/pdf-review/desktop.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  await page.screenshot({ path: '.aws-build/pdf-review/mobile.png', fullPage: true });
+  await page.getByRole('tab', { name: 'Review package', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Review package', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /submit|review submission/i })).toHaveCount(0);
+  assert.deepEqual(errors, []); assert.deepEqual(writes, []);
+  const after = await readCase(); assert.equal(digest(after), digest(before), 'Export must not mutate the case.');
+  const result = { passed: true, pages: pdf.getPageCount(), bytes: bytes.length, records: before.evidence.length, unchanged: true, writes: 0 };
+  writeFileSync('.aws-build/pdf-review/browser-result.json', JSON.stringify(result, null, 2));
+  console.log(JSON.stringify(result));
+} finally { await browser.close(); }
