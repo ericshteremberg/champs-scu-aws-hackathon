@@ -26,11 +26,11 @@ The historical [free-prose prompt evaluation](prompt-results.md) is retained for
 
 ## Software and CLI verification
 
-- Full application checks passed with **56 Node tests and 124 investigation/AWS unit tests**, type checking, frontend build and Lambda build before the latest mainline integration.
+- Full application checks passed with **56 Node tests and 124 investigation/AWS unit tests**, type checking, frontend build and Lambda build after merging main through `9e8e473`.
 - Regression coverage includes wrong-order records, queue versus provider events, acknowledgement field requirements, forged prose/citations/labels, unknown/duplicate/omitted fact IDs, wrong sections, date/timezone handling, unknown schemas, cancellation and finite correction attempts.
 - The CLI's five regression tests cover source hashes, selected versus internal material, empty-support packets, original image byte preservation, cross-case input rejection, unselected file rejection, overwrite protection and HTML escaping. Root CI tests use `--no-screenshots`; screenshot generation was additionally exercised with real local Chrome.
 - The [fictional packet example](packet-example/README.txt) contains seven text exhibits and seven clearly labeled transcript PNGs. The acknowledgement and SMS renders were visually inspected. They are not original customer screenshots. Supplied original-image copying and its hashes are tested separately.
-- Browser acceptance passed all 13 tests before the final source-order hardening, and investigation API acceptance passed. Final post-integration verification is recorded in the contributor handoff.
+- Final browser acceptance passed all 13 tests, including human-edit labeling and mobile layout. Both API suites and the separate adapter's type check and 90 tests passed. Details are recorded in the contributor handoff.
 
 Reproduce a new paid live batch with `node docs/evaluation/run-prompt-evaluation.mjs --repeats=2`, then audit offline with `node docs/evaluation/review-inventory-runs.mjs`. New inventory runs are written to `inventory-runs/`; the older `prompt-runs/` directory is left unchanged.
 

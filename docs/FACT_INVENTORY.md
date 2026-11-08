@@ -28,6 +28,8 @@ flowchart LR
 
 The merchant-selected preparation policy is `challenge_all`. This is a workflow preference, not a claim about fees, evidence strength or outcome probability.
 
+V1 selects receipt-dispute facts only when the case's reason is the canonical `product_not_received` value. Merchant-imported cases currently store the free-text complaint in that field, so they remain specialist-review cases until a separately verified canonical reason is preserved. The implementation does not guess a reason code from prose or a title.
+
 The outgoing response contains only code-selected supporting facts and relevant transaction context. Weak, contradictory and unmapped material is retained in the **internal** inventory rather than dumped into the outgoing letter. Necessary qualifications stay with selected statements: an SMS provider status cannot become proof of reading, for example.
 
 For the current receipt-dispute rules, a matched acknowledgement, completed order-linked recovery or a recognized provider-marked delivery event can supply affirmative material. Payment/order/issuance context is selected only when affirmative material exists. Email acceptance, failed attempts, unknown queue statuses and quoted free text are not affirmative packet facts. Attendance scans and policy versions currently require further review rather than automatic selection.
