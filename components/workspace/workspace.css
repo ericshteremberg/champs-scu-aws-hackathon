@@ -1911,6 +1911,12 @@
   padding: 0;
   background: transparent;
 }
+.cw-settings-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 79px;
+}
 .cw-design-note {
   position: fixed;
   bottom: 12px;
