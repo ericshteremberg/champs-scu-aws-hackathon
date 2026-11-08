@@ -1,8 +1,8 @@
 # Evaluation and local rehearsal
 
-This directory owns evaluation tools, source review and demo rehearsal. Application prompt/UI changes remain outside this branch's scope. Submission work is deferred at the user's request; the selected track is AWS.
+This directory owns evaluation tools, source review and demo rehearsal. The user subsequently authorized prompt fixes, regression tests and a real Bedrock rerun on this branch. Submission work remains deferred; the selected track is AWS.
 
-See [the checkpoint note](RELEASE-NOTE.md) for unresolved product issues and the proposed validation harness. This branch is ready to share as evaluation work, not as a claim that generation defects are fixed.
+See [the prompt-rerun results](prompt-results.md) for the latest application changes and remaining defects. The earlier [checkpoint note](RELEASE-NOTE.md) documents the pre-fix baseline. This branch is ready to share with its observed limitations, not as a guarantee of correct generation.
 
 ## Work completed on this branch
 
@@ -11,7 +11,16 @@ See [the checkpoint note](RELEASE-NOTE.md) for unresolved product issues and the
 - Local browser acceptance and [recorded sample rehearsal](artifacts/README.md): current Causality interface, isolated fictional cases, source inspection, saved edit, exact-revision approval and sample export.
 - Live runner provenance: `run-evaluation.mjs` now records API **and investigator** Lambda metadata before and after each run, the full local commit, working application diff and source fingerprint. It stops after saving a result if the deployment changes. Configuration secrets are never persisted.
 
-The evaluation scripts pass syntax and ESLint checks. The offline audit was exercised on the six real saved artifacts and on a deliberately broken citation, which correctly returned exit 1. The capture script was exercised against the local app. Changes to the live runner have not been executed against AWS; no new paid inference or deployment was needed for this branch's work.
+The evaluation scripts pass syntax and ESLint checks. The offline audit was exercised on the six saved baseline artifacts and on a deliberately broken citation, which correctly returned exit 1. The capture script was exercised against the local app. The Lambda-targeted `run-evaluation.mjs` provenance change has not been exercised against AWS. The separate local-engine runner made six real Bedrock investigations over the prompt revision; no deployment was required.
+
+## Evaluate a local prompt change
+
+```sh
+node docs/evaluation/run-prompt-evaluation.mjs --repeats=2
+node docs/evaluation/review-prompt-runs.mjs
+```
+
+The first command bundles the actual local engine and backend evidence adapter, uses the existing AWS session, and makes real paid Bedrock calls on fictional fixtures. It does not deploy, invoke Lambda or mutate shared workspaces. Source and input fingerprints, traces, output and token counts are saved in `prompt-runs/`. The second command rechecks those outputs offline. Its regression signals are not a semantic accuracy score or production validation gate. See [the observed results](prompt-results.md).
 
 ## Repeat the local rehearsal
 

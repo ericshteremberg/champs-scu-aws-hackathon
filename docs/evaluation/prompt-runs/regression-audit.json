@@ -1,0 +1,124 @@
+{
+  "note": "Current fixture-specific regression signals supersede initial raw regressionSignals; this is not a semantic accuracy score or human sign-off.",
+  "checkerSha256": "a2eecde58e32fa0c0bb77000cef238697c986e43dc88a735bc9f9c4a7470f427",
+  "batch": "ca6a0990-a1e3-4e1a-8aeb-13a7973ba0a5",
+  "runs": 6,
+  "completed": 6,
+  "citationOccurrences": 50,
+  "uniqueReferencesSummedPerRun": 50,
+  "unresolvedOrUnretrieved": 0,
+  "rows": [
+    {
+      "file": "ATM-1042-run_2cab3094-eb84-401b-af4e-fa620f0fc565.json",
+      "artifactSha256": "df46355c5f70325bb85eb526cbec08b6179faf3e818d1c9c43fbd4293851de81",
+      "order": "ATM-1042",
+      "repeat": 1,
+      "runId": "run_2cab3094-eb84-401b-af4e-fa620f0fc565",
+      "status": "completed",
+      "assessment": "supported",
+      "citationOccurrences": 10,
+      "uniqueReferences": 10,
+      "unresolvedOrUnretrieved": [],
+      "gaps": 10,
+      "modelCalls": 3,
+      "issues": []
+    },
+    {
+      "file": "ATM-1042-run_5c05af36-608c-4cc2-b247-a7fb85390880.json",
+      "artifactSha256": "d9be8ce480ff9ad9852ebf8e3dfd6b9b126f3d3d28c1fd2613b9bddd1070c8e6",
+      "order": "ATM-1042",
+      "repeat": 2,
+      "runId": "run_5c05af36-608c-4cc2-b247-a7fb85390880",
+      "status": "completed",
+      "assessment": "supported",
+      "citationOccurrences": 10,
+      "uniqueReferences": 10,
+      "unresolvedOrUnretrieved": [],
+      "gaps": 10,
+      "modelCalls": 3,
+      "issues": []
+    },
+    {
+      "file": "ATM-1043-run_0891d8d5-208f-4542-935d-ba740934ebb0.json",
+      "artifactSha256": "9fddbfbf64502e42966b006147f2326d8dcf051fe86a03568dbe43699ebad7a9",
+      "order": "ATM-1043",
+      "repeat": 2,
+      "runId": "run_0891d8d5-208f-4542-935d-ba740934ebb0",
+      "status": "completed",
+      "assessment": "mixed",
+      "citationOccurrences": 10,
+      "uniqueReferences": 10,
+      "unresolvedOrUnretrieved": [],
+      "gaps": 12,
+      "modelCalls": 3,
+      "issues": []
+    },
+    {
+      "file": "ATM-1043-run_4a0296c8-072e-4755-b3c4-ec144761911a.json",
+      "artifactSha256": "48cf8a7c0c02ecda5b189012f1bc742bb25bdf4f193307551f05075e3c3f9cad",
+      "order": "ATM-1043",
+      "repeat": 1,
+      "runId": "run_4a0296c8-072e-4755-b3c4-ec144761911a",
+      "status": "completed",
+      "assessment": "mixed",
+      "citationOccurrences": 10,
+      "uniqueReferences": 10,
+      "unresolvedOrUnretrieved": [],
+      "gaps": 12,
+      "modelCalls": 3,
+      "issues": []
+    },
+    {
+      "file": "ATM-1044-run_241029b5-07f9-4d26-a1a1-3cb9499d33d0.json",
+      "artifactSha256": "3a4dd55819a1fabdba8cf82469aa8b617b16a27f15712a5bc239d1a3d847ed01",
+      "order": "ATM-1044",
+      "repeat": 1,
+      "runId": "run_241029b5-07f9-4d26-a1a1-3cb9499d33d0",
+      "status": "completed",
+      "assessment": "insufficient",
+      "citationOccurrences": 5,
+      "uniqueReferences": 5,
+      "unresolvedOrUnretrieved": [],
+      "gaps": 17,
+      "modelCalls": 8,
+      "issues": [
+        {
+          "code": "verbose_gaps",
+          "severity": "review",
+          "message": "17 gap entries; check semantic repetition."
+        }
+      ]
+    },
+    {
+      "file": "ATM-1044-run_b74bed9f-1bf9-4d6d-b3fc-b704627e39a9.json",
+      "artifactSha256": "01d4ae5e0babe0cf1b6e24338bf35f328c67b4e8a819f0f602395d40b268153d",
+      "order": "ATM-1044",
+      "repeat": 2,
+      "runId": "run_b74bed9f-1bf9-4d6d-b3fc-b704627e39a9",
+      "status": "completed",
+      "assessment": "insufficient",
+      "citationOccurrences": 5,
+      "uniqueReferences": 5,
+      "unresolvedOrUnretrieved": [],
+      "gaps": 15,
+      "modelCalls": 8,
+      "issues": [
+        {
+          "code": "verbose_gaps",
+          "severity": "review",
+          "message": "15 gap entries; check semantic repetition."
+        },
+        {
+          "code": "issuance_source_citation",
+          "severity": "failure",
+          "message": "An issuance sentence cites no ticket-issuance record; the order record alone confirms the order, not issuance."
+        },
+        {
+          "code": "unscoped_absence",
+          "severity": "review",
+          "message": "Prefer records unavailable or no scan recorded in the selected records over a claim that no records exist."
+        }
+      ]
+    }
+  ]
+}

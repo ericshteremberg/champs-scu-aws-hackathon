@@ -36,6 +36,31 @@ function wire(section: EvidenceSection = 'summary') {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('portable investigation engine', () => {
+  it('sends the evidence-response contract on retrieval and finish calls', async () => {
+    let calls = 0;
+    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
+      calls++;
+      const system = request.system?.map(block => block.text || '').join('\n') || '';
+      for (const rule of [
+        'mixed: records point both ways OR materially support',
+        'insufficient: key evidence cannot establish either side',
+        'email accepted for processing is not inbox delivery',
+        'A complaint about missing tickets does not assert nonattendance',
+        "cite the provider's retry outcome record",
+        'only the next evidence-review step',
+        "eventStartsAt converted to the record's eventTimezone",
+        'Do not restate source limitations',
+        "actual merchant response to the payment provider in the merchant's voice",
+      ]) expect(system).toContain(rule);
+      const finish = request.toolConfig?.tools?.find(tool => tool.toolSpec?.name === 'finish_report')?.toolSpec;
+      expect(finish?.description).toContain('mixed includes evidence backing the complaint');
+      if (calls === 1) return modelResponse((['order', 'tickets', 'delivery', 'support'] as const).map(section => ({ name: 'get_evidence', input: { section } })));
+      return modelResponse([{ name: 'finish_report', input: report() }]);
+    });
+    await runInvestigation(input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke }));
+    expect(calls).toBe(2);
+  });
+
   it('retrieves scoped records, preserves IDs, and labels sample output honestly', async () => {
     const options = input();
     const result = await runInvestigation(options);

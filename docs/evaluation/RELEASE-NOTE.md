@@ -1,5 +1,7 @@
 # Evaluation checkpoint: ready to share, generation defects remain
 
+This note describes checkpoint `d005747`, before the user authorized prompt changes. See [the subsequent prompt revision and six live reruns](prompt-results.md) for the current state and remaining defects. The historical observations below are retained as baseline context.
+
 This checkpoint on `codex/demo-evaluation` adds evaluation tools, source-review material and a current local demo rehearsal. It is not a production-readiness sign-off and does not fix the model's generation behavior.
 
 ## Verified

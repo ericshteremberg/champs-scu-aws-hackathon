@@ -1,0 +1,218 @@
+{
+  "batch": "ca6a0990-a1e3-4e1a-8aeb-13a7973ba0a5",
+  "execution": "local engine, real Bedrock; no deployed API or storage",
+  "source": {
+    "commit": "d005747c33bae6363cf50c3d5043404a1fe7de42",
+    "files": [
+      {
+        "file": "aws/investigations.ts",
+        "sha256": "e26522bf00e8ca24a1280e9293583d5ad0568d12f5d7a4c5c2939c2c28afd27a"
+      },
+      {
+        "file": "aws/store.ts",
+        "sha256": "56134eac5ecc2af484b38cb96fb91b34ee9cf2bf8f6254b1f01bc35f8faed12f"
+      },
+      {
+        "file": "aws/stripe.ts",
+        "sha256": "6dcde33ea7f1c1646ca5c9ef6b0accb80e76992f0f162932f79673b8a670d385"
+      },
+      {
+        "file": "aws/types.ts",
+        "sha256": "26f4929d27abc59e361165bc6a2121d3703f3c4ce22d03fdcfdc5574569c2c14"
+      },
+      {
+        "file": "aws/workspace.ts",
+        "sha256": "cc3933c931964c10b893ec5198074330958bee906b54416c889daf6682501a1b"
+      },
+      {
+        "file": "lib/demo.ts",
+        "sha256": "98ea6f523f9507c45c2fb11b14d024033af0462d1de73b08ea81117457ccf71b"
+      },
+      {
+        "file": "lib/investigation/engine.ts",
+        "sha256": "244d6755fef88d92121f7d231b7742630c1df4e9588fb876b069bf4126bbcae7"
+      },
+      {
+        "file": "lib/investigation/merchant.ts",
+        "sha256": "6ea5f2037f00af2fd21644c716d6454be688e6c94497b64d23356d66482914e3"
+      },
+      {
+        "file": "lib/investigation/prompt.ts",
+        "sha256": "a71221cbd42739ba8e4c8a3efea7ad7b603bc9f86e8546b22a4264550e39d39b"
+      },
+      {
+        "file": "lib/investigation/report.ts",
+        "sha256": "2f074954cadba4197d58d789dcd353d77ed9f8fd59ec40101cb1a7c2c583c095"
+      },
+      {
+        "file": "lib/investigation/types.ts",
+        "sha256": "17bbdf3ccec5d4e19c8e630c882423d3be37edc8d93e267eeccde58e7c6b0de4"
+      },
+      {
+        "file": "lib/money.ts",
+        "sha256": "25ee1b0610f19e013fdc35d8abf81b3a527dd093df6e15b03fc0e6b6f06c7929"
+      },
+      {
+        "file": "lib/server/report.ts",
+        "sha256": "d441b50b9687315d8b23497a2b3fa78867620ac5a869d397f2dc974032cff556"
+      },
+      {
+        "file": "lib/server/validation.ts",
+        "sha256": "e1eb649feee64621b38e756f60b236834fc899c9906efeb454e862f011dc3610"
+      },
+      {
+        "file": "lib/stripe/model.ts",
+        "sha256": "68ac090bde1c20df3731f3c9a2a312c3470a30831259262628cd04ae4a44e24c"
+      },
+      {
+        "file": "lib/ticket-demo.ts",
+        "sha256": "fe2a6aca28c0356c6d4f9170b61999aacd19c6f418ccb5aed136fcfa5eca11fe"
+      }
+    ],
+    "sourceTreeSha256": "bc534f82cf79f83bfcd060ff8d7445ab512a961d5fb7e927e49cb74c8c08820d",
+    "bundleSha256": "d3bb084a7a21921f5c30ee6f1130d0a0178a83b8d8df06645aead62c1601134b",
+    "note": "Actual locally bundled source; includes uncommitted files. No claim about the deployed Lambda build."
+  },
+  "promptSha256": "85f36a43b27b2d132f09e8267e1ae9bc635f2d9a5dc5fd393959e1574718579f",
+  "modelId": "us.amazon.nova-2-lite-v1:0",
+  "region": "us-east-1",
+  "rows": [
+    {
+      "order": "ATM-1042",
+      "repeat": 1,
+      "runId": "run_2cab3094-eb84-401b-af4e-fa620f0fc565",
+      "status": "completed",
+      "assessment": "supported",
+      "metrics": {
+        "durationMs": 10442,
+        "toolCalls": 8,
+        "recordCount": 11,
+        "modelCalls": 3
+      },
+      "usage": {
+        "inputTokens": 18803,
+        "outputTokens": 1513
+      },
+      "issues": [],
+      "file": "ATM-1042-run_2cab3094-eb84-401b-af4e-fa620f0fc565.json"
+    },
+    {
+      "order": "ATM-1043",
+      "repeat": 1,
+      "runId": "run_4a0296c8-072e-4755-b3c4-ec144761911a",
+      "status": "completed",
+      "assessment": "mixed",
+      "metrics": {
+        "durationMs": 7985,
+        "toolCalls": 8,
+        "recordCount": 10,
+        "modelCalls": 3
+      },
+      "usage": {
+        "inputTokens": 18344,
+        "outputTokens": 1393
+      },
+      "issues": [],
+      "file": "ATM-1043-run_4a0296c8-072e-4755-b3c4-ec144761911a.json"
+    },
+    {
+      "order": "ATM-1044",
+      "repeat": 1,
+      "runId": "run_241029b5-07f9-4d26-a1a1-3cb9499d33d0",
+      "status": "completed",
+      "assessment": "insufficient",
+      "metrics": {
+        "durationMs": 12983,
+        "toolCalls": 8,
+        "recordCount": 5,
+        "modelCalls": 8
+      },
+      "usage": {
+        "inputTokens": 34484,
+        "outputTokens": 809
+      },
+      "issues": [
+        {
+          "code": "verbose_gaps",
+          "severity": "review",
+          "message": "17 gap entries; check semantic repetition."
+        },
+        {
+          "code": "missing_history_as_delivery",
+          "severity": "failure",
+          "message": "Missing history is being treated as delivery."
+        }
+      ],
+      "file": "ATM-1044-run_241029b5-07f9-4d26-a1a1-3cb9499d33d0.json"
+    },
+    {
+      "order": "ATM-1042",
+      "repeat": 2,
+      "runId": "run_5c05af36-608c-4cc2-b247-a7fb85390880",
+      "status": "completed",
+      "assessment": "supported",
+      "metrics": {
+        "durationMs": 9055,
+        "toolCalls": 8,
+        "recordCount": 11,
+        "modelCalls": 3
+      },
+      "usage": {
+        "inputTokens": 18833,
+        "outputTokens": 1573
+      },
+      "issues": [],
+      "file": "ATM-1042-run_5c05af36-608c-4cc2-b247-a7fb85390880.json"
+    },
+    {
+      "order": "ATM-1043",
+      "repeat": 2,
+      "runId": "run_0891d8d5-208f-4542-935d-ba740934ebb0",
+      "status": "completed",
+      "assessment": "mixed",
+      "metrics": {
+        "durationMs": 7937,
+        "toolCalls": 8,
+        "recordCount": 10,
+        "modelCalls": 3
+      },
+      "usage": {
+        "inputTokens": 18255,
+        "outputTokens": 1251
+      },
+      "issues": [],
+      "file": "ATM-1043-run_0891d8d5-208f-4542-935d-ba740934ebb0.json"
+    },
+    {
+      "order": "ATM-1044",
+      "repeat": 2,
+      "runId": "run_b74bed9f-1bf9-4d6d-b3fc-b704627e39a9",
+      "status": "completed",
+      "assessment": "insufficient",
+      "metrics": {
+        "durationMs": 11149,
+        "toolCalls": 8,
+        "recordCount": 5,
+        "modelCalls": 8
+      },
+      "usage": {
+        "inputTokens": 34484,
+        "outputTokens": 681
+      },
+      "issues": [
+        {
+          "code": "verbose_gaps",
+          "severity": "review",
+          "message": "15 gap entries; check semantic repetition."
+        },
+        {
+          "code": "missing_history_as_delivery",
+          "severity": "failure",
+          "message": "Missing history is being treated as delivery."
+        }
+      ],
+      "file": "ATM-1044-run_b74bed9f-1bf9-4d6d-b3fc-b704627e39a9.json"
+    }
+  ],
+  "semanticReview": "pending; regression signals are fixture-specific checks, not proof of claim support"
+}

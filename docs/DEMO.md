@@ -30,6 +30,8 @@ If a model call is slow, use the recorded backup and identify it as a recording.
 
 ## Ticket examples
 
+The [prompt revision and six live reruns](evaluation/prompt-results.md) now record improved labels and wording, plus the remaining citation and limitations issues. These local-engine Bedrock runs do not establish that the shared deployment has been updated. The recorded walkthrough above remains a baseline deterministic sample capture.
+
 Observed live-run results for these cases, including wording the model overstated, are in [evaluation/results.md](evaluation/results.md). Read them before rehearsing: for example, ATM-1042 summaries said the tickets were "delivered" although only the SMS was marked delivered, so the edit step in the walkthrough should fix that exact wording on screen.
 
 | Case | Evidence lesson |

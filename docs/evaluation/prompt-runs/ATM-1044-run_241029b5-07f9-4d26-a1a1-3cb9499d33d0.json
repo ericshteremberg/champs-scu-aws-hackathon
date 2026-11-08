@@ -1,0 +1,608 @@
+{
+  "order": "ATM-1044",
+  "caseId": "case_atm_1044",
+  "startedAt": "2026-11-08T03:17:53.075Z",
+  "finishedAt": "2026-11-08T03:18:06.058Z",
+  "batch": "ca6a0990-a1e3-4e1a-8aeb-13a7973ba0a5",
+  "repeat": 1,
+  "repoCommit": "d005747c33bae6363cf50c3d5043404a1fe7de42",
+  "execution": "local engine, real Bedrock; no deployed API or storage",
+  "source": {
+    "commit": "d005747c33bae6363cf50c3d5043404a1fe7de42",
+    "files": [
+      {
+        "file": "aws/investigations.ts",
+        "sha256": "e26522bf00e8ca24a1280e9293583d5ad0568d12f5d7a4c5c2939c2c28afd27a"
+      },
+      {
+        "file": "aws/store.ts",
+        "sha256": "56134eac5ecc2af484b38cb96fb91b34ee9cf2bf8f6254b1f01bc35f8faed12f"
+      },
+      {
+        "file": "aws/stripe.ts",
+        "sha256": "6dcde33ea7f1c1646ca5c9ef6b0accb80e76992f0f162932f79673b8a670d385"
+      },
+      {
+        "file": "aws/types.ts",
+        "sha256": "26f4929d27abc59e361165bc6a2121d3703f3c4ce22d03fdcfdc5574569c2c14"
+      },
+      {
+        "file": "aws/workspace.ts",
+        "sha256": "cc3933c931964c10b893ec5198074330958bee906b54416c889daf6682501a1b"
+      },
+      {
+        "file": "lib/demo.ts",
+        "sha256": "98ea6f523f9507c45c2fb11b14d024033af0462d1de73b08ea81117457ccf71b"
+      },
+      {
+        "file": "lib/investigation/engine.ts",
+        "sha256": "244d6755fef88d92121f7d231b7742630c1df4e9588fb876b069bf4126bbcae7"
+      },
+      {
+        "file": "lib/investigation/merchant.ts",
+        "sha256": "6ea5f2037f00af2fd21644c716d6454be688e6c94497b64d23356d66482914e3"
+      },
+      {
+        "file": "lib/investigation/prompt.ts",
+        "sha256": "a71221cbd42739ba8e4c8a3efea7ad7b603bc9f86e8546b22a4264550e39d39b"
+      },
+      {
+        "file": "lib/investigation/report.ts",
+        "sha256": "2f074954cadba4197d58d789dcd353d77ed9f8fd59ec40101cb1a7c2c583c095"
+      },
+      {
+        "file": "lib/investigation/types.ts",
+        "sha256": "17bbdf3ccec5d4e19c8e630c882423d3be37edc8d93e267eeccde58e7c6b0de4"
+      },
+      {
+        "file": "lib/money.ts",
+        "sha256": "25ee1b0610f19e013fdc35d8abf81b3a527dd093df6e15b03fc0e6b6f06c7929"
+      },
+      {
+        "file": "lib/server/report.ts",
+        "sha256": "d441b50b9687315d8b23497a2b3fa78867620ac5a869d397f2dc974032cff556"
+      },
+      {
+        "file": "lib/server/validation.ts",
+        "sha256": "e1eb649feee64621b38e756f60b236834fc899c9906efeb454e862f011dc3610"
+      },
+      {
+        "file": "lib/stripe/model.ts",
+        "sha256": "68ac090bde1c20df3731f3c9a2a312c3470a30831259262628cd04ae4a44e24c"
+      },
+      {
+        "file": "lib/ticket-demo.ts",
+        "sha256": "fe2a6aca28c0356c6d4f9170b61999aacd19c6f418ccb5aed136fcfa5eca11fe"
+      }
+    ],
+    "sourceTreeSha256": "bc534f82cf79f83bfcd060ff8d7445ab512a961d5fb7e927e49cb74c8c08820d",
+    "bundleSha256": "d3bb084a7a21921f5c30ee6f1130d0a0178a83b8d8df06645aead62c1601134b",
+    "note": "Actual locally bundled source; includes uncommitted files. No claim about the deployed Lambda build."
+  },
+  "promptSha256": "85f36a43b27b2d132f09e8267e1ae9bc635f2d9a5dc5fd393959e1574718579f",
+  "sourceStable": true,
+  "inputProvenance": "synthetic fixture (lib/ticket-demo.ts) normalized through aws/investigations.ts localEvidence",
+  "inputSha256": "fa4d0cb3b7f3a8924c84bdd96d742a2588b17844da2bd2da20ad1e27791aa16a",
+  "run": {
+    "id": "run_241029b5-07f9-4d26-a1a1-3cb9499d33d0",
+    "caseId": "case_atm_1044",
+    "status": "completed",
+    "mode": "bedrock",
+    "modelId": "us.amazon.nova-2-lite-v1:0",
+    "startedAt": "2026-11-08T03:17:53.075Z",
+    "events": [
+      {
+        "type": "started",
+        "title": "Investigation started",
+        "detail": "Amazon Bedrock will investigate the evidence available to this case.",
+        "id": "5b181339-3274-491f-a84f-237276341f56",
+        "at": "2026-11-08T03:17:53.075Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking summary",
+        "detail": "Reading summary records for this case.",
+        "section": "summary",
+        "id": "d70c3652-9edf-4cc4-b92d-1d29de78d247",
+        "at": "2026-11-08T03:17:53.075Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "2 summary records retrieved",
+        "detail": "Source records are available for review.",
+        "section": "summary",
+        "evidenceIds": [
+          "case_atm_1044:payment",
+          "case_atm_1044:dispute"
+        ],
+        "latencyMs": 1,
+        "id": "0c433179-2f00-48ee-bf47-33d466ae5160",
+        "at": "2026-11-08T03:17:53.076Z"
+      },
+      {
+        "type": "model_requested",
+        "title": "Reviewing the evidence",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "094cb829-a8b2-4dd3-83e2-e98d129c9f39",
+        "at": "2026-11-08T03:17:53.076Z"
+      },
+      {
+        "type": "model_completed",
+        "title": "Model response received",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "4d80bf26-df01-4bd4-aca9-4e380b5697c4",
+        "at": "2026-11-08T03:17:53.913Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking delivery",
+        "detail": "Reading delivery records for this case.",
+        "section": "delivery",
+        "id": "1f075c56-fe5c-4117-a906-d2aed6355e6f",
+        "at": "2026-11-08T03:17:53.913Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "delivery evidence unavailable",
+        "detail": "No delivery records are attached to this case. This does not establish that an event did not occur.",
+        "section": "delivery",
+        "evidenceIds": [],
+        "latencyMs": 1,
+        "id": "7ede3a7f-0d70-420e-b48f-4ac5384de0b1",
+        "at": "2026-11-08T03:17:53.914Z"
+      },
+      {
+        "type": "model_requested",
+        "title": "Reviewing the evidence",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "f3114f8b-b95f-4ec9-9967-ec0da18d2f37",
+        "at": "2026-11-08T03:17:53.914Z"
+      },
+      {
+        "type": "model_completed",
+        "title": "Model response received",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "b6e593a6-c682-45d2-805a-dd490dc24c3d",
+        "at": "2026-11-08T03:17:55.285Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking support",
+        "detail": "Reading support records for this case.",
+        "section": "support",
+        "id": "83df98e8-e948-470c-a136-33584543fe4e",
+        "at": "2026-11-08T03:17:55.285Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "support evidence unavailable",
+        "detail": "No support records are attached to this case. This does not establish that an event did not occur.",
+        "section": "support",
+        "evidenceIds": [],
+        "latencyMs": 0,
+        "id": "9e582154-9874-4cae-8f93-ac7867d632bc",
+        "at": "2026-11-08T03:17:55.285Z"
+      },
+      {
+        "type": "model_requested",
+        "title": "Reviewing the evidence",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "ee199c2c-ea85-4795-b130-5ee7be57fb35",
+        "at": "2026-11-08T03:17:55.285Z"
+      },
+      {
+        "type": "model_completed",
+        "title": "Model response received",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "7be353f2-81fb-4620-afa6-365a099a95a5",
+        "at": "2026-11-08T03:17:56.552Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking history",
+        "detail": "Reading history records for this case.",
+        "section": "history",
+        "id": "eda4f404-c2b1-4d8a-bafa-ae2cc3532ea7",
+        "at": "2026-11-08T03:17:56.552Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "history evidence unavailable",
+        "detail": "No history records are attached to this case. This does not establish that an event did not occur.",
+        "section": "history",
+        "evidenceIds": [],
+        "latencyMs": 0,
+        "id": "760236c3-17a9-48a4-a66d-e429fb3c69ea",
+        "at": "2026-11-08T03:17:56.552Z"
+      },
+      {
+        "type": "model_requested",
+        "title": "Reviewing the evidence",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "d7b57906-0911-44cf-a63b-e8f6e654983f",
+        "at": "2026-11-08T03:17:56.552Z"
+      },
+      {
+        "type": "model_completed",
+        "title": "Model response received",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "888696f4-d9e1-4205-bbec-be3a19d3b8ed",
+        "at": "2026-11-08T03:17:57.896Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking attendance",
+        "detail": "Reading attendance records for this case.",
+        "section": "attendance",
+        "id": "4e237097-743f-4445-a499-e4335f783b74",
+        "at": "2026-11-08T03:17:57.896Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "attendance evidence unavailable",
+        "detail": "No attendance records are attached to this case. This does not establish that an event did not occur.",
+        "section": "attendance",
+        "evidenceIds": [],
+        "latencyMs": 0,
+        "id": "c5088cd9-b68e-40f0-8e96-a172eccdf8f2",
+        "at": "2026-11-08T03:17:57.896Z"
+      },
+      {
+        "type": "model_requested",
+        "title": "Reviewing the evidence",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "71f96045-2a29-4a26-b8e3-e24123cf955a",
+        "at": "2026-11-08T03:17:57.896Z"
+      },
+      {
+        "type": "model_completed",
+        "title": "Model response received",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "c893b4c0-facb-48ba-8399-d51024215c69",
+        "at": "2026-11-08T03:17:59.308Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking policy",
+        "detail": "Reading policy records for this case.",
+        "section": "policy",
+        "id": "8c3b12dc-3d7a-44af-9e75-956aa63c4f9e",
+        "at": "2026-11-08T03:17:59.308Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "policy evidence unavailable",
+        "detail": "No policy records are attached to this case. This does not establish that an event did not occur.",
+        "section": "policy",
+        "evidenceIds": [],
+        "latencyMs": 0,
+        "id": "1b51fc77-1f41-40eb-9fb1-374a6b0027b2",
+        "at": "2026-11-08T03:17:59.308Z"
+      },
+      {
+        "type": "model_requested",
+        "title": "Reviewing the evidence",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "ef4b36b0-98b7-4e92-ae42-25d34b7f4d7d",
+        "at": "2026-11-08T03:17:59.308Z"
+      },
+      {
+        "type": "model_completed",
+        "title": "Model response received",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "147db1d4-341c-418e-882b-891692612248",
+        "at": "2026-11-08T03:18:00.762Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking order",
+        "detail": "Reading order records for this case.",
+        "section": "order",
+        "id": "47b3e9ff-8c26-4933-b161-82c97040f7ab",
+        "at": "2026-11-08T03:18:00.762Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "1 order record retrieved",
+        "detail": "Source records are available for review.",
+        "section": "order",
+        "evidenceIds": [
+          "case_atm_1044:order"
+        ],
+        "latencyMs": 0,
+        "id": "0f70dffc-076b-4750-a62c-847467797ee3",
+        "at": "2026-11-08T03:18:00.762Z"
+      },
+      {
+        "type": "model_requested",
+        "title": "Reviewing the evidence",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "69db6a4d-2108-4e67-a244-c798605ea468",
+        "at": "2026-11-08T03:18:00.762Z"
+      },
+      {
+        "type": "model_completed",
+        "title": "Model response received",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "af0e8099-f6c0-4d77-ac35-755f7f82489c",
+        "at": "2026-11-08T03:18:02.171Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking tickets",
+        "detail": "Reading tickets records for this case.",
+        "section": "tickets",
+        "id": "f06804b1-f66d-4b1b-b0ee-ea31b15e6e6e",
+        "at": "2026-11-08T03:18:02.171Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "2 tickets records retrieved",
+        "detail": "Source records are available for review.",
+        "section": "tickets",
+        "evidenceIds": [
+          "case_atm_1044:ticket-1",
+          "case_atm_1044:ticket-2"
+        ],
+        "latencyMs": 1,
+        "id": "4fd01fca-6a56-405c-b839-2752886808fe",
+        "at": "2026-11-08T03:18:02.172Z"
+      },
+      {
+        "type": "model_requested",
+        "title": "Reviewing the evidence",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "c05a9207-52f5-4469-bde7-97027e440c12",
+        "at": "2026-11-08T03:18:02.172Z"
+      },
+      {
+        "type": "model_completed",
+        "title": "Model response received",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "69d2983c-3399-4434-9792-e583c6d17815",
+        "at": "2026-11-08T03:18:06.058Z"
+      },
+      {
+        "type": "completed",
+        "title": "Investigation complete",
+        "detail": "The sourced response is ready for merchant review. Nothing was submitted to Stripe.",
+        "id": "13338774-6b82-4f4d-b322-c7337ca73a98",
+        "at": "2026-11-08T03:18:06.058Z"
+      }
+    ],
+    "finishedAt": "2026-11-08T03:18:06.058Z"
+  },
+  "usage": {
+    "inputTokens": 34484,
+    "outputTokens": 809
+  },
+  "draft": {
+    "caseId": "case_atm_1044",
+    "content": "We provide the following records in response to this dispute. The customer claims they were charged but cannot find any tickets or confirmation [case_atm_1044:dispute]. The payment was captured for order ATM-1044 for two tickets to The Late Set [case_atm_1044:payment][case_atm_1044:order]. Both tickets were issued and are present in the application [case_atm_1044:ticket-1][case_atm_1044:ticket-2]. However, no delivery records, support messages, history, attendance scans, or policy disclosures were provided in the available evidence. Without delivery confirmation, receipt acknowledgement, scan data, or customer communication, we cannot confirm that the tickets were delivered to or accessed by the customer, nor can we confirm attendance at the event.\n\nSOURCE LIMITATIONS\n- delivery records\n- support messages\n- history records\n- attendance scans\n- policy disclosures\n- No delivery records are attached to this case. This does not establish that an event did not occur.\n- No support records are attached to this case. This does not establish that an event did not occur.\n- No history records are attached to this case. This does not establish that an event did not occur.\n- No attendance records are attached to this case. This does not establish that an event did not occur.\n- Missing scan records do not establish nonattendance. A scan alone does not establish cardholder identity.\n- No policy records are attached to this case. This does not establish that an event did not occur.\n- Current terms do not establish which disclosures were shown at purchase time.\n- Delivery evidence is unavailable.\n- Support evidence is unavailable.\n- History evidence is unavailable.\n- Attendance evidence is unavailable.\n- Policy evidence is unavailable.",
+    "analysis": {
+      "content": "We provide the following records in response to this dispute. The customer claims they were charged but cannot find any tickets or confirmation [case_atm_1044:dispute]. The payment was captured for order ATM-1044 for two tickets to The Late Set [case_atm_1044:payment][case_atm_1044:order]. Both tickets were issued and are present in the application [case_atm_1044:ticket-1][case_atm_1044:ticket-2]. However, no delivery records, support messages, history, attendance scans, or policy disclosures were provided in the available evidence. Without delivery confirmation, receipt acknowledgement, scan data, or customer communication, we cannot confirm that the tickets were delivered to or accessed by the customer, nor can we confirm attendance at the event.\n\nSOURCE LIMITATIONS\n- delivery records\n- support messages\n- history records\n- attendance scans\n- policy disclosures\n- No delivery records are attached to this case. This does not establish that an event did not occur.\n- No support records are attached to this case. This does not establish that an event did not occur.\n- No history records are attached to this case. This does not establish that an event did not occur.\n- No attendance records are attached to this case. This does not establish that an event did not occur.\n- Missing scan records do not establish nonattendance. A scan alone does not establish cardholder identity.\n- No policy records are attached to this case. This does not establish that an event did not occur.\n- Current terms do not establish which disclosures were shown at purchase time.\n- Delivery evidence is unavailable.\n- Support evidence is unavailable.\n- History evidence is unavailable.\n- Attendance evidence is unavailable.\n- Policy evidence is unavailable.",
+      "summary": "The customer claims they were charged but cannot find any tickets or confirmation. Records show a captured payment for two issued tickets, but no delivery, receipt acknowledgement, scan, or support records are available. The evidence does not establish whether the tickets were delivered to or accessed by the customer or whether they attended the event.",
+      "assessment": "insufficient",
+      "recommendation": "Retrieve delivery records, customer support messages, history records, attendance scans, and any available policy disclosures to determine whether the tickets were delivered, acknowledged, or used, and to assess compliance with purchase-time terms.",
+      "findings": [
+        {
+          "kind": "supported",
+          "title": "Payment captured and order placed",
+          "detail": "A USD 118.00 payment was captured for order ATM-1044, which includes two tickets to The Late Set.",
+          "evidenceIds": [
+            "case_atm_1044:payment",
+            "case_atm_1044:order"
+          ]
+        },
+        {
+          "kind": "supported",
+          "title": "Tickets issued",
+          "detail": "Both tickets linked to order ATM-1044 were issued and are present in the application.",
+          "evidenceIds": [
+            "case_atm_1044:ticket-1",
+            "case_atm_1044:ticket-2"
+          ]
+        },
+        {
+          "kind": "missing",
+          "title": "Delivery records",
+          "detail": "No delivery records are available to confirm how or whether tickets were delivered to the customer.",
+          "evidenceIds": []
+        },
+        {
+          "kind": "missing",
+          "title": "Receipt acknowledgement",
+          "detail": "No record shows the customer acknowledged receiving or accessing the tickets.",
+          "evidenceIds": []
+        },
+        {
+          "kind": "missing",
+          "title": "Attendance scans",
+          "detail": "No scan records are available to confirm whether the tickets were used at the event.",
+          "evidenceIds": []
+        },
+        {
+          "kind": "missing",
+          "title": "Support messages",
+          "detail": "No customer support messages are available to show requests, resends, or confirmations regarding the tickets.",
+          "evidenceIds": []
+        },
+        {
+          "kind": "missing",
+          "title": "Policy disclosures",
+          "detail": "No policy records are available to confirm what disclosures were shown at purchase time.",
+          "evidenceIds": []
+        }
+      ],
+      "gaps": [
+        "delivery records",
+        "support messages",
+        "history records",
+        "attendance scans",
+        "policy disclosures",
+        "No delivery records are attached to this case. This does not establish that an event did not occur.",
+        "No support records are attached to this case. This does not establish that an event did not occur.",
+        "No history records are attached to this case. This does not establish that an event did not occur.",
+        "No attendance records are attached to this case. This does not establish that an event did not occur.",
+        "Missing scan records do not establish nonattendance. A scan alone does not establish cardholder identity.",
+        "No policy records are attached to this case. This does not establish that an event did not occur.",
+        "Current terms do not establish which disclosures were shown at purchase time.",
+        "Delivery evidence is unavailable.",
+        "Support evidence is unavailable.",
+        "History evidence is unavailable.",
+        "Attendance evidence is unavailable.",
+        "Policy evidence is unavailable."
+      ],
+      "evidenceIds": [
+        "case_atm_1044:payment",
+        "case_atm_1044:order",
+        "case_atm_1044:ticket-1",
+        "case_atm_1044:ticket-2",
+        "case_atm_1044:dispute"
+      ],
+      "metrics": {
+        "durationMs": 12983,
+        "toolCalls": 8,
+        "recordCount": 5,
+        "modelCalls": 8
+      },
+      "modelId": "us.amazon.nova-2-lite-v1:0"
+    },
+    "method": "bedrock",
+    "status": "draft",
+    "revision": 1
+  },
+  "evidence": [
+    {
+      "id": "case_atm_1044:payment",
+      "caseId": "case_atm_1044",
+      "source": "stripe",
+      "title": "Payment captured",
+      "content": "A fictional USD 118.00 payment maps to order ATM-1044.",
+      "occurredAt": "2026-11-01T21:11:00Z",
+      "reference": "Synthetic: pi_demo_atm_1044",
+      "provenance": {
+        "section": "summary",
+        "sourceMode": "synthetic",
+        "fields": {
+          "chargeCaptured": true,
+          "refundAmount": 0,
+          "disputeStatus": "needs_response",
+          "orderRef": "ATM-1044",
+          "paymentRef": "pi_demo_atm_1044",
+          "amount": 11800,
+          "currency": "USD",
+          "stripeAccount": "acct_demo_atmsphr",
+          "liveMode": false
+        },
+        "limitations": [],
+        "originalSourceId": "pi_demo_atm_1044"
+      }
+    },
+    {
+      "id": "case_atm_1044:dispute",
+      "caseId": "case_atm_1044",
+      "source": "stripe",
+      "title": "Dispute requires a response",
+      "content": "I was charged, but I cannot find any tickets or confirmation.",
+      "occurredAt": "2026-11-05T16:10:00Z",
+      "reference": "Synthetic: dp_demo_atm-1044",
+      "provenance": {
+        "section": "summary",
+        "sourceMode": "synthetic",
+        "fields": {
+          "disputeStatus": "needs_response",
+          "reason": "product_not_received",
+          "evidenceDueAt": "2026-11-09T07:59:00Z",
+          "amount": 11800,
+          "currency": "USD"
+        },
+        "limitations": [],
+        "originalSourceId": "dp_demo_atm-1044"
+      }
+    },
+    {
+      "id": "case_atm_1044:order",
+      "caseId": "case_atm_1044",
+      "source": "database",
+      "title": "Paid order for two tickets",
+      "content": "Order ATM-1044 is linked to the captured payment and two tickets to The Late Set.",
+      "occurredAt": "2026-11-01T21:11:00Z",
+      "reference": "Synthetic: order_demo_1044",
+      "provenance": {
+        "section": "order",
+        "sourceMode": "synthetic",
+        "fields": {
+          "orderRef": "ATM-1044",
+          "paymentRef": "pi_demo_atm_1044",
+          "quantity": 2,
+          "subtotal": 10000,
+          "fees": 1800,
+          "total": 11800,
+          "currency": "USD",
+          "status": "paid",
+          "eventStartsAt": "2026-11-04T05:00:00Z",
+          "eventTimezone": "America/Los_Angeles"
+        },
+        "limitations": [],
+        "originalSourceId": "order_demo_1044"
+      }
+    },
+    {
+      "id": "case_atm_1044:ticket-1",
+      "caseId": "case_atm_1044",
+      "source": "database",
+      "title": "First ticket issued",
+      "content": "The application contains an issued ticket linked to the order.",
+      "occurredAt": "2026-11-01T21:11:06Z",
+      "reference": "Synthetic: ticket_demo_1044_a",
+      "provenance": {
+        "section": "tickets",
+        "sourceMode": "synthetic",
+        "fields": {
+          "orderRef": "ATM-1044",
+          "ticketStatus": "issued",
+          "transferredFrom": null,
+          "transferredTo": null,
+          "scanRecorded": false
+        },
+        "limitations": [],
+        "originalSourceId": "ticket_demo_1044_a"
+      }
+    },
+    {
+      "id": "case_atm_1044:ticket-2",
+      "caseId": "case_atm_1044",
+      "source": "database",
+      "title": "Second ticket issued",
+      "content": "The application contains a second issued ticket. No receipt acknowledgement accompanies it.",
+      "occurredAt": "2026-11-01T21:11:06Z",
+      "reference": "Synthetic: ticket_demo_1044_b",
+      "provenance": {
+        "section": "tickets",
+        "sourceMode": "synthetic",
+        "fields": {
+          "orderRef": "ATM-1044",
+          "ticketStatus": "issued",
+          "transferredFrom": null,
+          "transferredTo": null,
+          "scanRecorded": false
+        },
+        "limitations": [],
+        "originalSourceId": "ticket_demo_1044_b"
+      }
+    }
+  ],
+  "regressionSignals": [
+    {
+      "code": "verbose_gaps",
+      "severity": "review",
+      "message": "17 gap entries; check semantic repetition."
+    },
+    {
+      "code": "missing_history_as_delivery",
+      "severity": "failure",
+      "message": "Missing history is being treated as delivery."
+    }
+  ]
+}

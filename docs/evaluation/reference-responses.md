@@ -2,7 +2,7 @@
 
 These are editor-written examples for the fictional fixtures, prepared by Codex against `lib/ticket-demo.ts`. They are neither model reruns nor human-approved packets. They do not replace the saved raw outputs or fix the application. Bracketed references below are the fixture's original source IDs; the application uses different, run-scoped citation IDs.
 
-Use them to judge factual boundaries and response style, not to demand identical wording. The assessment labels follow the proposed rubric in `results.md`; the application prompt does not yet define that rubric.
+Use them to judge factual boundaries and response style, not to demand identical wording. The assessment labels follow the rubric in `results.md`, which is now included in the revised application prompt; see [the live rerun](prompt-results.md).
 
 ## ATM-1042 — supported
 

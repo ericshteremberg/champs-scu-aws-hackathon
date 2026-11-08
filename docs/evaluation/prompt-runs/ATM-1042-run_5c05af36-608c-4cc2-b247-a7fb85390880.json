@@ -1,0 +1,701 @@
+{
+  "order": "ATM-1042",
+  "caseId": "case_atm_1042",
+  "startedAt": "2026-11-08T03:18:06.065Z",
+  "finishedAt": "2026-11-08T03:18:15.120Z",
+  "batch": "ca6a0990-a1e3-4e1a-8aeb-13a7973ba0a5",
+  "repeat": 2,
+  "repoCommit": "d005747c33bae6363cf50c3d5043404a1fe7de42",
+  "execution": "local engine, real Bedrock; no deployed API or storage",
+  "source": {
+    "commit": "d005747c33bae6363cf50c3d5043404a1fe7de42",
+    "files": [
+      {
+        "file": "aws/investigations.ts",
+        "sha256": "e26522bf00e8ca24a1280e9293583d5ad0568d12f5d7a4c5c2939c2c28afd27a"
+      },
+      {
+        "file": "aws/store.ts",
+        "sha256": "56134eac5ecc2af484b38cb96fb91b34ee9cf2bf8f6254b1f01bc35f8faed12f"
+      },
+      {
+        "file": "aws/stripe.ts",
+        "sha256": "6dcde33ea7f1c1646ca5c9ef6b0accb80e76992f0f162932f79673b8a670d385"
+      },
+      {
+        "file": "aws/types.ts",
+        "sha256": "26f4929d27abc59e361165bc6a2121d3703f3c4ce22d03fdcfdc5574569c2c14"
+      },
+      {
+        "file": "aws/workspace.ts",
+        "sha256": "cc3933c931964c10b893ec5198074330958bee906b54416c889daf6682501a1b"
+      },
+      {
+        "file": "lib/demo.ts",
+        "sha256": "98ea6f523f9507c45c2fb11b14d024033af0462d1de73b08ea81117457ccf71b"
+      },
+      {
+        "file": "lib/investigation/engine.ts",
+        "sha256": "244d6755fef88d92121f7d231b7742630c1df4e9588fb876b069bf4126bbcae7"
+      },
+      {
+        "file": "lib/investigation/merchant.ts",
+        "sha256": "6ea5f2037f00af2fd21644c716d6454be688e6c94497b64d23356d66482914e3"
+      },
+      {
+        "file": "lib/investigation/prompt.ts",
+        "sha256": "a71221cbd42739ba8e4c8a3efea7ad7b603bc9f86e8546b22a4264550e39d39b"
+      },
+      {
+        "file": "lib/investigation/report.ts",
+        "sha256": "2f074954cadba4197d58d789dcd353d77ed9f8fd59ec40101cb1a7c2c583c095"
+      },
+      {
+        "file": "lib/investigation/types.ts",
+        "sha256": "17bbdf3ccec5d4e19c8e630c882423d3be37edc8d93e267eeccde58e7c6b0de4"
+      },
+      {
+        "file": "lib/money.ts",
+        "sha256": "25ee1b0610f19e013fdc35d8abf81b3a527dd093df6e15b03fc0e6b6f06c7929"
+      },
+      {
+        "file": "lib/server/report.ts",
+        "sha256": "d441b50b9687315d8b23497a2b3fa78867620ac5a869d397f2dc974032cff556"
+      },
+      {
+        "file": "lib/server/validation.ts",
+        "sha256": "e1eb649feee64621b38e756f60b236834fc899c9906efeb454e862f011dc3610"
+      },
+      {
+        "file": "lib/stripe/model.ts",
+        "sha256": "68ac090bde1c20df3731f3c9a2a312c3470a30831259262628cd04ae4a44e24c"
+      },
+      {
+        "file": "lib/ticket-demo.ts",
+        "sha256": "fe2a6aca28c0356c6d4f9170b61999aacd19c6f418ccb5aed136fcfa5eca11fe"
+      }
+    ],
+    "sourceTreeSha256": "bc534f82cf79f83bfcd060ff8d7445ab512a961d5fb7e927e49cb74c8c08820d",
+    "bundleSha256": "d3bb084a7a21921f5c30ee6f1130d0a0178a83b8d8df06645aead62c1601134b",
+    "note": "Actual locally bundled source; includes uncommitted files. No claim about the deployed Lambda build."
+  },
+  "promptSha256": "85f36a43b27b2d132f09e8267e1ae9bc635f2d9a5dc5fd393959e1574718579f",
+  "sourceStable": true,
+  "inputProvenance": "synthetic fixture (lib/ticket-demo.ts) normalized through aws/investigations.ts localEvidence",
+  "inputSha256": "e0faef135f23af400162e512a1c6044ac721831e3bd17bdbf921dc5f9c004b16",
+  "run": {
+    "id": "run_5c05af36-608c-4cc2-b247-a7fb85390880",
+    "caseId": "case_atm_1042",
+    "status": "completed",
+    "mode": "bedrock",
+    "modelId": "us.amazon.nova-2-lite-v1:0",
+    "startedAt": "2026-11-08T03:18:06.065Z",
+    "events": [
+      {
+        "type": "started",
+        "title": "Investigation started",
+        "detail": "Amazon Bedrock will investigate the evidence available to this case.",
+        "id": "3e6f5e39-c1d2-497d-a977-c627c00749ec",
+        "at": "2026-11-08T03:18:06.065Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking summary",
+        "detail": "Reading summary records for this case.",
+        "section": "summary",
+        "id": "d7554141-f260-4a84-9cd6-71792f84f912",
+        "at": "2026-11-08T03:18:06.065Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "2 summary records retrieved",
+        "detail": "Source records are available for review.",
+        "section": "summary",
+        "evidenceIds": [
+          "case_atm_1042:payment",
+          "case_atm_1042:dispute"
+        ],
+        "latencyMs": 1,
+        "id": "a7108524-3ec7-4208-88f4-0e3b7e132ee6",
+        "at": "2026-11-08T03:18:06.066Z"
+      },
+      {
+        "type": "model_requested",
+        "title": "Reviewing the evidence",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "5cb8865e-7e06-48eb-9b9c-9a84dbd7335a",
+        "at": "2026-11-08T03:18:06.066Z"
+      },
+      {
+        "type": "model_completed",
+        "title": "Model response received",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "df828f90-4c32-41a5-a063-0be1d06d2374",
+        "at": "2026-11-08T03:18:07.690Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking order",
+        "detail": "Reading order records for this case.",
+        "section": "order",
+        "id": "322badc8-137e-404e-8d15-e54e26e32d69",
+        "at": "2026-11-08T03:18:07.690Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "1 order record retrieved",
+        "detail": "Source records are available for review.",
+        "section": "order",
+        "evidenceIds": [
+          "case_atm_1042:order"
+        ],
+        "latencyMs": 0,
+        "id": "d5aea5cf-1b66-4a62-9bec-bc073d371d75",
+        "at": "2026-11-08T03:18:07.690Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking tickets",
+        "detail": "Reading tickets records for this case.",
+        "section": "tickets",
+        "id": "87488e23-9d83-4efb-a455-33cd97d2b806",
+        "at": "2026-11-08T03:18:07.690Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "2 tickets records retrieved",
+        "detail": "Source records are available for review.",
+        "section": "tickets",
+        "evidenceIds": [
+          "case_atm_1042:ticket-1",
+          "case_atm_1042:ticket-2"
+        ],
+        "latencyMs": 0,
+        "id": "7aeaa9cc-ad6c-44f1-a55a-56cffbcf0133",
+        "at": "2026-11-08T03:18:07.690Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking delivery",
+        "detail": "Reading delivery records for this case.",
+        "section": "delivery",
+        "id": "a422b50e-c336-4c5b-bd89-9fa4dff5376e",
+        "at": "2026-11-08T03:18:07.690Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "2 delivery records retrieved",
+        "detail": "Email acceptance does not prove inbox delivery. An SMS delivery status does not prove the message was read.",
+        "section": "delivery",
+        "evidenceIds": [
+          "case_atm_1042:email",
+          "case_atm_1042:sms"
+        ],
+        "latencyMs": 0,
+        "id": "1b6cb962-5fda-4b50-b895-22899a8ffabe",
+        "at": "2026-11-08T03:18:07.690Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking history",
+        "detail": "Reading history records for this case.",
+        "section": "history",
+        "id": "17043db4-1988-4940-a16c-fe686f8b5d90",
+        "at": "2026-11-08T03:18:07.690Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "1 history record retrieved",
+        "detail": "Source records are available for review.",
+        "section": "history",
+        "evidenceIds": [
+          "case_atm_1042:recovery"
+        ],
+        "latencyMs": 0,
+        "id": "7d92d9f6-c90f-40cb-97a1-930102c37b73",
+        "at": "2026-11-08T03:18:07.691Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking support",
+        "detail": "Reading support records for this case.",
+        "section": "support",
+        "id": "ee3eb92c-6a36-487b-84fe-7b1f0624f2db",
+        "at": "2026-11-08T03:18:07.691Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "3 support records retrieved",
+        "detail": "This is a fictional conversation for the demo. Acknowledged access does not establish attendance or determine a bank decision.",
+        "section": "support",
+        "evidenceIds": [
+          "case_atm_1042:support-1",
+          "case_atm_1042:support-2",
+          "case_atm_1042:support-3"
+        ],
+        "latencyMs": 0,
+        "id": "3f9f181b-7a52-4185-a92e-e5a9a1e9a6a2",
+        "at": "2026-11-08T03:18:07.691Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking attendance",
+        "detail": "Reading attendance records for this case.",
+        "section": "attendance",
+        "id": "308c7796-5e10-460c-b06c-877eb131b30c",
+        "at": "2026-11-08T03:18:07.691Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "attendance evidence unavailable",
+        "detail": "No attendance records are attached to this case. This does not establish that an event did not occur.",
+        "section": "attendance",
+        "evidenceIds": [],
+        "latencyMs": 0,
+        "id": "e2474c8a-5622-497c-bc7a-8999e456140c",
+        "at": "2026-11-08T03:18:07.691Z"
+      },
+      {
+        "type": "tool_requested",
+        "title": "Checking policy",
+        "detail": "Reading policy records for this case.",
+        "section": "policy",
+        "id": "7c17b41a-80f9-4afb-8cf5-85add6e49f5f",
+        "at": "2026-11-08T03:18:07.691Z"
+      },
+      {
+        "type": "tool_completed",
+        "title": "policy evidence unavailable",
+        "detail": "No policy records are attached to this case. This does not establish that an event did not occur.",
+        "section": "policy",
+        "evidenceIds": [],
+        "latencyMs": 0,
+        "id": "319c4fa0-e08f-4673-80c4-bc538e103b34",
+        "at": "2026-11-08T03:18:07.691Z"
+      },
+      {
+        "type": "model_requested",
+        "title": "Reviewing the evidence",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "77bfe6d1-5ece-418d-b07d-d715d63dc4b4",
+        "at": "2026-11-08T03:18:07.691Z"
+      },
+      {
+        "type": "model_completed",
+        "title": "Model response received",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "9a0403c9-26ae-478e-975d-85ddf4af6b1d",
+        "at": "2026-11-08T03:18:11.802Z"
+      },
+      {
+        "type": "blocked",
+        "title": "Request blocked",
+        "detail": "The report cites records that were not retrieved for this case.",
+        "id": "cea0d918-fe7a-4704-b129-19a4d17abfeb",
+        "at": "2026-11-08T03:18:11.802Z"
+      },
+      {
+        "type": "model_requested",
+        "title": "Reviewing the evidence",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "d5e53b6b-c79f-45fe-a90c-fed204d7dfa9",
+        "at": "2026-11-08T03:18:11.802Z"
+      },
+      {
+        "type": "model_completed",
+        "title": "Model response received",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "0116542f-21b7-4b83-a226-3fe3313c2719",
+        "at": "2026-11-08T03:18:15.120Z"
+      },
+      {
+        "type": "completed",
+        "title": "Investigation complete",
+        "detail": "The sourced response is ready for merchant review. Nothing was submitted to Stripe.",
+        "id": "37aff16e-6c5d-407b-a01b-ecbdab83cb93",
+        "at": "2026-11-08T03:18:15.120Z"
+      }
+    ],
+    "finishedAt": "2026-11-08T03:18:15.120Z"
+  },
+  "usage": {
+    "inputTokens": 18833,
+    "outputTokens": 1573
+  },
+  "draft": {
+    "caseId": "case_atm_1042",
+    "content": "We provide the following records in response to this dispute. The customer claims they never received tickets for order ATM-1042. Payment was captured for two tickets [case_atm_1042:payment]. The order confirms two general-admission tickets were purchased [case_atm_1042:order]. Both tickets were issued and linked to the order [case_atm_1042:ticket-1][case_atm_1042:ticket-2]. The confirmation email was accepted for processing, but inbox delivery and reading are not recorded [case_atm_1042:email]. An SMS ticket-link message was marked delivered by the provider, but reading is not established [case_atm_1042:sms]. The customer contacted support indicating they could not see the tickets [case_atm_1042:support-1]. The organizer directed the customer to use a ticket recovery link [case_atm_1042:support-2]. The customer subsequently acknowledged finding both tickets in their account [case_atm_1042:support-3]. A ticket recovery flow completed, recording account access but not physical attendance [case_atm_1042:recovery]. No attendance scans are recorded, which does not establish nonattendance.\n\nSOURCE LIMITATIONS\n- Attendance scan records to confirm or refute event entry\n- Policy disclosures shown at purchase time\n- Email acceptance does not prove inbox delivery. An SMS delivery status does not prove the message was read.\n- This is a fictional conversation for the demo. Acknowledged access does not establish attendance or determine a bank decision.\n- No attendance records are attached to this case. This does not establish that an event did not occur.\n- Missing scan records do not establish nonattendance. A scan alone does not establish cardholder identity.\n- No policy records are attached to this case. This does not establish that an event did not occur.\n- Current terms do not establish which disclosures were shown at purchase time.\n- Attendance evidence is unavailable.\n- Policy evidence is unavailable.",
+    "analysis": {
+      "content": "We provide the following records in response to this dispute. The customer claims they never received tickets for order ATM-1042. Payment was captured for two tickets [case_atm_1042:payment]. The order confirms two general-admission tickets were purchased [case_atm_1042:order]. Both tickets were issued and linked to the order [case_atm_1042:ticket-1][case_atm_1042:ticket-2]. The confirmation email was accepted for processing, but inbox delivery and reading are not recorded [case_atm_1042:email]. An SMS ticket-link message was marked delivered by the provider, but reading is not established [case_atm_1042:sms]. The customer contacted support indicating they could not see the tickets [case_atm_1042:support-1]. The organizer directed the customer to use a ticket recovery link [case_atm_1042:support-2]. The customer subsequently acknowledged finding both tickets in their account [case_atm_1042:support-3]. A ticket recovery flow completed, recording account access but not physical attendance [case_atm_1042:recovery]. No attendance scans are recorded, which does not establish nonattendance.\n\nSOURCE LIMITATIONS\n- Attendance scan records to confirm or refute event entry\n- Policy disclosures shown at purchase time\n- Email acceptance does not prove inbox delivery. An SMS delivery status does not prove the message was read.\n- This is a fictional conversation for the demo. Acknowledged access does not establish attendance or determine a bank decision.\n- No attendance records are attached to this case. This does not establish that an event did not occur.\n- Missing scan records do not establish nonattendance. A scan alone does not establish cardholder identity.\n- No policy records are attached to this case. This does not establish that an event did not occur.\n- Current terms do not establish which disclosures were shown at purchase time.\n- Attendance evidence is unavailable.\n- Policy evidence is unavailable.",
+      "summary": "The customer disputes receiving tickets for order ATM-1042. Records show payment, order confirmation, ticket issuance, email acceptance, SMS delivery, completed recovery, and customer acknowledgment of finding the tickets. Attendance scans are missing, but this does not prove nonattendance. The customer acknowledged accessing the tickets after a recovery prompt.",
+      "assessment": "supported",
+      "recommendation": "Verify the customer's acknowledgment message and recovery completion against the dispute timeline. Confirm whether the payment provider requires attendance proof for this dispute category.",
+      "findings": [
+        {
+          "kind": "supported",
+          "title": "Payment captured",
+          "detail": "A USD 92.00 payment was captured for order ATM-1042.",
+          "evidenceIds": [
+            "case_atm_1042:payment"
+          ]
+        },
+        {
+          "kind": "supported",
+          "title": "Order confirms two tickets",
+          "detail": "Order ATM-1042 contains two general-admission tickets.",
+          "evidenceIds": [
+            "case_atm_1042:order"
+          ]
+        },
+        {
+          "kind": "supported",
+          "title": "Tickets issued",
+          "detail": "Two tickets were created and linked to order ATM-1042.",
+          "evidenceIds": [
+            "case_atm_1042:ticket-1",
+            "case_atm_1042:ticket-2"
+          ]
+        },
+        {
+          "kind": "supported",
+          "title": "Email accepted for processing",
+          "detail": "The email provider accepted the confirmation email, but inbox delivery and reading are not recorded.",
+          "evidenceIds": [
+            "case_atm_1042:email"
+          ]
+        },
+        {
+          "kind": "supported",
+          "title": "SMS marked delivered",
+          "detail": "The SMS provider returned delivered for the ticket-link message, but reading is not established.",
+          "evidenceIds": [
+            "case_atm_1042:sms"
+          ]
+        },
+        {
+          "kind": "supported",
+          "title": "Recovery completed",
+          "detail": "An order-linked recovery flow completed, recording account access.",
+          "evidenceIds": [
+            "case_atm_1042:recovery"
+          ]
+        },
+        {
+          "kind": "supported",
+          "title": "Customer acknowledged finding tickets",
+          "detail": "The customer confirmed finding both tickets in their account after support guidance.",
+          "evidenceIds": [
+            "case_atm_1042:support-3"
+          ]
+        },
+        {
+          "kind": "missing",
+          "title": "Attendance scans",
+          "detail": "No attendance scan records are available for this order.",
+          "evidenceIds": []
+        },
+        {
+          "kind": "missing",
+          "title": "Policy disclosures",
+          "detail": "No policy records were retrieved for this case.",
+          "evidenceIds": []
+        }
+      ],
+      "gaps": [
+        "Attendance scan records to confirm or refute event entry",
+        "Policy disclosures shown at purchase time",
+        "Email acceptance does not prove inbox delivery. An SMS delivery status does not prove the message was read.",
+        "This is a fictional conversation for the demo. Acknowledged access does not establish attendance or determine a bank decision.",
+        "No attendance records are attached to this case. This does not establish that an event did not occur.",
+        "Missing scan records do not establish nonattendance. A scan alone does not establish cardholder identity.",
+        "No policy records are attached to this case. This does not establish that an event did not occur.",
+        "Current terms do not establish which disclosures were shown at purchase time.",
+        "Attendance evidence is unavailable.",
+        "Policy evidence is unavailable."
+      ],
+      "evidenceIds": [
+        "case_atm_1042:payment",
+        "case_atm_1042:order",
+        "case_atm_1042:ticket-1",
+        "case_atm_1042:ticket-2",
+        "case_atm_1042:email",
+        "case_atm_1042:sms",
+        "case_atm_1042:recovery",
+        "case_atm_1042:support-3",
+        "case_atm_1042:support-1",
+        "case_atm_1042:support-2"
+      ],
+      "metrics": {
+        "durationMs": 9055,
+        "toolCalls": 8,
+        "recordCount": 11,
+        "modelCalls": 3
+      },
+      "modelId": "us.amazon.nova-2-lite-v1:0"
+    },
+    "method": "bedrock",
+    "status": "draft",
+    "revision": 1
+  },
+  "evidence": [
+    {
+      "id": "case_atm_1042:payment",
+      "caseId": "case_atm_1042",
+      "source": "stripe",
+      "title": "Payment captured",
+      "content": "A fictional USD 92.00 payment maps to order ATM-1042.",
+      "occurredAt": "2026-11-02T18:03:00Z",
+      "reference": "Synthetic: pi_demo_atm_1042",
+      "provenance": {
+        "section": "summary",
+        "sourceMode": "synthetic",
+        "fields": {
+          "chargeCaptured": true,
+          "refundAmount": 0,
+          "disputeStatus": "needs_response",
+          "orderRef": "ATM-1042",
+          "paymentRef": "pi_demo_atm_1042",
+          "amount": 9200,
+          "currency": "USD",
+          "stripeAccount": "acct_demo_atmsphr",
+          "liveMode": false
+        },
+        "limitations": [],
+        "originalSourceId": "pi_demo_atm_1042"
+      }
+    },
+    {
+      "id": "case_atm_1042:dispute",
+      "caseId": "case_atm_1042",
+      "source": "stripe",
+      "title": "Dispute requires a response",
+      "content": "I paid for two tickets but never received them.",
+      "occurredAt": "2026-11-06T20:15:00Z",
+      "reference": "Synthetic: dp_demo_atm-1042",
+      "provenance": {
+        "section": "summary",
+        "sourceMode": "synthetic",
+        "fields": {
+          "disputeStatus": "needs_response",
+          "reason": "product_not_received",
+          "evidenceDueAt": "2026-11-14T07:59:00Z",
+          "amount": 9200,
+          "currency": "USD"
+        },
+        "limitations": [],
+        "originalSourceId": "dp_demo_atm-1042"
+      }
+    },
+    {
+      "id": "case_atm_1042:order",
+      "caseId": "case_atm_1042",
+      "source": "database",
+      "title": "Order confirmed for two tickets",
+      "content": "Order ATM-1042 contains two general-admission tickets to After Hours: Fall Session.",
+      "occurredAt": "2026-11-02T18:03:00Z",
+      "reference": "Synthetic: order_demo_1042",
+      "provenance": {
+        "section": "order",
+        "sourceMode": "synthetic",
+        "fields": {
+          "orderRef": "ATM-1042",
+          "paymentRef": "pi_demo_atm_1042",
+          "quantity": 2,
+          "subtotal": 8000,
+          "fees": 1200,
+          "total": 9200,
+          "currency": "USD",
+          "status": "paid",
+          "eventStartsAt": "2026-11-07T05:00:00Z",
+          "eventTimezone": "America/Los_Angeles"
+        },
+        "limitations": [],
+        "originalSourceId": "order_demo_1042"
+      }
+    },
+    {
+      "id": "case_atm_1042:ticket-1",
+      "caseId": "case_atm_1042",
+      "source": "database",
+      "title": "First ticket issued",
+      "content": "A ticket was created and linked to order ATM-1042. Issuance alone does not establish delivery.",
+      "occurredAt": "2026-11-02T18:03:04Z",
+      "reference": "Synthetic: ticket_demo_1042_a",
+      "provenance": {
+        "section": "tickets",
+        "sourceMode": "synthetic",
+        "fields": {
+          "orderRef": "ATM-1042",
+          "ticketStatus": "issued",
+          "transferredFrom": null,
+          "transferredTo": null,
+          "scanRecorded": false
+        },
+        "limitations": [],
+        "originalSourceId": "ticket_demo_1042_a"
+      }
+    },
+    {
+      "id": "case_atm_1042:ticket-2",
+      "caseId": "case_atm_1042",
+      "source": "database",
+      "title": "Second ticket issued",
+      "content": "A second ticket was created for the same order.",
+      "occurredAt": "2026-11-02T18:03:04Z",
+      "reference": "Synthetic: ticket_demo_1042_b",
+      "provenance": {
+        "section": "tickets",
+        "sourceMode": "synthetic",
+        "fields": {
+          "orderRef": "ATM-1042",
+          "ticketStatus": "issued",
+          "transferredFrom": null,
+          "transferredTo": null,
+          "scanRecorded": false
+        },
+        "limitations": [],
+        "originalSourceId": "ticket_demo_1042_b"
+      }
+    },
+    {
+      "id": "case_atm_1042:email",
+      "caseId": "case_atm_1042",
+      "source": "database",
+      "title": "Confirmation email accepted",
+      "content": "The email provider accepted the confirmation for processing. Inbox delivery and reading are not recorded.",
+      "occurredAt": "2026-11-02T18:03:12Z",
+      "reference": "Synthetic: email_demo_1042",
+      "provenance": {
+        "section": "delivery",
+        "sourceMode": "synthetic",
+        "fields": {
+          "channel": "email",
+          "providerStatus": "accepted",
+          "delivered": null,
+          "read": null,
+          "errorCode": null,
+          "orderRef": "ATM-1042"
+        },
+        "limitations": [
+          "Email acceptance does not prove inbox delivery. An SMS delivery status does not prove the message was read."
+        ],
+        "originalSourceId": "email_demo_1042"
+      }
+    },
+    {
+      "id": "case_atm_1042:sms",
+      "caseId": "case_atm_1042",
+      "source": "database",
+      "title": "Ticket-link SMS marked delivered",
+      "content": "The SMS provider returned delivered for the order-linked message. Reading is not established.",
+      "occurredAt": "2026-11-02T18:04:02Z",
+      "reference": "Synthetic: sms_demo_1042",
+      "provenance": {
+        "section": "delivery",
+        "sourceMode": "synthetic",
+        "fields": {
+          "channel": "sms",
+          "providerStatus": "delivered",
+          "delivered": true,
+          "read": null,
+          "errorCode": null,
+          "orderRef": "ATM-1042"
+        },
+        "limitations": [
+          "Email acceptance does not prove inbox delivery. An SMS delivery status does not prove the message was read."
+        ],
+        "originalSourceId": "sms_demo_1042"
+      }
+    },
+    {
+      "id": "case_atm_1042:recovery",
+      "caseId": "case_atm_1042",
+      "source": "database",
+      "title": "Ticket recovery completed",
+      "content": "An order-linked recovery flow completed. This records account access, not physical event attendance.",
+      "occurredAt": "2026-11-02T18:10:41Z",
+      "reference": "Synthetic: recovery_demo_1042",
+      "provenance": {
+        "section": "history",
+        "sourceMode": "synthetic",
+        "fields": {
+          "orderRef": "ATM-1042",
+          "recoveryCompleted": true,
+          "recoveredTicketCount": 2
+        },
+        "limitations": [],
+        "originalSourceId": "recovery_demo_1042"
+      }
+    },
+    {
+      "id": "case_atm_1042:support-1",
+      "caseId": "case_atm_1042",
+      "source": "manual",
+      "title": "Customer asked for help finding tickets",
+      "content": "Fictional customer message: \"My payment went through, but I cannot see the tickets for order ATM-1042.\"",
+      "occurredAt": "2026-11-02T18:08:10Z",
+      "reference": "Synthetic: thread_demo_1042:message_1",
+      "provenance": {
+        "section": "support",
+        "sourceMode": "synthetic",
+        "fields": {
+          "orderRef": "ATM-1042",
+          "messageRole": "customer",
+          "customerAcknowledgedReceipt": false,
+          "threadMatch": "explicit_order_reference"
+        },
+        "limitations": [
+          "This is a fictional conversation for the demo. Acknowledged access does not establish attendance or determine a bank decision."
+        ],
+        "originalSourceId": "thread_demo_1042:message_1"
+      }
+    },
+    {
+      "id": "case_atm_1042:support-2",
+      "caseId": "case_atm_1042",
+      "source": "manual",
+      "title": "Organizer explained ticket recovery",
+      "content": "Fictional organizer message: \"Please open the ticket recovery link for order ATM-1042 and sign in with the purchase address.\"",
+      "occurredAt": "2026-11-02T18:09:20Z",
+      "reference": "Synthetic: thread_demo_1042:message_2",
+      "provenance": {
+        "section": "support",
+        "sourceMode": "synthetic",
+        "fields": {
+          "orderRef": "ATM-1042",
+          "messageRole": "organizer",
+          "customerAcknowledgedReceipt": false,
+          "threadMatch": "explicit_order_reference"
+        },
+        "limitations": [
+          "This is a fictional conversation for the demo. Acknowledged access does not establish attendance or determine a bank decision."
+        ],
+        "originalSourceId": "thread_demo_1042:message_2"
+      }
+    },
+    {
+      "id": "case_atm_1042:support-3",
+      "caseId": "case_atm_1042",
+      "source": "manual",
+      "title": "Customer acknowledged finding both tickets",
+      "content": "Fictional customer message: \"Found both tickets in my account for ATM-1042. Thank you.\"",
+      "occurredAt": "2026-11-02T18:12:18Z",
+      "reference": "Synthetic: thread_demo_1042:message_3",
+      "provenance": {
+        "section": "support",
+        "sourceMode": "synthetic",
+        "fields": {
+          "orderRef": "ATM-1042",
+          "messageRole": "customer",
+          "customerAcknowledgedReceipt": true,
+          "threadMatch": "explicit_order_reference"
+        },
+        "limitations": [
+          "This is a fictional conversation for the demo. Acknowledged access does not establish attendance or determine a bank decision."
+        ],
+        "originalSourceId": "thread_demo_1042:message_3"
+      }
+    }
+  ],
+  "regressionSignals": []
+}

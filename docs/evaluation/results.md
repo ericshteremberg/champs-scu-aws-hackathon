@@ -4,7 +4,11 @@ Owner: teammate 3 (`codex/demo-evaluation`). Last edited: 2026-11-07.
 
 This file separates three things: what the fixtures say (written before looking at any model output), what each run produced, and what a reviewer decided. Every input is a fictional fixture from [`lib/ticket-demo.ts`](../../lib/ticket-demo.ts). None of it is ATMSPHR customer evidence, and nothing here measures savings, accuracy across real cases, or dispute outcomes.
 
-## Branch follow-through (2026-11-07 Pacific)
+## Latest prompt revision (2026-11-07 Pacific)
+
+The user authorized application prompt fixes and regression tests after the documentation checkpoint below. [Six new live Bedrock runs](prompt-results.md) completed using the changed local engine: all six labels match the rubric, and the earlier delivery overstatement, invented nonattendance, retry-citation mistake, outcome advice and recap opening were not observed. Repetitive limitations and a narrower issuance-citation error remain. Local dates were omitted, so that instruction is not live-verified. The new report records source fingerprints and the exact remaining issues; the historical runs below remain unchanged.
+
+## Earlier evaluation checkpoint (2026-11-07 Pacific)
 
 Evaluation is proceeding independently of application fixes. The user asked this branch to complete work within its scope and later deferred the submission package (AWS track selected).
 
@@ -17,7 +21,7 @@ Evaluation is proceeding independently of application fixes. The user asked this
 
 Human sign-off and real preparation-time measurements remain unrecorded. They are limits on claims, not blockers for local testing, review preparation or rehearsal. Submission files are left unchanged at the user's request.
 
-## Status summary
+## Historical baseline status summary
 
 | Case | Live Bedrock runs | Claim-level review (AI-assisted, against fixtures) | Human sign-off | Outcome |
 | --- | --- | --- | --- | --- |
@@ -35,7 +39,7 @@ Repository commit when the runs were made: `994158b` (application code unchanged
 
 ## Label and field definitions
 
-These definitions are the standard the review below uses. They follow the wording the interface already shows the organizer (`components/workspace/workspace-app.tsx`): `supported` shows "Evidence supports a response.", `mixed` shows "The evidence needs a closer look.", and `insufficient` shows "More evidence is needed." They are also what the investigator's prompt should say, because the prompt currently never defines them.
+These definitions are the standard the baseline review below uses. They follow the wording the interface already shows the organizer (`components/workspace/workspace-app.tsx`): `supported` shows "Evidence supports a response.", `mixed` shows "The evidence needs a closer look.", and `insufficient` shows "More evidence is needed." The baseline prompt omitted those definitions; the revised [system prompt](../../lib/investigation/prompt.ts) now includes them.
 
 The assessment is a signal about the evidence for the person reviewing the draft. It is not a ruling on the dispute and not a prediction of the bank's decision.
 
@@ -59,9 +63,9 @@ Notes on the definitions:
 | `recommendation` | The organizer's next step about the evidence: which records to use, what to obtain, or that the records support a response. | Predict the bank's decision, suggest a refund, or say to close, contest or escalate the dispute. |
 | `gaps` | What the records cannot show, each stated once. | Turn absence into a negative ("no support interactions were recorded" is fine only if the source says no conversation was matched). |
 
-### Proposed prompt wording (for Aiden; not applied)
+### Baseline proposed prompt wording (superseded by the implemented revision)
 
-The investigator prompt is in `lib/investigation/engine.ts`. These lines address the issues in the table below. They are suggestions only; this branch changes documentation, not application code.
+These suggestions informed the implemented prompt in `lib/investigation/prompt.ts`, used by `engine.ts`. See [the rerun results](prompt-results.md) for what was actually changed and evaluated. The text below preserves the original proposal.
 
 ```text
 Compare the customer's claim with the records and draft the merchant's response using only
