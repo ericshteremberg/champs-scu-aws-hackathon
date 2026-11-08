@@ -1,0 +1,31 @@
+{
+  "name": "Causality",
+  "developerAccountId": "acct_1U33O9QjrrTJzQt3",
+  "developerAccountName": "Black Label Creators LLC",
+  "appId": "com.blacklabelcreators.causality",
+  "uniqueAppId": "app_61VimchfX0Y9Qjo6t41QjrrTJzQt39fU",
+  "clientId": "ca_VaZpkG3mZU0HIiQa7qS8p94YHXG2ziQK",
+  "version": "0.1.0",
+  "versionId": "appver_61VimchMAWw3zrC3441QjrrTJzQt3CVM",
+  "mode": "live",
+  "authentication": "oauth",
+  "distribution": "public",
+  "marketplacePublished": false,
+  "externalTesting": {
+    "version": "0.1.0",
+    "access": "anyone_with_link",
+    "installationsAtVerification": 0
+  },
+  "permissions": [
+    "dispute_read",
+    "charge_read"
+  ],
+  "redirectUri": "https://causality-hackathon-dev.slidah60.workers.dev/api/providers/stripe/callback",
+  "uploadStatus": "UPLOAD_COMPLETED",
+  "customerOAuthTested": false,
+  "consentPreviewVerified": true,
+  "consentPreviewPermissions": {
+    "Charges and Refunds": "Read-only",
+    "Payment Disputes": "Read-only"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "description": "Investigate ticket disputes using payment records and relevant order, ticket, delivery and attendance evidence.",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "license": "~~proprietary~~",
+  "lint-staged": {
+    "*.{json,md,yaml}": "prettier --write",
+    "*.{ts,mts,mjs,js}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  },
+  "name": "com.blacklabelcreators.causality",
+  "overrides": {
+    "@types/react": "^18.3.1"
+  },
+  "packageManager": "pnpm@10.30.3",
+  "private": true,
+  "version": "0.1.0"
+}
