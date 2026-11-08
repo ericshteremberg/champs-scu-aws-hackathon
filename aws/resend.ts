@@ -10,6 +10,7 @@ type DeliveryEvent = { emailId: string; event: string; occurredAt: string; recei
 const eventPrefix = (emailId: string) => `resend-event#${emailId}#`;
 const actionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('verify') }).strict(),
+  z.object({ action: z.literal('find'), caseId: z.string().min(1).max(200), recent: z.boolean().optional(), after: emailIdSchema.optional() }).strict(),
   z.object({ action: z.literal('discover'), caseId: z.string().min(1).max(200) }).strict(),
   z.object({ action: z.literal('preview_log'), caseId: z.string().min(1).max(200), evidenceId: z.string().min(1).max(200) }).strict(),
   z.object({ action: z.literal('import_log'), caseId: z.string().min(1).max(200), evidenceId: z.string().min(1).max(200), confirmed: z.literal(true) }).strict(),
@@ -29,6 +30,21 @@ function orderLinked(email: z.infer<typeof sentEmailSchema>, orderRef: string) {
   const pattern = new RegExp(`(^|[^A-Za-z0-9_-])${escaped}($|[^A-Za-z0-9_-])`, 'i');
   return pattern.test(email.subject) || pattern.test(email.text || '') || pattern.test((email.html || '').replace(/<[^>]*>/g, ' ')) || (email.tags || []).some(t => ['order_id', 'order_ref', 'order_number'].includes(t.name) && t.value === orderRef);
 }
+export function linkedResendIds(evidence: EvidenceDoc[]) {
+  const ids = new Set<string>();
+  for (const item of evidence) {
+    const fields = item.provenance?.fields || {};
+    for (const value of [fields.emailId, fields.resend_email_id, fields.resend_id, ...(item.provenance?.section === 'delivery' || /message_log/i.test(item.reference || '') ? [fields.provider_id] : [])]) {
+      if (emailIdSchema.safeParse(value).success) ids.add(String(value).toLowerCase());
+    }
+    // Explicit provider labels only. Never treat arbitrary order/ticket UUIDs as email IDs.
+    for (const text of [item.reference || '', item.content]) {
+      const pattern = /\bresend(?:[ _-]+email)?(?:[ _-]+id)?[\s:#/="'-]{0,12}([a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})\b/gi;
+      for (const match of text.matchAll(pattern)) if (emailIdSchema.safeParse(match[1]).success) ids.add(match[1].toLowerCase());
+    }
+  }
+  return [...ids];
+}
 export async function resendAction(user: TrustedUser, input: unknown) {
   const parsed = actionSchema.safeParse(input); if (!parsed.success) throw new ApiError(400, 'Choose a valid Resend action.');
   const wid = (await requireWorkspace(user)).data.id;
@@ -45,6 +61,22 @@ export async function resendAction(user: TrustedUser, input: unknown) {
   }
   const row = await ownedCase(wid, action.caseId); assertMutableCase(row.data);
   if (row.data.source === 'demo') throw new ApiError(409, 'Use a real case for live email evidence.');
+  if (action.action === 'find') {
+    if (!z.string().email().safeParse(row.data.email).success || !row.data.orderRef || row.data.orderRef.length < 4) throw new ApiError(409, 'Save a customer email and exact order reference on this case first.', 'resend_case_details_required');
+    if (!action.recent && !action.after) {
+      const records = await listEvidence(wid, row.data.id), ids = linkedResendIds(records.map(r => r.data));
+      if (ids.length) {
+        await commit(wid, [{ key: row.key, expectedVersion: row.version, check: true }]);
+        return { candidates: ids.slice(0, 20).map(emailId => ({ emailId, subject: 'Email referenced by this case', source: 'case_reference' })), moreAvailable: false, linkedTruncated: ids.length > 20, searchedEmail: row.data.email, orderRef: row.data.orderRef };
+      }
+    }
+    const listSchema = z.object({ has_more: z.boolean(), data: z.array(sentEmailSchema.pick({ id: true, from: true, to: true, subject: true, created_at: true })).max(100) });
+    const list = listSchema.safeParse(await readResend(`/emails?limit=100${action.after ? `&after=${action.after}` : ''}`));
+    if (!list.success || (list.data.has_more && !list.data.data.length)) throw new ApiError(502, 'Resend returned an invalid email list.');
+    const candidates = list.data.data.filter(e => allowedSender(e.from) && e.to.length === 1 && e.to[0].toLowerCase() === row.data.email.toLowerCase()).map(e => ({ emailId: e.id, subject: e.subject, createdAt: e.created_at, source: 'resend_recipient' }));
+    await commit(wid, [{ key: row.key, expectedVersion: row.version, check: true }]);
+    return { candidates, moreAvailable: list.data.has_more, nextCursor: list.data.has_more ? list.data.data.at(-1)!.id : null, searchedEmail: row.data.email, orderRef: row.data.orderRef, scanned: list.data.data.length };
+  }
   const saved = (await listEvidence(wid, row.data.id)).filter(r => savedEmailLog(r.data, row.data.orderRef));
   if (action.action === 'discover') return { records: saved.map(r => savedEmailLog(r.data, row.data.orderRef)) };
   const savedRow = 'evidenceId' in action ? saved.find(r => r.data.id === action.evidenceId) : ('emailId' in action ? saved.find(r => savedEmailLog(r.data, row.data.orderRef)?.emailId === action.emailId) : undefined);
@@ -54,22 +86,39 @@ export async function resendAction(user: TrustedUser, input: unknown) {
   const fallback = async (reason: string) => {
     if (!savedRow || !log) throw new ApiError(404, 'This email is unavailable. Import the order email log to use saved sending evidence.');
     const record = withSavedEmailContext(savedRow.data, row.data.orderRef);
+    await commit(wid, [{ key: row.key, expectedVersion: row.version, check: true }, { key: savedRow.key, expectedVersion: savedRow.version, check: true }]);
     // Evidence is already attached. No duplicate, no expiry, no downgrade of an earlier provider record.
     if (action.action === 'import_log' || action.action === 'import') {
-      await commit(wid, [{ key: row.key, expectedVersion: row.version, check: true }, { key: savedRow.key, expectedVersion: savedRow.version, check: true }]);
       return { imported: false, unchanged: true, evidenceId: record.id, savedLog: true };
     }
     return { preview: { emailId: emailId || '', evidenceId: record.id, orderRef: row.data.orderRef,
-      subject: log.subject, lastEvent: 'unavailable', eventCount: 0, savedLog: true,
+      subject: log.subject, lastEvent: 'unavailable', eventCount: 0, savedLog: true, savedEvidence: true, liveVerified: false,
       logStatus: log.logStatus, notice: reason, content: record.content } };
   };
   if (!emailId || !bound(wid)) return fallback('Saved order email log is included in the report. Provider lookup is unavailable.');
+  const historical = (await listEvidence(wid, row.data.id)).filter(record => linkedResendIds([record.data]).includes(emailId.toLowerCase()));
   let raw: unknown;
   try { raw = await readResend(`/emails/${emailId}`); }
   catch (error) {
-    if (savedRow && error instanceof ApiError && [404, 502, 503].includes(error.status))
+    if (savedRow && historical.length <= 1 && error instanceof ApiError && [404, 502, 503].includes(error.status))
       return fallback('Resend could not retrieve this message. The saved order email log remains included.');
-    throw error;
+    if (!historical.length || !(error instanceof ApiError) || ![404, 502, 503].includes(error.status)) throw error;
+    const shown = historical.slice(0, 20);
+    await commit(wid, [{ key: row.key, expectedVersion: row.version, check: true }, ...shown.map(record => ({ key: record.key, expectedVersion: record.version, check: true as const }))]);
+    if (action.action === 'import') return { imported: false, unchanged: true, savedEvidence: true, evidenceIds: shown.map(record => record.data.id) };
+    let remaining = 60000, truncated = historical.length > shown.length;
+    const content = shown.map(record => {
+      const log = savedEmailLog(record.data, row.data.orderRef);
+      const original = log ? withSavedEmailContext(record.data, row.data.orderRef) : record.data;
+      const excerpt = original.content.slice(0, Math.min(20000, remaining)); remaining -= excerpt.length;
+      truncated ||= excerpt.length < original.content.length;
+      const label = log ? 'Retained merchant email log, not provider-confirmed delivery' : 'Previously attached case evidence, not freshly verified';
+      return `${label}\nTitle: ${original.title}\nSource reference: ${original.reference || 'Not recorded'}\nRecorded event time: ${original.occurredAt}\n\n${excerpt}${excerpt.length < original.content.length ? '\n[Preview excerpt truncated. Full original remains on the case.]' : ''}`;
+    }).join('\n\n');
+    return { preview: { emailId: emailId, orderRef: row.data.orderRef, subject: 'Saved email evidence', lastEvent: 'unavailable', eventCount: 0,
+      savedEvidence: true, liveVerified: false, evidenceIds: shown.map(record => record.data.id), truncated,
+      notice: error.status === 404 ? 'Resend could not return the live record. Showing evidence already saved on this case. The reason for the missing provider record is not confirmed.' : 'The live Resend lookup is temporarily unavailable. Showing evidence already saved on this case.',
+      content } };
   }
   const parsedEmail = sentEmailSchema.safeParse(raw);
   if (!parsedEmail.success) throw new ApiError(502, 'Resend returned an unsupported email record.');
@@ -81,7 +130,10 @@ export async function resendAction(user: TrustedUser, input: unknown) {
   const content = [`Resend email ${email.id}`, `Order reference: ${row.data.orderRef}`, `Sender: ${email.from}`, `Recipient: ${email.to[0]}`, `Subject: ${email.subject}`, `Created: ${created.toISOString()}`, `Latest provider event: ${email.last_event || 'unavailable'}`, `Verified webhook events: ${events.length ? events.map(e => `${e.occurredAt}: ${e.event}`).join('; ') : 'none captured'}`, ...limitations].join('\n');
   const providerStatus = email.last_event?.replace(/^email\./, '') || null;
   const preview = { evidenceId: savedRow?.data.id, emailId: email.id, orderRef: row.data.orderRef, subject: email.subject, lastEvent: email.last_event || 'unavailable', eventCount: events.length, content };
-  if (action.action === 'preview' || action.action === 'preview_log') return { preview };
+  if (action.action === 'preview' || action.action === 'preview_log') {
+    await commit(wid, [{ key: row.key, expectedVersion: row.version, check: true }, ...(savedRow ? [{ key: savedRow.key, expectedVersion: savedRow.version, check: true as const }] : [])]);
+    return { preview: { ...preview, savedEvidence: false, liveVerified: true } };
+  }
   const evidenceId = `ev_resend_${createHash('sha256').update(`${row.data.id}:${email.id}`).digest('hex').slice(0,24)}`;
   const [records, draft, existing] = await Promise.all([listEvidence(wid, row.data.id), getDraft(wid, row.data.id), getItem<EvidenceDoc>(wid, keys.evidence(row.data.id, evidenceId))]);
   if (!existing && records.length >= MAX_CASE_EVIDENCE) throw new ApiError(409, 'This case has reached its evidence limit.');

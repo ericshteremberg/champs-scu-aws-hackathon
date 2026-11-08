@@ -181,3 +181,104 @@ describe('Retained order email history', () => {
     if(status==='failed') expect(result.findings.some(f=>f.kind==='conflict'&&f.evidenceIds.includes(record.id))).toBe(true);
   });
 });
+
+describe('Resend lookup from case context', () => {
+  it('discovers explicit Resend and message-log IDs without asking for a UUID or listing unrelated mail', async () => {
+    const evidenceId = 'linked';
+    fixture.rows.set(`${wid}|evidence#${caseId}#${evidenceId}`, { key: `evidence#${caseId}#${evidenceId}`, version: 1, data: { id: evidenceId, caseId, source: 'database', title: 'Ticket receipt', content: `Order UUID 22222222-2222-4222-8222-222222222222.`, reference: `Resend ${emailId} / message_log`, occurredAt: '2026-11-01', createdAt: '2026-11-01' } });
+    const result = await resendAction(user, { action: 'find', caseId });
+    expect(result).toMatchObject({ candidates: [{ emailId, source: 'case_reference' }], searchedEmail: 'buyer@example.test' });
+    expect(fixture.read).not.toHaveBeenCalled();
+  });
+  it('filters recent metadata to the case recipient and allowed sender, then paginates explicitly', async () => {
+    fixture.read.mockResolvedValue({ has_more: true, data: [email(), { ...email(), id: '22222222-2222-4222-8222-222222222222', to: ['other@example.test'] }, { ...email(), id: '33333333-3333-4333-8333-333333333333', from: 'bad@unrelated.test' }] });
+    const result = await resendAction(user, { action: 'find', caseId });
+    expect(result).toMatchObject({ candidates: [{ emailId, source: 'resend_recipient' }], moreAvailable: true, nextCursor: '33333333-3333-4333-8333-333333333333' });
+    expect(fixture.read).toHaveBeenCalledWith('/emails?limit=100');
+    await resendAction(user, { action: 'find', caseId, after: emailId });
+    expect(fixture.read).toHaveBeenLastCalledWith(`/emails?limit=100&after=${emailId}`);
+    fixture.read.mockResolvedValue({ ...email(), subject: 'Other order', text: 'Other order' });
+    await expect(resendAction(user, { action: 'preview', caseId, emailId })).rejects.toMatchObject({ status: 409 });
+  });
+  it('fails closed on malformed lists, case changes and unrelated workspace reads', async () => {
+    fixture.read.mockResolvedValue({ has_more: true, data: [] });
+    await expect(resendAction(user, { action: 'find', caseId })).rejects.toMatchObject({ status: 502 });
+    fixture.read.mockImplementationOnce(async () => { await executeAction(user, { action: 'updateCase', caseId, title: 'Changed' }); return { has_more: false, data: [email()] }; });
+    await expect(resendAction(user, { action: 'find', caseId })).rejects.toMatchObject({ status: 409 });
+    await expect(resendAction(other, { action: 'find', caseId })).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe('saved evidence when a live Resend record is unavailable', () => {
+  const savedId = 'historical-email';
+  const savedKey = () => `evidence#${caseId}#${savedId}`;
+  function save(fields = {}) {
+    const data = { id: savedId, caseId, source: 'gmail', title: 'Previously captured receipt', content: 'Original captured email text. Delivery status was not independently verified.', reference: `Resend ${emailId} / message_log historical`, occurredAt: '2026-08-21T01:19:00Z', createdAt: '2026-11-01T00:00:00Z', ...fields };
+    fixture.rows.set(`${wid}|${savedKey()}`, { key: savedKey(), version: 1, data });
+  }
+  it('shows explicitly linked saved evidence on 404 without changing the case, evidence or approved draft', async () => {
+    const { ApiError } = await import('../aws/types.ts');
+    save(); await executeAction(user, { action: 'generateDraft', caseId });
+    const state = await getWorkspaceState(user); await executeAction(user, { action: 'approveDraft', caseId, revision: state.cases[0].draft!.revision });
+    const before = structuredClone(fixture.rows);
+    fixture.read.mockRejectedValue(new ApiError(404, 'Not found'));
+    const result = await resendAction(user, { action: 'preview', caseId, emailId });
+    expect(result).toMatchObject({ preview: { savedEvidence: true, liveVerified: false, evidenceIds: [savedId], lastEvent: 'unavailable', eventCount: 0, content: expect.stringContaining('Original captured email text') } });
+    expect(await resendAction(user, { action: 'import', caseId, emailId, confirmed: true })).toMatchObject({ imported: false, unchanged: true, savedEvidence: true });
+    expect(fixture.rows).toEqual(before);
+  });
+  it('labels temporary provider failure separately and keeps conflicting saved records', async () => {
+    const { ApiError } = await import('../aws/types.ts');
+    save(); const secondKey = `evidence#${caseId}#failed-email`;
+    fixture.rows.set(`${wid}|${secondKey}`, { key: secondKey, version: 1, data: { ...(fixture.rows.get(`${wid}|${savedKey()}`)!.data as object), id: 'failed-email', content: 'Delivery failed according to the captured source.' } });
+    fixture.read.mockRejectedValue(new ApiError(502, 'Provider unavailable'));
+    const result = await resendAction(user, { action: 'preview', caseId, emailId });
+    expect(result).toMatchObject({ preview: { savedEvidence: true, notice: expect.stringContaining('temporarily unavailable'), evidenceIds: [savedId,'failed-email'], content: expect.stringContaining('Delivery failed') } });
+  });
+  it('does not fall back for unrelated UUIDs, wrong provider matches or another workspace', async () => {
+    const { ApiError } = await import('../aws/types.ts');
+    save({ reference: 'Order UUID 22222222-2222-4222-8222-222222222222' });
+    fixture.read.mockRejectedValueOnce(new ApiError(404, 'Not found'));
+    await expect(resendAction(user, { action: 'preview', caseId, emailId })).rejects.toMatchObject({ status: 404 });
+    save(); fixture.read.mockResolvedValueOnce({ ...email(), to: ['other@example.test'] });
+    await expect(resendAction(user, { action: 'preview', caseId, emailId })).rejects.toMatchObject({ status: 409 });
+    await expect(resendAction(other, { action: 'preview', caseId, emailId })).rejects.toMatchObject({ status: 403 });
+  });
+  it('rejects a fallback if the case or saved evidence changes during the request', async () => {
+    const { ApiError } = await import('../aws/types.ts'); save();
+    fixture.read.mockImplementationOnce(async () => { await executeAction(user, { action: 'updateCase', caseId, title: 'Changed' }); throw new ApiError(404,'Not found'); });
+    await expect(resendAction(user, { action: 'preview', caseId, emailId })).rejects.toMatchObject({ status: 409 });
+    fixture.read.mockImplementationOnce(async () => { fixture.rows.delete(`${wid}|${savedKey()}`); throw new ApiError(404,'Not found'); });
+    await expect(resendAction(user, { action: 'preview', caseId, emailId })).rejects.toMatchObject({ status: 409 });
+  });
+  it('bounds excerpts without modifying saved evidence or claiming a recovered email body', async () => {
+    const { ApiError } = await import('../aws/types.ts'); save({ content: 'x'.repeat(25000) });
+    fixture.read.mockRejectedValue(new ApiError(404,'Not found'));
+    expect(await resendAction(user, { action: 'preview', caseId, emailId })).toMatchObject({ preview: { savedEvidence: true, truncated: true, content: expect.stringContaining('Full original remains on the case') } });
+    expect((fixture.rows.get(`${wid}|${savedKey()}`)!.data as { content: string }).content).toHaveLength(25000);
+  });
+  it('preserves merchant-log limitations without upgrading merchant delivered status to provider confirmation', async () => {
+    const { withSavedEmailContext } = await import('../aws/resend-history.ts');
+    const record = { id: 'log', caseId, source: 'database' as const, title: 'Merchant email log', content: 'Saved merchant row', occurredAt: '2026-08-21', reference: 'supabase:project:public.message_log:row', provenance: { sourceMode: 'supabase_oauth', section: 'delivery', fields: { order_id: 'ORDER-42', channel: 'email', provider_id: emailId, status: 'delivered' }, limitations: [], originalSourceId: 'row' } };
+    expect(withSavedEmailContext(record, 'ORDER-42').provenance?.fields).toMatchObject({ providerStatus: null, merchantEmailStatus: 'delivered', statusSource: 'merchant_email_log' });
+    expect(withSavedEmailContext({ ...record, provenance: { ...record.provenance, fields: { ...record.provenance.fields, status: 'failed' } } }, 'ORDER-42').provenance?.fields.providerStatus).toBe('failed');
+    expect(withSavedEmailContext(record, 'OTHER-ORDER')).toEqual(record);
+  });
+});
+
+
+describe('merged retained and captured email history', () => {
+  it('keeps conflicting manual captures alongside the structured order log', async () => {
+    const { ApiError } = await import('../aws/types.ts');
+    savedLog();
+    const id = 'manual-conflict', key = keys.evidence(caseId, id);
+    fixture.rows.set(`${wid}|${key}`, { key, version: 1, data: {
+      id, caseId, source: 'manual', title: 'Captured failure', content: 'Conflicting captured failure must remain visible.',
+      reference: `Resend ${emailId}`, occurredAt: '2026-08-21', createdAt: '2026-08-21',
+    } });
+    fixture.read.mockRejectedValue(new ApiError(404, 'Not found'));
+    const result = await resendAction(user, { action: 'preview', caseId, emailId });
+    expect(result).toMatchObject({ preview: { savedEvidence: true, liveVerified: false, content: expect.stringContaining('Conflicting captured failure') } });
+    expect(result).toMatchObject({ preview: { content: expect.stringContaining('Original merchant record') } });
+  });
+});

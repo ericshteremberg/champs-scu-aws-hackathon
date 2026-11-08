@@ -17,7 +17,7 @@ const actions = z.discriminatedUnion('action', [
   z.object({ action: z.literal('discover'), email: discoveryEmail }).strict(),
   z.object({ action: z.literal('connect'), settings: imapSettingsSchema, confirmed: z.literal(true), detectSent: z.boolean().optional() }).strict(),
   z.object({ action: z.literal('disconnect') }).strict(),
-  z.object({ action: z.literal('search'), caseId }).strict(),
+  z.object({ action: z.literal('search'), caseId, scope: z.enum(['recent', 'all']).optional() }).strict(),
   z.object({ action: z.literal('preview'), caseId, messageId: imapMessageId }).strict(),
   z.object({ action: z.literal('import'), caseId, messageId: imapMessageId, confirmed: z.literal(true) }).strict(),
 ]);
@@ -69,10 +69,10 @@ export async function imapProviderAction(user: TrustedUser, input: unknown) {
   const selectionKey = `imap-selection#${row.data.id}`, previewKey = `imap-preview#${row.data.id}`;
   try {
     if (action.action === 'search') {
-      const results = await searchImap(token.data, row.data.email);
+      const results = await searchImap(token.data, row.data.email, action.scope ?? 'recent');
       const prior = await getItem<Selection>(wid, selectionKey);
       await commit(wid, [...guard, { key: row.key, expectedVersion: row.version, check: true }, { key: selectionKey, expectedVersion: prior?.version ?? null, data: { caseVersion: row.version, connectionVersion: connection.version, ids: results.messages.map(m => m.id), ttlEpochSeconds: Math.floor(Date.now() / 1000) + 600 } satisfies Selection }, auditChange(user, 'provider.imap_searched', 'Searched up to ten messages involving the case customer email. Message bodies were not saved.', row.data.id)]);
-      return results;
+      return { ...results, searchedEmail: row.data.email, scope: action.scope ?? 'recent', folders: token.data.folders };
     }
     if (action.action === 'preview') {
       const selection = await getItem<Selection>(wid, selectionKey);

@@ -49,6 +49,15 @@ describe('customer-selected Stripe disputes and linked Supabase evidence', () =>
     for (const input of [{ action: 'import_stripe_dispute', disputeId: dispute.id }, { action: 'preview_records', caseId, paymentRef: 'pi_other' }, { action: 'save_mapping', mapping, confirmed: true, projectRef: 'differentprojectxxxx' }, { action: 'import_records', caseId, previewId: crypto.randomUUID(), confirmed: true, records: [] }, { action: 'refund' }]) await expect(providerEvidenceAction(user, input)).rejects.toMatchObject({ code: 'invalid_request' });
     expect(fixture.query).not.toHaveBeenCalled();
   });
+  it('previews the case payment without importing and rejects amount mismatches or multiple references', async () => {
+    const before = structuredClone(fixture.rows);
+    expect(await act('preview_case_payment', { caseId })).toMatchObject({ payment: { disputeId: dispute.id, chargeId: dispute.chargeId } });
+    expect(fixture.rows).toEqual(before);
+    fixture.dispute.mockResolvedValueOnce({ ...dispute, amount: 5100 });
+    await expect(act('preview_case_payment', { caseId })).rejects.toMatchObject({ code: 'payment_case_mismatch' });
+    seed(keys.evidence(caseId, 'other-dispute'), { id: 'other-dispute', caseId, source: 'stripe', reference: 'du_other', content: 'Another dispute' });
+    await expect(act('preview_case_payment', { caseId })).rejects.toMatchObject({ code: 'payment_link_required' });
+  });
   it('imports exactly one selected dispute, preserves local work and hides credentials', async () => {
     await executeAction(user, { action: 'updateCase', caseId, title: 'My reviewed title' });
     expect(await act('import_stripe_dispute', { disputeId: dispute.id, confirmed: true })).toMatchObject({ imported: false, caseId });
@@ -133,4 +142,78 @@ it('fills a missing case email only from the explicitly mapped and reviewed orde
   });
   await importRecords((await preview()).id);
   expect((await getWorkspaceState(user)).cases[0].email).toBe('reviewed@example.test');
+});
+
+describe('reviewed Supabase customer lookup before mailbox search', () => {
+  const customerMapping = { table: 'customers', idColumn: 'id', nameColumn: 'name', emailColumn: 'email' };
+  const configure = async () => {
+    fixture.schema.mockResolvedValue([...schema, { name: 'customers', columns: ['id', 'name', 'email', 'private_token'] }]);
+    await act('customer_save_mapping', { mapping: customerMapping, confirmed: true });
+    fixture.query.mockResolvedValue([{ id: 'CUSTOMER-1', name: 'Mason Example', email: 'mason@example.com' }, { id: 'CUSTOMER-2', name: 'Mason Example', email: 'another@example.com' }]);
+  };
+  const lookup = () => act('customer_lookup', { caseId, query: 'Mason Example' }) as Promise<{ lookupId: string; matches: { id: string; email: string }[] }>;
+  const select = (p: { lookupId: string; matches: { id: string }[] }) => act('customer_select', { caseId, lookupId: p.lookupId, matchId: p.matches[0].id, confirmed: true });
+  it('requires authentication, explicit scope approval and denies secret columns', async () => {
+    expect(await handler({ kind: 'api', path: '/api/providers/evidence', method: 'POST', body: { action: 'customer_config' } })).toMatchObject({ status: 401 });
+    await expect(act('customer_save_mapping', { mapping: customerMapping })).rejects.toMatchObject({ code: 'invalid_request' });
+    fixture.schema.mockResolvedValue([{ name: 'customers', columns: ['id', 'name', 'private_token'] }]);
+    await expect(act('customer_save_mapping', { mapping: { ...customerMapping, emailColumn: 'private_token' }, confirmed: true })).rejects.toMatchObject({ code: 'customer_mapping_invalid' });
+    expect(fixture.query).not.toHaveBeenCalled();
+  });
+  it('adds only the approved lookup columns while preserving existing scope, without requiring Stripe', async () => {
+    fixture.rows.delete(key('provider#stripe')); fixture.rows.delete(key('provider-token#stripe'));
+    await configure();
+    const config = await act('customer_config'); expect(config).toMatchObject({ mapping: customerMapping });
+    const data = fixture.rows.get(key('provider#supabase'))!.data as { approvedTables: unknown[] };
+    expect(data.approvedTables).toEqual([...schema, { name: 'customers', columns: ['id', 'name', 'email'] }]);
+    expect(fixture.query).not.toHaveBeenCalled();
+  });
+  it('returns distinct accounts and changes the case only after selection of a stored result', async () => {
+    await configure(); const p = await lookup();
+    expect(p.matches).toHaveLength(2);
+    expect((await getWorkspaceState(user)).cases[0].email).toBe('customer@example.test');
+    expect(fixture.query.mock.calls[0][2]).toContain('LIMIT 6');
+    expect(fixture.query.mock.calls[0][3]).toEqual(['%Mason Example%', '%Mason%', '%Example%']);
+    await executeAction(user, { action: 'generateDraft', caseId });
+    const state = await getWorkspaceState(user); await executeAction(user, { action: 'approveDraft', caseId, revision: state.cases[0].draft!.revision });
+    const fresh = await lookup(); expect(await select(fresh)).toMatchObject({ email: 'mason@example.com' });
+    const updated = (await getWorkspaceState(user)).cases[0]; expect(updated.email).toBe('mason@example.com'); expect(updated.draft?.status).toBe('draft'); expect(updated.draft?.sourceStale).toBe(true);
+    await expect(select(fresh)).rejects.toMatchObject({ code: 'customer_lookup_expired' });
+  });
+  it('preserves the case and approved draft when selecting its existing email', async () => {
+    await configure();
+    fixture.query.mockResolvedValue([{ id: '1', name: 'Customer', email: dispute.email }]);
+    await executeAction(user, { action: 'generateDraft', caseId });
+    const state = await getWorkspaceState(user); await executeAction(user, { action: 'approveDraft', caseId, revision: state.cases[0].draft!.revision });
+    const before = (await getWorkspaceState(user)).cases[0];
+    await select(await lookup());
+    expect((await getWorkspaceState(user)).cases[0]).toEqual(before);
+  });
+  it('rejects forged addresses, stale results, changed cases and permissions', async () => {
+    await configure(); const p = await lookup();
+    await expect(act('customer_select', { caseId, lookupId: p.lookupId, matchId: p.matches[0].id, confirmed: true, email: 'forged@example.com' })).rejects.toMatchObject({ code: 'invalid_request' });
+    await executeAction(user, { action: 'updateCase', caseId, title: 'Changed' });
+    await expect(select(p)).rejects.toMatchObject({ code: 'customer_lookup_expired' });
+    const p2 = await lookup(); (fixture.rows.get(key(`customer-lookup#${caseId}`))!.data as { ttlEpochSeconds: number }).ttlEpochSeconds = 1;
+    await expect(select(p2)).rejects.toMatchObject({ code: 'customer_lookup_expired' });
+    const connection = fixture.rows.get(key('provider#supabase'))!; seed(connection.key, connection.data);
+    await expect(lookup()).rejects.toMatchObject({ code: 'customer_mapping_required' });
+  });
+  it('filters invalid emails, binds query values and does not persist results after disconnect', async () => {
+    await configure(); fixture.query.mockResolvedValue([{ id: '1', name: 'Mason', email: 'not-an-email' }]);
+    expect(await lookup()).toMatchObject({ matches: [], skippedInvalid: 1 });
+    await act('customer_lookup', { caseId, query: "Mason%' OR true--" });
+    const call = fixture.query.mock.calls.at(-1)!; expect(call[2]).not.toContain("Mason%"); expect(call[3][0]).toContain('\\%');
+    fixture.query.mockImplementationOnce(async () => { const connection = fixture.rows.get(key('provider#supabase'))!; seed(connection.key, { status: 'disconnected' }); return [{ id: '1', name: 'Mason', email: 'mason@example.com' }]; });
+    await expect(lookup()).rejects.toMatchObject({ code: 'conflict' });
+  });
+  it('supports manual cases but rejects another workspace and closed cases', async () => {
+    await configure();
+    await expect(providerEvidenceAction(other, { action: 'customer_lookup', caseId, query: 'Mason' })).rejects.toMatchObject({ code: 'provider_disconnected' });
+    (fixture.rows.get(key(keys.case(caseId)))!.data as { status: string }).status = 'submitted';
+    await expect(lookup()).rejects.toMatchObject({ status: 409 });
+    const state = await executeAction(user, { action: 'addCase', title: 'Manual customer', customerName: 'Mason', amount: 5000, reason: 'Not received', dueAt: '2026-12-01' });
+    const manual = state.cases.find(c => c.source === 'manual')!;
+    expect(await act('customer_lookup', { caseId: manual.id, query: 'Mason' })).toMatchObject({ matches: expect.any(Array) });
+  });
 });

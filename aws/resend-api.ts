@@ -18,12 +18,12 @@ export function allowedSender(from: string) {
   const email = /<([^<>]+)>$/.exec(from.trim())?.[1] || from.trim();
   return /^[^\s@<>]+@[^\s@<>]+$/.test(email) && allowedResendDomains().includes(email.split('@')[1].toLowerCase());
 }
-export async function readResend(path: '/domains' | `/emails/${string}`) {
-  if (path !== '/domains' && !/^\/emails\/[a-f0-9-]{36}$/i.test(path)) throw new ApiError(400, 'Invalid Resend resource.');
+export async function readResend(path: '/domains' | `/emails/${string}` | `/emails?${string}`) {
+  if (path !== '/domains' && !/^\/emails\/[a-f0-9-]{36}$/i.test(path) && !/^\/emails\?limit=100(?:&after=[a-f0-9-]{36})?$/i.test(path)) throw new ApiError(400, 'Invalid Resend resource.');
   const { apiKey } = await loadResendSecret();
   try {
     const response = await fetch(`https://api.resend.com${path}`, { method: 'GET', redirect: 'error', headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(10000) });
-    if (!response.ok) throw new ApiError(response.status === 404 ? 404 : 502, response.status === 404 ? 'This email is unavailable in Resend. It may be outside retention.' : 'Resend could not return the requested record.');
+    if (!response.ok) throw new ApiError(response.status === 404 ? 404 : 502, response.status === 404 ? 'Resend could not return this email (404). The cause is not confirmed; check the account, email reference and retention.' : 'Resend could not return the requested record.');
     const reader = response.body?.getReader(); if (!reader) throw new Error('Empty response');
     const chunks: Uint8Array[] = []; let size = 0;
     while (true) { const part = await reader.read(); if (part.done) break; size += part.value.length; if (size > 512 * 1024) { await reader.cancel(); throw new ApiError(413, 'The Resend record is too large.'); } chunks.push(part.value); }

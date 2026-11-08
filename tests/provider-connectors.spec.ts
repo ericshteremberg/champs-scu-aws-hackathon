@@ -261,3 +261,113 @@ test('Google discovery directs customers to OAuth without asking for a mailbox p
   await expect(card.getByRole('link', { name: 'Use Connect Gmail' })).toHaveAttribute('href', '#gmail-connection');
   await expect(card.getByLabel('Mailbox or app password')).toHaveCount(0);
 });
+
+async function customerCase(page: Page) {
+  const setupResult = await setup(page);
+  const { status, base, headers } = setupResult;
+  const response = await page.request.post(`${base}/api/workspace`, { headers: { ...headers, Origin: base }, data: { action: 'addCase', title: 'Customer lookup test', customerName: 'Mason Example', email: 'old@example.com', amount: 5000, currency: 'usd', reason: 'Ticket not received', orderRef: 'ORDER-LOOKUP', dueAt: '2026-12-01' } });
+  const caseId = (await response.json()).cases[0].id;
+  status.imap = { configured: true, connection: { status: 'authorized', updatedAt: new Date().toISOString(), email: 'support@example.com', host: 'imap.provider.com', folders: ['INBOX', 'Sent'] } };
+  return { ...setupResult, caseId };
+}
+
+test('Supabase lookup approval and account selection lead to an email-based IMAP search', async ({ page }) => {
+  const { caseId } = await customerCase(page);
+  const mapping = { table: 'orders', idColumn: 'id', nameColumn: 'name', emailColumn: 'email' };
+  const calls: Record<string, unknown>[] = [];
+  await page.route('**/api/providers/evidence', async route => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { mapping: null, eligibleCaseIds: [] } });
+    const body = route.request().postDataJSON(); calls.push(body);
+    if (body.action === 'customer_config') return route.fulfill({ json: { projectName: 'Tickets', tables: [{ name: 'orders', columns: ['id','name','email'] }], mapping: null } });
+    if (body.action === 'customer_save_mapping') return route.fulfill({ json: { mapping } });
+    if (body.action === 'customer_lookup') return route.fulfill({ json: { lookupId: 'lookup-id', table: 'orders', matches: [{ id: 'match-1', sourceId: 'ORDER-1', name: 'Mason Example', email: 'actual@example.com' }, { id: 'match-2', sourceId: 'ORDER-2', name: 'Mason Example', email: 'other@example.com' }], moreAvailable: false, skippedInvalid: 0 } });
+    return route.fulfill({ json: { email: 'actual@example.com', caseId } });
+  });
+  await page.route('**/api/providers/imap', async route => { calls.push(route.request().postDataJSON()); return route.fulfill({ json: { messages: [], searchedEmail: 'actual@example.com', folders: ['INBOX','Sent'], scanLimited: false, moreAvailable: false } }); });
+  await page.goto('/workspace?view=integrations');
+  const card = page.getByRole('article', { name: 'Other email IMAP connection' });
+  await card.getByLabel('Case for IMAP evidence').selectOption(caseId);
+  await card.getByRole('button', { name: 'Find customer account in Supabase' }).click();
+  await expect(card.getByLabel('Customer lookup table')).toHaveValue('orders');
+  await expect(card.getByRole('button', { name: 'Save customer lookup' })).toBeDisabled();
+  await card.getByRole('checkbox', { name: /I approve read-only customer lookup/ }).check();
+  await card.getByRole('button', { name: 'Save customer lookup' }).click();
+  await card.getByRole('button', { name: 'Look up customer', exact: true }).click();
+  await expect(card.getByRole('button', { name: /Use this email and search/ })).toHaveCount(2);
+  expect(calls.some(c => c.action === 'search')).toBe(false);
+  await card.getByRole('button', { name: 'Use this email and search actual@example.com record ORDER-1' }).click();
+  await expect(card.getByRole('status').filter({ hasText: 'Searched actual@example.com' })).toContainText('Searched actual@example.com');
+  expect(calls.at(-1)).toEqual({ action: 'search', caseId, scope: 'all' });
+  expect(calls.at(-2)).toEqual({ action: 'customer_select', caseId, lookupId: 'lookup-id', matchId: 'match-1', confirmed: true });
+});
+
+test('choosing a Resend case finds its saved reference and previews without UUID entry', async ({ page }) => {
+  const { caseId } = await customerCase(page); const calls: Record<string, unknown>[] = [];
+  const emailId = '11111111-1111-4111-8111-111111111111';
+  await page.route('**/api/providers/resend', async route => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { configured: true, verifiedAt: null, domains: ['send.example.com'] } });
+    const body = route.request().postDataJSON(); calls.push(body);
+    if (body.action === 'discover') return route.fulfill({ json: { records: [] } });
+    if (body.action === 'find') return route.fulfill({ json: { candidates: [{ emailId, subject: 'Linked receipt', source: 'case_reference' }], moreAvailable: false, searchedEmail: 'old@example.com', orderRef: 'ORDER-LOOKUP' } });
+    return route.fulfill({ json: { preview: { emailId, subject: 'Linked receipt', lastEvent: 'delivered', eventCount: 0, orderRef: 'ORDER-LOOKUP', content: 'Verified recipient and order. Delivered is not proof of reading.' } } });
+  });
+  await page.goto('/workspace?view=integrations');
+  const card = page.getByRole('article', { name: 'Resend email evidence' });
+  await card.getByLabel('Resend evidence case').selectOption(caseId);
+  await expect(card.locator('pre')).toContainText('Verified recipient and order');
+  await expect(card.getByLabel('Resend email ID')).toBeHidden();
+  expect(calls.filter(c => c.action !== 'discover')).toEqual([{ action: 'find', caseId }, { action: 'preview', caseId, emailId }]);
+  expect(calls.some(c => c.action === 'import')).toBe(false);
+});
+
+test('Get evidence starts all sources and preserves successes when one provider fails', async ({ page }) => {
+  const { caseId } = await customerCase(page); const actions: string[] = [];
+  await page.route('**/api/providers/evidence', async route => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { mapping: null, eligibleCaseIds: [] } });
+    const body = route.request().postDataJSON(); actions.push(body.action);
+    if (body.action === 'preview_case_payment') return route.fulfill({ json: { payment: { disputeId: 'du_demo', chargeId: 'ch_demo', amount: 5000, currency: 'usd', status: 'needs_response' }, limitation: 'Preview only' } });
+    return route.fulfill({ status: 409, json: { error: 'Set up the customer lookup first.' } });
+  });
+  await page.route('**/api/providers/resend', async route => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { configured: false, verifiedAt: null, domains: [] } });
+    actions.push(route.request().postDataJSON().action); return route.fulfill({ json: { candidates: [], moreAvailable: true } });
+  });
+  await page.route('**/api/providers/imap', async route => { actions.push(route.request().postDataJSON().action); return route.fulfill({ json: { searchedEmail: 'old@example.com', folders: ['INBOX'], messages: [{ id: 'm1', subject: 'Ticket confirmation', from: 'support@example.com', to: 'old@example.com', folder: 'INBOX' }], moreAvailable: false } }); });
+  await page.goto('/workspace?view=integrations');
+  const card = page.getByRole('article', { name: 'Get evidence from all providers' });
+  await card.getByLabel('Case to collect evidence for').selectOption(caseId);
+  await card.getByRole('button', { name: 'Get evidence', exact: true }).click();
+  await expect(card.getByRole('heading', { name: 'Stripe: Ready to review' })).toBeVisible();
+  await expect(card.getByRole('heading', { name: 'IMAP: Ready to review' })).toBeVisible();
+  await expect(card).toContainText('Set up the customer lookup first.');
+  await expect(card.getByRole('button', { name: 'Get evidence', exact: true })).toBeEnabled();
+  expect(actions.sort()).toEqual(['customer_lookup','find','preview_case_payment','search']);
+  expect(actions.some(a => /import|send|select$/.test(a))).toBe(false);
+});
+
+test('unavailable Resend email shows saved evidence without offering a duplicate import or claiming live verification', async ({ page }) => {
+  const { caseId } = await customerCase(page);
+  const emailId = '11111111-1111-4111-8111-111111111111';
+  const calls: string[] = [];
+  await page.route('**/api/providers/resend', async route => {
+    if (route.request().method() === 'GET') return route.fulfill({ json: { configured: true, verifiedAt: '2026-11-01', domains: ['send.example.com'] } });
+    const body = route.request().postDataJSON(); calls.push(body.action);
+    if (body.action === 'discover') return route.fulfill({ json: { records: [] } });
+    if (body.action === 'find') return route.fulfill({ json: { candidates: [{ emailId, subject: 'Email referenced by this case', source: 'case_reference' }], moreAvailable: false, searchedEmail: 'old@example.com', orderRef: 'ORDER-LOOKUP' } });
+    return route.fulfill({ json: { preview: { emailId, subject: 'Saved email evidence', lastEvent: 'unavailable', eventCount: 0, orderRef: 'ORDER-LOOKUP', savedEvidence: true, liveVerified: false, notice: 'Resend could not return the live record. Showing evidence already saved on this case.', content: '<script>not executed</script> Original captured evidence.' } } });
+  });
+  await page.goto('/workspace?view=integrations');
+  const card = page.getByRole('article', { name: 'Resend email evidence' });
+  await card.getByLabel('Resend evidence case').selectOption(caseId);
+  await expect(card.getByRole('heading', { name: 'Saved case evidence, not reverified' })).toBeVisible();
+  await expect(card.getByRole('alert')).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Attach to report' })).toHaveCount(0);
+  await expect(card.locator('pre')).toContainText('<script>not executed</script>');
+  await expect(card).toContainText('Already attached.');
+  const collector = page.getByRole('article', { name: 'Get evidence from all providers' });
+  await collector.getByLabel('Case to collect evidence for').selectOption(caseId);
+  await collector.getByRole('button', { name: 'Get evidence', exact: true }).click();
+  await expect(collector).toContainText('Saved case evidence is available. The live Resend record could not be reverified.');
+  await expect(collector).not.toContainText('Found and verified the email');
+  expect(calls).not.toContain('import');
+});

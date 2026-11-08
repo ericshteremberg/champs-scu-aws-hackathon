@@ -1,3 +1,4 @@
+import { customerActions, customerLookupAction } from './customer-lookup.ts';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { commit, getItem, keys, queryItems } from './store.ts';
@@ -17,6 +18,7 @@ type Preview = { preview: LinkedEvidencePreview; caseVersion: number; mappingVer
 const caseId = z.string().min(1).max(200);
 const actions = z.discriminatedUnion('action', [
   z.object({ action: z.literal('stripe_disputes') }).strict(),
+  z.object({ action: z.literal('preview_case_payment'), caseId }).strict(),
   z.object({ action: z.literal('import_stripe_dispute'), disputeId: stripeDisputeId, confirmed: z.literal(true) }).strict(),
   z.object({ action: z.literal('save_mapping'), mapping: orderMappingSchema, confirmed: z.literal(true) }).strict(),
   z.object({ action: z.literal('preview_records'), caseId }).strict(),
@@ -32,6 +34,10 @@ export async function providerEvidenceStatus(user: TrustedUser) {
   return { mapping: matches(mapping, supabase, stripe) ? mapping!.data.mapping : null, eligibleCaseIds: links.filter(row => stripe?.data.status === 'authorized' && row.data.accountId === stripe.data.accountId && row.data.mode === stripe.data.mode).map(row => row.key.slice('provider-case#'.length)) };
 }
 export async function providerEvidenceAction(user: TrustedUser, input: unknown) {
+  if (input && typeof input === 'object' && 'action' in input && typeof input.action === 'string' && input.action.startsWith('customer_')) {
+    if (!customerActions.safeParse(input).success) throw new ApiError(400, 'Choose a valid customer lookup action.', 'invalid_request');
+    return customerLookupAction(user, input);
+  }
   const parsed = actions.safeParse(input);
   if (!parsed.success) throw new ApiError(400, 'Choose a valid evidence action and confirm imports.', 'invalid_request');
   const action = parsed.data, wid = (await requireWorkspace(user)).data.id;
@@ -41,6 +47,17 @@ export async function providerEvidenceAction(user: TrustedUser, input: unknown) 
     const result = await listStripeOAuthDisputes(stripe.token.data);
     await commit(wid, stripeGuard);
     return result;
+  }
+  if (action.action === 'preview_case_payment') {
+    const row = await ownedCase(wid, action.caseId); assertMutableCase(row.data);
+    if (row.data.source === 'demo') throw new ApiError(409, 'Choose a real case for live provider reads.', 'live_case_required');
+    const evidence = await listEvidence(wid, row.data.id);
+    const ids = [...new Set([row.data.stripeDisputeId, ...evidence.filter(e => e.data.source === 'stripe').map(e => e.data.reference)].filter((v): v is string => stripeDisputeId.safeParse(v).success))];
+    if (ids.length !== 1) throw new ApiError(409, 'Import a Stripe dispute or attach its exact dispute reference to this case first. Multiple references require review.', 'payment_link_required');
+    const dispute = await readStripeOAuthDispute(stripe.token.data, ids[0]);
+    if (dispute.amount !== row.data.amount || dispute.currency.toLowerCase() !== row.data.currency.toLowerCase() || (row.data.stripeAccountId && row.data.stripeAccountId !== dispute.accountId)) throw new ApiError(409, 'The Stripe dispute amount, currency or account differs from this case. Review the case before collecting payment evidence.', 'payment_case_mismatch');
+    await commit(wid, [...stripeGuard, ...guard(row)]);
+    return { payment: { disputeId: dispute.id, chargeId: dispute.chargeId, paymentIntentId: dispute.paymentIntentId, amount: dispute.amount, currency: dispute.currency, status: dispute.status, email: dispute.email, reason: dispute.reason, dueAt: dispute.dueAt }, limitation: 'Verified provider read. The reference alone does not prove customer identity or delivery. Preview only, nothing imported or submitted.' };
   }
   if (action.action === 'import_stripe_dispute') {
     const dispute = await readStripeOAuthDispute(stripe.token.data, action.disputeId);

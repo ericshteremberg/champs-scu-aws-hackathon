@@ -6,7 +6,8 @@ import type { DisputeCase, WorkspaceState } from '../../lib/domain';
 import './provider-connectors.css';
 
 type Status = { configured: boolean; verifiedAt: string | null; domains: string[] };
-type Preview = { content: string; emailId: string; orderRef: string; subject: string; lastEvent: string; eventCount: number; evidenceId?: string; savedLog?: boolean; logStatus?: string; notice?: string };
+type Preview = { content: string; emailId: string; orderRef: string; subject: string; lastEvent: string; eventCount: number; evidenceId?: string; savedLog?: boolean; logStatus?: string; notice?: string; savedEvidence?: boolean; truncated?: boolean };
+type Search = { candidates: { emailId: string; subject: string; source: string }[]; moreAvailable: boolean; nextCursor?: string; searchedEmail: string; orderRef: string };
 type SavedEmail = { evidenceId: string; emailId: string | null; subject: string; logStatus: string; occurredAt: string | null };
 type Props = {
   cases: DisputeCase[];
@@ -35,6 +36,8 @@ export function ResendConnector({ cases, caseId: fixedCaseId, disabled = false, 
   const [status, setStatus] = useState<Status | null>(null);
   const [selectedCase, setSelectedCase] = useState(fixedCaseId || '');
   const [emailId, setEmailId] = useState('');
+  const [search, setSearch] = useState<Search | null>(null);
+  const [searchNote, setSearchNote] = useState('');
   const [savedEmails, setSavedEmails] = useState<SavedEmail[]>([]);
   const [discoveryNote, setDiscoveryNote] = useState('');
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -61,6 +64,19 @@ export function ResendConnector({ cases, caseId: fixedCaseId, disabled = false, 
     }).catch(e => { if (alive) setDiscoveryNote(e.message); });
     return () => { alive = false; };
   }, [expanded, caseId, sample, current?.orderRef, current?.evidence]);
+  useEffect(() => {
+    let alive = true; setSearch(null); setSearchNote('');
+    if (!expanded || !caseId || sample || !status?.configured) return;
+    api<Search>({ action: 'find', caseId }).then(async result => {
+      if (!alive) return;
+      setSearch(result);
+      if (result.candidates.length === 1 && result.candidates[0].source === 'case_reference') {
+        const response = await api<{ preview: Preview }>({ action: 'preview', caseId, emailId: result.candidates[0].emailId });
+        if (alive) setPreview(response.preview);
+      }
+    }).catch(e => { if (alive) setSearchNote(e.message); });
+    return () => { alive = false; };
+  }, [expanded, caseId, sample, status?.configured]);
   useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   const run = async (action: () => Promise<void>) => {
     setBusy(true); setError(''); setNotice('');
@@ -84,7 +100,7 @@ export function ResendConnector({ cases, caseId: fixedCaseId, disabled = false, 
         {status && <>
           {disabled && <p className="cw-provider-note">Save any response edits and finish the current investigation before importing. Closed cases are read-only.</p>}
           <p className="cw-provider-note">Senders: {status.domains.join(', ') || 'No approved domains'}</p>
-          {!fixedCaseId && <label className="cw-field"><span>Case</span><select value={selectedCase} disabled={locked} onChange={e => { setSelectedCase(e.target.value); setEmailId(''); reset(); }}><option value="">Choose a case</option>{eligible.map(c => <option key={c.id} value={c.id}>{c.customerName} · {c.orderRef || c.title}</option>)}</select></label>}
+          {!fixedCaseId && <label className="cw-field"><span>Resend evidence case</span><select value={selectedCase} disabled={locked} onChange={e => { setSelectedCase(e.target.value); setEmailId(''); reset(); }}><option value="">Choose a case</option>{eligible.map(c => <option key={c.id} value={c.id}>{c.customerName} · {c.orderRef || c.title}</option>)}</select></label>}
           {!fixedCaseId && !eligible.length && <p className="cw-provider-note">Create or import a real case to attach email evidence.</p>}
           {discoveryNote && <p className="cw-provider-note" role="status">{discoveryNote}</p>}
           {savedEmails.map(log => <div className="cw-resend-heading" key={log.evidenceId}>
@@ -93,23 +109,39 @@ export function ResendConnector({ cases, caseId: fixedCaseId, disabled = false, 
               setPreview(null); const r = await api<{ preview: Preview }>({ action: 'preview_log', caseId, evidenceId: log.evidenceId }); setPreview(r.preview);
             })}>View email record</button>
           </div>)}
+          {searchNote && <p className="cw-provider-note">{searchNote}</p>}
+          {search && <section aria-label="Discovered Resend emails">
+            <p>{search.candidates.length} candidate emails for {search.searchedEmail}. Preview checks recipient, sender and order.</p>
+            {search.candidates.map(candidate => <div className="cw-resend-heading" key={candidate.emailId}>
+              <strong>{candidate.subject || '(No subject)'}</strong>
+              <button className="cw-button" disabled={locked} onClick={() => void run(async () => {
+                setPreview(null); const result = await api<{ preview: Preview }>({ action:'preview', caseId, emailId:candidate.emailId }); setPreview(result.preview);
+              })}>Preview email <span className="sr-only">{candidate.emailId}</span></button>
+            </div>)}
+            {!search.candidates.length && <p>No matches on this page. This does not prove an email was never sent.</p>}
+          </section>}
+          {status.configured && caseId && <div className="cw-actions">
+            <button className="cw-button" disabled={locked} onClick={() => void run(async () => { setPreview(null); setSearch(await api<Search>({ action:'find', caseId, recent:true })); })}>Search recent Resend emails</button>
+            {search?.moreAvailable && <button className="cw-button" disabled={locked} onClick={() => void run(async () => { setPreview(null); setSearch(await api<Search>({ action:'find', caseId, recent:true, after:search.nextCursor })); })}>Search older Resend emails</button>}
+          </div>}
           <details><summary>Look up another email</summary>
           <div className="cw-resend-input"><label className="cw-field"><span>Resend email ID</span><input value={emailId} disabled={locked || !current} placeholder="Email ID from Resend" autoComplete="off" spellCheck={false} onChange={e => { setEmailId(e.target.value.trim()); reset(); }} /></label>
             <button className="cw-button" disabled={locked || !current || !validId.test(emailId)} onClick={() => void run(async () => { setPreview(null); const r = await api<{ preview: Preview }>({ action: 'preview', caseId, emailId }); setPreview(r.preview); })}>{busy ? 'Checking…' : 'Preview email'}</button>
           </div>
           <p className="cw-provider-note">Use the ID from Resend or your order’s email log. The recipient, order and sender must match.</p></details>
-          {preview && <section className="cw-resend-preview" aria-label="Matched Resend record"><div className="cw-resend-heading"><h4>{preview.subject}</h4><span className="cw-pill">{preview.savedLog ? `Order log: ${preview.logStatus}` : preview.lastEvent.replace(/^email\./, '').replaceAll('_', ' ')}</span></div>
+          {preview && <section className="cw-resend-preview" aria-label="Matched Resend record"><div className="cw-resend-heading"><h4>{preview.savedEvidence ? "Saved case evidence, not reverified" : preview.subject}</h4><span className="cw-pill">{preview.savedLog ? `Order log: ${preview.logStatus}` : preview.lastEvent.replace(/^email\./, '').replaceAll('_', ' ')}</span></div>
             {preview.notice && <p>{preview.notice}</p>}
+            {preview.truncated && <p>Preview excerpt only. Review the full source on the case.</p>}
             <p>Matched to {preview.orderRef} · {preview.eventCount} captured events</p>
             <details><summary>Inspect source record</summary><pre>{preview.content}</pre></details>
             <p className="cw-provider-note">Delivery confirms mail-server acceptance, not reading or attendance.</p>
-            <button className="cw-button primary" disabled={locked} onClick={() => void run(async () => {
+            {preview.savedEvidence ? <p>Already attached. The original evidence remains included in compilation; live delivery is not reverified.</p> : <button className="cw-button primary" disabled={locked} onClick={() => void run(async () => {
               await api(preview.evidenceId ? { action: 'import_log', caseId, evidenceId: preview.evidenceId, confirmed: true } : { action: 'import', caseId, emailId: preview.emailId, confirmed: true });
               setPreview(null); setNotice(preview.savedLog ? 'Saved email log is included in the next compilation. Delivery remains unverified.' : 'Email attached. It will be included in the next compilation.');
               const response = await fetch('/api/workspace', { cache: 'no-store' });
               if (!response.ok) throw new Error('Email saved. Reload the workspace to see the updated evidence before compiling.');
               onImported(await response.json() as WorkspaceState, caseId);
-            })}>{busy ? 'Checking…' : preview.savedLog ? 'Use saved email log' : 'Attach to report'}</button>
+            })}>{busy ? 'Checking…' : preview.savedLog ? 'Use saved email log' : 'Attach to report'}</button>}
           </section>}
           {imported.length > 0 && <details className="cw-resend-linked"><summary>Linked Resend records ({imported.length})</summary>{imported.map(e => <div key={e.id}><span>{e.title}</span><button className="cw-button" disabled={locked} onClick={() => { setEmailId(String(e.provenance?.fields.emailId || '')); reset(); }}>Check latest status</button></div>)}</details>}
         </>}

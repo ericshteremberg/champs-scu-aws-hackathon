@@ -62,6 +62,13 @@ describe('IMAP public TLS transport and bounded reads', () => {
     expect(result).toMatchObject({ scanLimited: true, messages: [{ id: 'SU5CT1g.7.123' }] });
     expect(fixture.fetch.mock.calls[0][1]).not.toHaveProperty('source');
   });
+  it('can search older messages server-side while bounding fetched headers', async () => {
+    fixture.search.mockResolvedValue([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 123]);
+    const result = await searchImap(settings, 'customer@example.test', 'all');
+    expect(fixture.search).toHaveBeenCalledWith({ deleted: false, or: [{ from: 'customer@example.test' }, { to: 'customer@example.test' }] }, { uid: true });
+    expect(fixture.fetch.mock.calls[0][0]).toHaveLength(10);
+    expect(result).toMatchObject({ scanLimited: false, moreAvailable: true });
+  });
   it('validates case email and rejects stale UIDVALIDITY or an unselected folder', async () => {
     await expect(searchImap(settings, 'customer@example.test\r\nALL')).rejects.toMatchObject({ code: 'imap_email_required' });
     await expect(previewImap(settings, 'U2VudA.7.123')).rejects.toMatchObject({ code: 'imap_selection_expired' });
