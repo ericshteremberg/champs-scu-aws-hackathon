@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
-import {existsSync,readFileSync,writeFileSync} from 'node:fs';
+import {readFileSync,writeFileSync} from 'node:fs';
 import {LambdaClient,InvokeCommand} from '@aws-sdk/client-lambda';
-if(existsSync('.dev.vars'))process.loadEnvFile('.dev.vars');
+import {loadAwsSession} from './load-aws-session.mjs';
+loadAwsSession();
 const deployment=JSON.parse(readFileSync('.aws-build/deployment.json','utf8'));
 if(deployment.FunctionName!=='causality-hackathon-backend'||deployment.region!=='us-east-1')throw new Error('This smoke test targets only the named hackathon development backend.');
 const client=new LambdaClient({region:deployment.region});
@@ -47,10 +48,19 @@ const good=ticket('ATM-1042');
 value=await api('/api/investigations',{action:'start',caseId:good.id,mode:'sample'});assert.equal(value.status,202);const cancel=await api('/api/investigations',{action:'cancel',runId:value.body.run.id});assert.equal(cancel.body.run.status,'cancelled');assert.equal((await waitRun(good.id)).status,'cancelled');
 value=await api('/api/investigations',{action:'start',caseId:good.id,mode:'sample'});assert.equal(value.status,202);
 const prior=(await state()).body.cases.find(item=>item.id===good.id).draft;
-assert.equal((await api('/api/workspace',{action:'approveDraft',caseId:good.id,revision:prior.revision})).status,200);
-assert.equal((await waitRun(good.id)).status,'stale');
+const approval=await api('/api/workspace',{action:'approveDraft',caseId:good.id,revision:prior.revision});
+const raced=await waitRun(good.id);
+let archiveRevision=prior.revision;
+if(approval.status===200){assert.equal(raced.status,'stale');}
+else {
+ assert.equal(approval.status,409,'A conflicting approval must fail explicitly');
+ assert.equal(raced.status,'completed');
+ archiveRevision=(await state()).body.cases.find(item=>item.id===good.id).draft.revision;
+ assert.ok(archiveRevision>prior.revision);
+ assert.equal((await api('/api/workspace',{action:'approveDraft',caseId:good.id,revision:archiveRevision})).status,200);
+}
 assert.equal((await state()).body.cases.find(item=>item.id===good.id).draft.status,'approved');
-const archive=await api('/api/investigations/archive',{caseId:good.id,revision:prior.revision});assert.equal(archive.status,200,JSON.stringify(archive));assert.equal(archive.body.archived,true);
+const archive=await api('/api/investigations/archive',{caseId:good.id,revision:archiveRevision});assert.equal(archive.status,200,JSON.stringify(archive));assert.equal(archive.body.archived,true);
 console.log('PASS: cancellation, concurrent approval preservation, and private approved-revision S3 archive.');
 value=await api('/api/investigations',{action:'start',caseId:good.id,mode:'bedrock'});assert.equal(value.status,202,JSON.stringify(value));
 const live=await waitRun(good.id);assert.equal(live.status,'completed',JSON.stringify(live));

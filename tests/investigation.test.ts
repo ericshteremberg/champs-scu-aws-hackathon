@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ConverseCommandOutput } from '@aws-sdk/client-bedrock-runtime';
 import { runInvestigation, validateEnvelope } from '../lib/investigation/engine.ts';
 import { fetchMerchantSection, normalizeMerchantSection } from '../lib/investigation/merchant.ts';
-import { buildSampleReport, validateReport } from '../lib/investigation/report.ts';
+import { buildSampleReport, CitationAliases, validateReport } from '../lib/investigation/report.ts';
 import { EVIDENCE_SECTIONS, type EvidenceEnvelope, type EvidenceSection, type InvestigationEvent, type InvestigationInput } from '../lib/investigation/types.ts';
 
 const timestamp = '2026-11-07T18:00:00.000Z';
@@ -97,6 +97,128 @@ describe('portable investigation engine', () => {
     expect(options.events.filter(event => event.type === 'blocked')).toHaveLength(1);
   });
 
+  it('shows short aliases to Bedrock and persists only canonical evidence references', async () => {
+    let calls = 0;
+    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
+      calls++;
+      if (calls === 1) {
+        const initial = JSON.parse(request.messages![0].content![0].text!);
+        expect(initial.initialSummary.records[0]).toMatchObject({ id: 'E1', sourceId: 'original_summary' });
+        return modelResponse((['order','tickets','delivery','support'] as const).map(section => ({ name: 'get_evidence', input: { section } })));
+      }
+      const returned = request.messages!.at(-1)!.content!.map(block => block.toolResult?.content?.[0].json as { records: { id: string }[] });
+      expect(returned.map(section => section.records[0].id)).toEqual(['E2','E3','E4','E5']);
+      return modelResponse([{ name: 'finish_report', input: { ...report(), content: 'Payment is recorded. [E1] Support is attached. [E5]', summary: 'Payment and support records are attached. [E1] [E5]', findings: [{ ...report().findings[0], detail: 'The source records include payment and support. [E1] [E5]', evidenceIds: ['E1','E5'] }] } }]);
+    });
+    const options = input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke });
+    const result = await runInvestigation(options);
+    expect(result.content).toContain('[record_summary]'); expect(result.content).toContain('[record_support]');
+    expect(result.summary).toContain('[record_summary]');
+    expect(result.findings[0].evidenceIds).toEqual(['record_summary','record_support']);
+    expect(result.findings[0].detail).toContain('[record_support]');
+    expect(JSON.stringify(result)).not.toMatch(/\[E\d+\]/);
+    expect(options.events.flatMap(event => event.evidenceIds || [])).toContain('record_summary');
+    expect(options.events.flatMap(event => event.evidenceIds || []).some(id => /^E\d+$/.test(id))).toBe(false);
+  });
+
+  it('rejects invented aliases with actionable valid-reference feedback before accepting a corrected report', async () => {
+    let calls = 0;
+    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
+      calls++;
+      if (calls === 1) return modelResponse((['order','tickets','delivery','support'] as const).map(section => ({ name: 'get_evidence', input: { section } })));
+      if (calls === 2) return modelResponse([{ name: 'finish_report', input: { ...report(), content: 'The ticket was received. [E999]', findings: [{ ...report().findings[0], evidenceIds: ['E999'] }] } }]);
+      const feedback = request.messages!.at(-1)!.content![0].toolResult!;
+      expect(feedback.status).toBe('error');
+      expect(feedback.content![0].text).toContain('E1, E2, E3, E4, E5');
+      expect(feedback.content![0].text).toContain('"field":"content","reference":"E999"');
+      expect(feedback.content![0].text).toContain('"field":"findings[0].evidenceIds","reference":"E999"');
+      expect(feedback.content![0].text).toContain('[E1] [E2]');
+      expect(feedback.content![0].text).toContain('Do not cite sourceId');
+      return modelResponse([{ name: 'finish_report', input: { ...report(), content: 'The payment record is attached. [E1]', findings: [{ ...report().findings[0], evidenceIds: ['E1'] }] } }]);
+    });
+    const options = input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke });
+    const result = await runInvestigation(options);
+    expect(result.evidenceIds).toEqual(['record_summary']);
+    expect(options.events.filter(event => event.type === 'blocked')).toHaveLength(1);
+    expect(result.metrics.modelCalls).toBe(3);
+  });
+
+  it('offers only unread sections and forces Nova to finish once all sections have been retrieved', async () => {
+    let calls = 0;
+    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
+      calls++;
+      if (calls === 1) {
+        expect(request.toolConfig?.toolChoice).toEqual({ any: {} });
+        const retrieval = request.toolConfig!.tools![0].toolSpec!;
+        expect((retrieval.inputSchema!.json as { properties: { section: { enum: string[] } } }).properties.section.enum).not.toContain('summary');
+        return modelResponse(EVIDENCE_SECTIONS.filter(section => section !== 'summary').map(section => ({ name: 'get_evidence', input: { section } })));
+      }
+      expect(request.toolConfig!.tools!.map(tool => tool.toolSpec?.name)).toEqual(['finish_report']);
+      expect(request.toolConfig!.toolChoice).toEqual({ tool: { name: 'finish_report' } });
+      return modelResponse([{ name: 'finish_report', input: { ...report(), content: 'The payment record is attached. [E1]', findings: [{ ...report().findings[0], evidenceIds: ['E1'] }] } }]);
+    });
+    const result = await runInvestigation(input({ mode: 'bedrock', modelId: 'us.amazon.nova-2-lite-v1:0', invokeModel: invoke }));
+    expect(result.metrics.modelCalls).toBe(2);
+    expect(result.evidenceIds).toEqual(['record_summary']);
+  });
+
+  it('returns exactly one tool result for each repeated section request without fetching it again', async () => {
+    let calls = 0;
+    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
+      calls++;
+      if (calls === 1) return modelResponse((['order','order','tickets','delivery','support'] as const).map(section => ({ name: 'get_evidence', input: { section } })));
+      const results = request.messages!.at(-1)!.content!.map(block => block.toolResult!);
+      expect(results.map(result => result.toolUseId)).toEqual(['tool_0','tool_1','tool_2','tool_3','tool_4']);
+      expect(results.map(result => result.status)).toEqual(['success','error','success','success','success']);
+      expect(results[1].content![0].text).toContain('already retrieved');
+      return modelResponse([{ name: 'finish_report', input: report() }]);
+    });
+    const options = input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke });
+    await runInvestigation(options);
+    expect(vi.mocked(options.readEvidence).mock.calls.filter(([section]) => section === 'order')).toHaveLength(1);
+  });
+
+  it('reserves the last two model calls for reporting while retaining unrequested-source gaps', async () => {
+    let calls = 0;
+    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
+      calls++;
+      if (calls === 1) return modelResponse((['order','tickets','delivery','support'] as const).map(section => ({ name: 'get_evidence', input: { section } })));
+      if (calls < 11) return { $metadata: {}, usage: { inputTokens: 10, outputTokens: 10, totalTokens: 20 }, metrics: { latencyMs: 1 }, output: { message: { role: 'assistant', content: [{ text: 'Considering the next step.' }] } }, stopReason: 'end_turn' };
+      expect(request.toolConfig!.tools!.map(tool => tool.toolSpec?.name)).toEqual(['finish_report']);
+      expect(request.toolConfig!.toolChoice).toEqual({ tool: { name: 'finish_report' } });
+      return modelResponse([{ name: 'finish_report', input: report() }]);
+    });
+    const result = await runInvestigation(input({ mode: 'bedrock', modelId: 'us.amazon.nova-2-lite-v1:0', invokeModel: invoke }));
+    expect(result.metrics.modelCalls).toBe(11);
+    expect(result.gaps).toContain('Policy records were not requested during this investigation.');
+  });
+
+  it('identifies a missing content field for the model without exposing schema details in persisted events', async () => {
+    let calls = 0;
+    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
+      calls++;
+      if (calls === 1) return modelResponse((['order','tickets','delivery','support'] as const).map(section => ({ name: 'get_evidence', input: { section } })));
+      if (calls === 2) {
+        const { content: _content, ...incomplete } = report();
+        return modelResponse([{ name: 'finish_report', input: incomplete }]);
+      }
+      const feedback = request.messages!.at(-1)!.content![0].toolResult!.content![0].text!;
+      expect(feedback).toContain('"field":"content"');
+      expect(feedback).toContain('expected string, received undefined');
+      expect(feedback).toContain('complete report, not just the changed fields');
+      const schema = request.toolConfig!.tools!.find(tool => tool.toolSpec?.name === 'finish_report')!.toolSpec!.inputSchema!.json as { properties: { content: { minLength: number; maxLength: number }; findings: { maxItems: number } } };
+      expect(schema.properties.content).toMatchObject({ minLength: 1, maxLength: 50000 });
+      expect(schema.properties.findings.maxItems).toBe(30);
+      return modelResponse([{ name: 'finish_report', input: report() }]);
+    });
+    const options = input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke });
+    const result = await runInvestigation(options);
+    expect(result.metrics.modelCalls).toBe(3);
+    const blocked = options.events.filter(event => event.type === 'blocked');
+    expect(blocked[0].detail).toBe('The investigation did not produce the required report format.');
+    expect(blocked[0].detail).not.toContain('undefined');
+  });
+
   it('never silently substitutes sample results when AWS fails', async () => {
     const invoke = vi.fn(async () => { throw Object.assign(new Error('Sensitive upstream detail'), {name:'AccessDeniedException'}); });
     await expect(runInvestigation(input({ mode:'bedrock',modelId:'test-model',invokeModel:invoke }))).rejects.toMatchObject({code:'bedrock_failed'});
@@ -124,6 +246,24 @@ describe('portable investigation engine', () => {
 });
 
 describe('evidence and report validation', () => {
+  it('keeps aliases stable within a run without mutating source records', () => {
+    const aliases = new CitationAliases(); const original = envelope('summary');
+    expect(aliases.modelView(original).records[0].id).toBe('E1');
+    expect(aliases.modelView(envelope('order')).records[0].id).toBe('E2');
+    expect(aliases.modelView(original).records[0].id).toBe('E1');
+    expect(original.records[0].id).toBe('record_summary');
+    const separate = new CitationAliases();
+    expect(separate.modelView(envelope('support')).records[0].id).toBe('E1');
+  });
+
+  it('does not allow unknown aliases, another case IDs, source IDs, or grouped brackets through citation validation', () => {
+    const aliases = new CitationAliases(); aliases.modelView(envelope('summary'));
+    for (const invalid of ['E999', 'other_case_evidence', 'original_summary', 'E1, E2']) {
+      const resolved = aliases.resolveReport({ ...report(), content: `A claim. [${invalid}]`, findings: [{ ...report().findings[0], evidenceIds: ['E1'] }] });
+      expect(() => validateReport(resolved, [envelope('summary')])).toThrow('not retrieved');
+    }
+    expect(() => aliases.resolveReport({ ...report(), summary: 'An invented reference. [E999]' })).toThrow('not retrieved');
+  });
   it('rejects duplicate records and unavailable sections carrying data', () => {
     const value = envelope('summary'); value.records.push(value.records[0]);
     expect(() => validateEnvelope(value,caseData.id,'summary')).toThrow();

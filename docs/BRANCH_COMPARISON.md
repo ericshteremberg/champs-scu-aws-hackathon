@@ -20,7 +20,7 @@ The integrated product combines Causality's interface and review controls with C
 
 The integration started from these remote revisions:
 
-- Causality `origin/main`: `0e2f191bcd7a60cee59886878f626c85b26c845b`.
+- Causality starting point: `0e2f191bcd7a60cee59886878f626c85b26c845b`. The later `5d70174` update adds the desktop screen library, product preview, and workspace refinements. Landing-page refinements and icons through `399b3af46768e2397852aadc2b1f055d187850b8` are also preserved.
 - Casework engine baseline: `4c707e72906bc8abf918c4d715a16260a8ddda71`.
 - Later Casework recording/assets commit: `c32e19038629a4ae1210698fcb3d1b3cb8371672`.
 - Integration branch: `codex/integrate-aws-causality`.
@@ -33,7 +33,7 @@ The `docs/demo/` recording and associated older capture/edit scripts show standa
 
 Wrangler serves the frontend and authenticates the controlled preview. It IAM-invokes a private Lambda with trusted user identity; there is no public Lambda URL accepting arbitrary user headers. The Lambda execution role owns DynamoDB, S3, Bedrock, and asynchronous job invocation.
 
-The AWS stack is `causality-hackathon-dev` in `us-east-1`. Direct AWS acceptance passed for native persistence, owner isolation, asynchronous investigations, private S3 files, cancellation, concurrent approvals, archives, and a complete real Nova investigation using `us.amazon.nova-2-lite-v1:0`. The public frontend bridge remains under final verification; direct Lambda tests do not establish the complete HTTPS browser path.
+The AWS stack is `causality-hackathon-dev` in `us-east-1`. Direct AWS acceptance passed for native persistence, owner isolation, asynchronous investigations, private S3 files, cancellation, concurrent approvals, archives, and a complete real Nova investigation using `us.amazon.nova-2-lite-v1:0`. The separate published browser rehearsal passed through the authenticated frontend, signed Lambda bridge, real Bedrock investigation, approval/export, S3 archive, browser upload, and private download.
 
 The development Worker has no D1 or R2 binding. Its temporary D1 database was deleted. Original D1/R2 code and immutable migrations remain for Sites compatibility and local regression tests, not as a hidden AWS database shim.
 

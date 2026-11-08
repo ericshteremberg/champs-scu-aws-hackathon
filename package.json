@@ -25,7 +25,9 @@
     "build:aws": "node scripts/build-aws.mjs",
     "deploy:aws": "npm run build:aws && node scripts/deploy-aws.mjs",
     "sync:dev-secrets": "node scripts/sync-dev-secrets.mjs",
-    "test:aws:smoke": "node scripts/smoke-aws.mjs"
+    "test:aws:smoke": "node scripts/smoke-aws.mjs",
+    "test:dev:smoke": "node scripts/smoke-dev.mjs",
+    "init:dev-access": "node scripts/init-dev-access.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock": "^3.1164.0",

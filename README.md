@@ -19,9 +19,9 @@ flowchart LR
   Browser -->|Short-lived signed upload| S3
 ```
 
-The development stack is `causality-hackathon-dev` in `us-east-1`. Its frontend is [causality-hackathon-dev.slidah60.workers.dev](https://causality-hackathon-dev.slidah60.workers.dev).
+The development stack is `causality-hackathon-dev` in `us-east-1`. Its frontend is [causality-hackathon-dev.slidah60.workers.dev](https://causality-hackathon-dev.slidah60.workers.dev). The API and investigator have separate Lambda concurrency limits, so background model calls do not consume the capacity reserved for polling, cancellation, and review.
 
-**Verification status:** Direct AWS acceptance passed with `npm run test:aws:smoke`: DynamoDB persistence and owner isolation, all three asynchronous ticket investigations, private S3 upload/validation/download, cancellation, concurrent approval preservation, approved S3 archival, and a complete real Nova investigation with validated citations and a newly unapproved draft. The model is `us.amazon.nova-2-lite-v1:0`. The public frontend is published, but its HTTPS-to-Lambda bridge remains under final verification. ATMSPHR production data and Stripe submission remain unconnected.
+**Verification status:** Direct AWS acceptance passed with `npm run test:aws:smoke`: DynamoDB persistence and owner isolation, all three asynchronous ticket investigations, private S3 upload/validation/download, cancellation, concurrent approval preservation, approved S3 archival, and a complete real Nova investigation with validated citations and a newly unapproved draft. The model is `us.amazon.nova-2-lite-v1:0`. Published browser acceptance also passed with `npm run test:dev:smoke`: authenticated frontend, signed Lambda bridge, real Bedrock investigation, reviewed approval/export, S3 archive, and browser upload/private download, with no JavaScript errors. ATMSPHR production data and Stripe submission remain unconnected.
 
 There are no D1 or R2 bindings in the development deployment. The temporary development D1 database was deleted. Legacy D1/R2 modules and migrations remain only for the original Sites compatibility path and local regression tests; they do not store the AWS deployment's data.
 
@@ -40,6 +40,8 @@ There are no D1 or R2 bindings in the development deployment. The temporary deve
 ## Development access
 
 The deployed preview requires username `dev` and its development password. The password is saved locally in Git-ignored `.dev-worker-access.txt` with owner-only file permissions. Share it separately from the repository; never commit it or paste it into a public demo.
+
+On another computer, securely copy that private access file to reuse the same login. `npm run init:dev-access` creates a new random password only when the file is absent. Syncing a newly generated password changes the shared deployment's login.
 
 This is a shared team development workspace. The Worker strips caller-supplied platform identity headers and inserts a fixed reviewer identity only after password verification. The original Sites-managed identity path remains available in its own deployment mode. The development password gate is not production multi-user authentication.
 
@@ -60,7 +62,7 @@ npm run aws:check -- --invoke
 npm run sync:dev-secrets
 ```
 
-The save helper writes the three temporary credential variables to Git-ignored `.dev.vars`, preserving other settings. `sync:dev-secrets` sends those credentials and the existing private development password to the Wrangler secret store without committing them. Use `AWS_REGION=us-east-1` and `BEDROCK_MODEL_ID=us.amazon.nova-2-lite-v1:0`. The model check sends a small synthetic tool-use request.
+The save helper writes the three temporary credential variables to Git-ignored `.dev.vars`, preserving other settings. Saved session credentials take precedence over stale terminal exports; a partial saved session is rejected. Explicit region, model, and origin overrides remain supported. `sync:dev-secrets` sends those credentials and the existing private development password to the Wrangler secret store without committing them. The default region is `us-east-1` and model is `us.amazon.nova-2-lite-v1:0`. The model check sends a small synthetic tool-use request.
 
 Deploy the AWS backend, then the Wrangler frontend:
 
@@ -111,7 +113,9 @@ The deployed AWS acceptance test is separate:
 npm run test:aws:smoke
 ```
 
-It targets the named hackathon development backend, creates isolated synthetic workspaces and S3 objects, and makes real Bedrock requests. It has passed the AWS persistence, investigation, file, cancellation, approval-race, and archive scenarios described above. Results are written to ignored `.aws-build/smoke-result.json`. It directly invokes Lambda, so it does not verify the public frontend bridge or browser CORS. Complete that deployed browser rehearsal before recording the final demo.
+It targets the named hackathon development backend, creates isolated synthetic workspaces and S3 objects, and makes real Bedrock requests. It has passed the AWS persistence, investigation, file, cancellation, approval-race, and archive scenarios described above. Results are written to ignored `.aws-build/smoke-result.json`. It directly invokes Lambda, so it does not verify the public frontend bridge or browser CORS.
+
+`npm run test:dev:smoke` exercises the published browser flow using the private access file. It runs a real Bedrock investigation on the shared synthetic ATM-1042 case, approves and exports the response, archives it to S3, and uploads/downloads a synthetic attachment. It writes ignored `.aws-build/browser-smoke.json`. Run it when those changes to the shared demo workspace are appropriate.
 
 For the retained local Sites compatibility test path only:
 

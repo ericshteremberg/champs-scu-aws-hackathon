@@ -187,7 +187,7 @@ describe('private S3 evidence', () => {
     expect(send.mock.calls.some(([command]) => command instanceof PutObjectCommand)).toBe(false);
   });
 
-  it('cleans up its validated copy when a concurrent edit invalidates finalization', async () => {
+  it('preserves its private copy when a concurrent edit invalidates finalization', async () => {
     const prepared = await prepareUpload(user, uploadInput());
     const send = vi.spyOn(S3Client.prototype, 'send').mockImplementation(async command => {
       if (command instanceof GetObjectCommand) return uploadedObject('hello') as never;
@@ -195,8 +195,35 @@ describe('private S3 evidence', () => {
       return {} as never;
     });
     await expect(completeUpload(user, prepared.uploadId)).rejects.toBeInstanceOf(ConflictError);
-    expect(send.mock.calls.some(([command]) => command instanceof DeleteObjectCommand && command.input.Key?.startsWith('evidence/'))).toBe(true);
+    expect(send.mock.calls.some(([command]) => command instanceof DeleteObjectCommand && command.input.Key?.startsWith('evidence/'))).toBe(false);
     expect((await getWorkspaceState(user)).cases.find(item => item.id === caseId)?.evidence.some(record => record.fileName === 'receipt.txt')).toBe(false);
+  });
+
+  it.each([true, false])('retains committed evidence bytes after a lost response, including when reconciliation succeeds: %s', async reconciliationSucceeds => {
+    const prepared = await prepareUpload(user, uploadInput());
+    const objects = new Map<string, string>();
+    const send = vi.spyOn(S3Client.prototype, 'send').mockImplementation(async command => {
+      if (command instanceof GetObjectCommand) return uploadedObject('hello') as never;
+      if (command instanceof PutObjectCommand) objects.set(command.input.Key!, command.input.Body!.toString());
+      if (command instanceof DeleteObjectCommand) objects.delete(command.input.Key!);
+      return {} as never;
+    });
+    const apply = vi.mocked(commit).getMockImplementation()!;
+    vi.mocked(commit).mockImplementationOnce(async (workspaceId, changes) => {
+      await apply(workspaceId, changes);
+      if (!reconciliationSucceeds) vi.mocked(getItem).mockRejectedValueOnce(new Error('The reconciliation read also failed.'));
+      throw new Error('The transaction committed, but its response was lost.');
+    });
+    if (reconciliationSucceeds) await expect(completeUpload(user, prepared.uploadId)).resolves.toBeUndefined();
+    else await expect(completeUpload(user, prepared.uploadId)).rejects.toThrow('The transaction committed, but its response was lost.');
+    const saved = (await getWorkspaceState(user)).cases.find(item => item.id === caseId)!;
+    expect(saved.evidence.filter(record => record.fileName === 'receipt.txt')).toHaveLength(1);
+    const put = send.mock.calls.find(([command]) => command instanceof PutObjectCommand)![0] as PutObjectCommand;
+    expect(objects.get(put.input.Key!)).toBe('hello');
+    const count = send.mock.calls.length;
+    await completeUpload(user, prepared.uploadId);
+    expect(send.mock.calls).toHaveLength(count);
+    expect(objects.get(put.input.Key!)).toBe('hello');
   });
 
   it('archives only an approved current revision and uses a stable immutable content-addressed key', async () => {

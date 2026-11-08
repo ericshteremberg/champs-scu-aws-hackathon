@@ -1,23 +1,360 @@
 {
- "AWSTemplateFormatVersion":"2010-09-09",
- "Description":"Causality AWS hackathon backend: private Lambda, DynamoDB, S3, and Bedrock.",
- "Parameters":{
-  "FrontendOrigin":{"Type":"String","Default":"https://not-configured.example.invalid"},
-  "BedrockModelId":{"Type":"String","Default":"us.amazon.nova-2-lite-v1:0"}
- },
- "Resources":{
-  "WorkspaceTable":{"Type":"AWS::DynamoDB::Table","DeletionPolicy":"Retain","UpdateReplacePolicy":"Retain","Properties":{"BillingMode":"PAY_PER_REQUEST","AttributeDefinitions":[{"AttributeName":"pk","AttributeType":"S"},{"AttributeName":"sk","AttributeType":"S"}],"KeySchema":[{"AttributeName":"pk","KeyType":"HASH"},{"AttributeName":"sk","KeyType":"RANGE"}],"SSESpecification":{"SSEEnabled":true}}},
-  "EvidenceBucket":{"Type":"AWS::S3::Bucket","DeletionPolicy":"Retain","UpdateReplacePolicy":"Retain","Properties":{"PublicAccessBlockConfiguration":{"BlockPublicAcls":true,"IgnorePublicAcls":true,"BlockPublicPolicy":true,"RestrictPublicBuckets":true},"OwnershipControls":{"Rules":[{"ObjectOwnership":"BucketOwnerEnforced"}]},"BucketEncryption":{"ServerSideEncryptionConfiguration":[{"ServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]},"VersioningConfiguration":{"Status":"Enabled"},"CorsConfiguration":{"CorsRules":[{"AllowedOrigins":[{"Ref":"FrontendOrigin"}],"AllowedMethods":["POST","PUT","GET","HEAD"],"AllowedHeaders":["*"],"ExposedHeaders":["ETag"],"MaxAge":300}]}}},
-  "EvidenceBucketPolicy":{"Type":"AWS::S3::BucketPolicy","Properties":{"Bucket":{"Ref":"EvidenceBucket"},"PolicyDocument":{"Version":"2012-10-17","Statement":[{"Effect":"Deny","Principal":"*","Action":"s3:*","Resource":[{"Fn::GetAtt":["EvidenceBucket","Arn"]},{"Fn::Sub":"${EvidenceBucket.Arn}/*"}],"Condition":{"Bool":{"aws:SecureTransport":false}}}]}}},
-  "BackendLogs":{"Type":"AWS::Logs::LogGroup","Properties":{"LogGroupName":"/aws/lambda/causality-hackathon-backend","RetentionInDays":7}},
-  "BackendRole":{"Type":"AWS::IAM::Role","Properties":{"AssumeRolePolicyDocument":{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]},"Policies":[{"PolicyName":"CausalityBackend","PolicyDocument":{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["dynamodb:GetItem","dynamodb:Query","dynamodb:PutItem","dynamodb:UpdateItem","dynamodb:DeleteItem","dynamodb:ConditionCheckItem"],"Resource":{"Fn::GetAtt":["WorkspaceTable","Arn"]}},{"Effect":"Allow","Action":["s3:GetObject","s3:PutObject","s3:DeleteObject"],"Resource":{"Fn::Sub":"${EvidenceBucket.Arn}/*"}},{"Effect":"Allow","Action":["bedrock:InvokeModel"],"Resource":[{"Fn::Sub":"arn:${AWS::Partition}:bedrock:*::foundation-model/*"},{"Fn::Sub":"arn:${AWS::Partition}:bedrock:*:${AWS::AccountId}:inference-profile/*"}]},{"Effect":"Allow","Action":"lambda:InvokeFunction","Resource":{"Fn::Sub":"arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:causality-hackathon-backend"}},{"Effect":"Allow","Action":["logs:CreateLogStream","logs:PutLogEvents"],"Resource":{"Fn::GetAtt":["BackendLogs","Arn"]}}]}}]}},
-  "BackendFunction":{"Type":"AWS::Lambda::Function","Properties":{"FunctionName":"causality-hackathon-backend","Runtime":"nodejs22.x","Handler":"index.handler","Architectures":["arm64"],"MemorySize":512,"Timeout":180,"ReservedConcurrentExecutions":5,"Role":{"Fn::GetAtt":["BackendRole","Arn"]},"Code":{"ZipFile":"exports.handler=async()=>({status:503,body:{error:'Backend code deployment is pending.'}});"},"Environment":{"Variables":{"CAUSALITY_TABLE":{"Ref":"WorkspaceTable"},"EVIDENCE_BUCKET":{"Ref":"EvidenceBucket"},"BEDROCK_MODEL_ID":{"Ref":"BedrockModelId"},"FUNCTION_NAME":"causality-hackathon-backend"}}}},
-  "AsyncPolicy":{"Type":"AWS::Lambda::EventInvokeConfig","Properties":{"FunctionName":{"Ref":"BackendFunction"},"Qualifier":"$LATEST","MaximumEventAgeInSeconds":300,"MaximumRetryAttempts":0}}
- },
- "Outputs":{
-  "FunctionName":{"Value":{"Ref":"BackendFunction"}},
-  "TableName":{"Value":{"Ref":"WorkspaceTable"}},
-  "BucketName":{"Value":{"Ref":"EvidenceBucket"}},
-  "BucketOrigin":{"Value":{"Fn::Sub":"https://${EvidenceBucket}.s3.${AWS::Region}.amazonaws.com"}}
- }
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Causality AWS hackathon backend: private Lambda, DynamoDB, S3, and Bedrock.",
+  "Parameters": {
+    "FrontendOrigin": {
+      "Type": "String",
+      "Default": "https://not-configured.example.invalid"
+    },
+    "BedrockModelId": {
+      "Type": "String",
+      "Default": "us.amazon.nova-2-lite-v1:0"
+    }
+  },
+  "Resources": {
+    "WorkspaceTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "pk",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "sk",
+            "AttributeType": "S"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "pk",
+            "KeyType": "HASH"
+          },
+          {
+            "AttributeName": "sk",
+            "KeyType": "RANGE"
+          }
+        ],
+        "SSESpecification": {
+          "SSEEnabled": true
+        }
+      }
+    },
+    "EvidenceBucket": {
+      "Type": "AWS::S3::Bucket",
+      "DeletionPolicy": "Retain",
+      "UpdateReplacePolicy": "Retain",
+      "Properties": {
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerEnforced"
+            }
+          ]
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "CorsConfiguration": {
+          "CorsRules": [
+            {
+              "AllowedOrigins": [
+                {
+                  "Ref": "FrontendOrigin"
+                }
+              ],
+              "AllowedMethods": [
+                "POST",
+                "PUT",
+                "GET",
+                "HEAD"
+              ],
+              "AllowedHeaders": [
+                "*"
+              ],
+              "ExposedHeaders": [
+                "ETag"
+              ],
+              "MaxAge": 300
+            }
+          ]
+        }
+      }
+    },
+    "EvidenceBucketPolicy": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "EvidenceBucket"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::GetAtt": [
+                    "EvidenceBucket",
+                    "Arn"
+                  ]
+                },
+                {
+                  "Fn::Sub": "${EvidenceBucket.Arn}/*"
+                }
+              ],
+              "Condition": {
+                "Bool": {
+                  "aws:SecureTransport": false
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "BackendLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/causality-hackathon-backend",
+        "RetentionInDays": 7
+      }
+    },
+    "BackendRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "CausalityBackend",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:GetItem",
+                    "dynamodb:Query",
+                    "dynamodb:PutItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:ConditionCheckItem"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": [
+                      "WorkspaceTable",
+                      "Arn"
+                    ]
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject"
+                  ],
+                  "Resource": {
+                    "Fn::Sub": "${EvidenceBucket.Arn}/*"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "bedrock:InvokeModel"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:bedrock:*::foundation-model/*"
+                    },
+                    {
+                      "Fn::Sub": "arn:${AWS::Partition}:bedrock:*:${AWS::AccountId}:inference-profile/*"
+                    }
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": "lambda:InvokeFunction",
+                  "Resource": {
+                    "Fn::Sub": "arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:causality-hackathon-investigator"
+                  }
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::GetAtt": [
+                        "BackendLogs",
+                        "Arn"
+                      ]
+                    },
+                    {
+                      "Fn::GetAtt": [
+                        "InvestigatorLogs",
+                        "Arn"
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "BackendFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": "causality-hackathon-backend",
+        "Runtime": "nodejs22.x",
+        "Handler": "index.handler",
+        "Architectures": [
+          "arm64"
+        ],
+        "MemorySize": 512,
+        "Timeout": 180,
+        "ReservedConcurrentExecutions": 5,
+        "Role": {
+          "Fn::GetAtt": [
+            "BackendRole",
+            "Arn"
+          ]
+        },
+        "Code": {
+          "ZipFile": "exports.handler=async()=>({status:503,body:{error:'Backend code deployment is pending.'}});"
+        },
+        "Environment": {
+          "Variables": {
+            "CAUSALITY_TABLE": {
+              "Ref": "WorkspaceTable"
+            },
+            "EVIDENCE_BUCKET": {
+              "Ref": "EvidenceBucket"
+            },
+            "BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelId"
+            },
+            "FUNCTION_NAME": "causality-hackathon-investigator"
+          }
+        }
+      }
+    },
+    "AsyncPolicy": {
+      "Type": "AWS::Lambda::EventInvokeConfig",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "InvestigatorFunction"
+        },
+        "Qualifier": "$LATEST",
+        "MaximumEventAgeInSeconds": 300,
+        "MaximumRetryAttempts": 0
+      }
+    },
+    "InvestigatorFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "FunctionName": "causality-hackathon-investigator",
+        "Runtime": "nodejs22.x",
+        "Handler": "index.handler",
+        "Architectures": [
+          "arm64"
+        ],
+        "MemorySize": 512,
+        "Timeout": 180,
+        "ReservedConcurrentExecutions": 2,
+        "Role": {
+          "Fn::GetAtt": [
+            "BackendRole",
+            "Arn"
+          ]
+        },
+        "Code": {
+          "ZipFile": "exports.handler=async()=>({status:503,body:{error:'Backend code deployment is pending.'}});"
+        },
+        "Environment": {
+          "Variables": {
+            "CAUSALITY_TABLE": {
+              "Ref": "WorkspaceTable"
+            },
+            "EVIDENCE_BUCKET": {
+              "Ref": "EvidenceBucket"
+            },
+            "BEDROCK_MODEL_ID": {
+              "Ref": "BedrockModelId"
+            },
+            "FUNCTION_NAME": "causality-hackathon-investigator"
+          }
+        }
+      }
+    },
+    "InvestigatorLogs": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": "/aws/lambda/causality-hackathon-investigator",
+        "RetentionInDays": 7
+      }
+    }
+  },
+  "Outputs": {
+    "FunctionName": {
+      "Value": {
+        "Ref": "BackendFunction"
+      }
+    },
+    "TableName": {
+      "Value": {
+        "Ref": "WorkspaceTable"
+      }
+    },
+    "BucketName": {
+      "Value": {
+        "Ref": "EvidenceBucket"
+      }
+    },
+    "BucketOrigin": {
+      "Value": {
+        "Fn::Sub": "https://${EvidenceBucket}.s3.${AWS::Region}.amazonaws.com"
+      }
+    },
+    "InvestigatorFunctionName": {
+      "Value": {
+        "Ref": "InvestigatorFunction"
+      }
+    }
+  }
 }

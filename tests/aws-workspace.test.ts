@@ -53,7 +53,7 @@ describe('AWS workspace ownership and approval lifecycle', () => {
   });
 
   it('binds approval to the exact draft revision and marks changed source records stale', async () => {
-    const item = (await samples()).cases[0];
+    const item = (await samples()).cases.find(record => record.orderRef === 'ATM-1042')!;
     const prepared = await executeAction(user, { action: 'generateDraft', caseId: item.id });
     const revision = prepared.cases.find(record => record.id === item.id)!.draft!.revision;
     const approved = await executeAction(user, { action: 'approveDraft', caseId: item.id, revision });
@@ -65,7 +65,7 @@ describe('AWS workspace ownership and approval lifecycle', () => {
   });
 
   it('loses a concurrent approval race atomically without approving or changing the case', async () => {
-    const item = (await samples()).cases[0];
+    const item = (await samples()).cases.find(record => record.orderRef === 'ATM-1042')!;
     await executeAction(user, { action: 'generateDraft', caseId: item.id });
     const caseKey = `${wid}|${keys.case(item.id)}`;
     fixture.beforeCommit = () => {

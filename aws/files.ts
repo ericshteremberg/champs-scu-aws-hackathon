@@ -79,7 +79,6 @@ export async function completeUpload(user: TrustedUser, uploadId: string): Promi
   const { bucket, client } = storage();
   // The browser can overwrite only its pending key. A validated copy receives a new, server-only key.
   const evidenceId = `ev_${randomUUID()}`; const finalKey = `evidence/${wid}/${item.data.id}/${evidenceId}`;
-  let storedFinal = false; let committed = false;
   try {
     let bytes: Buffer;
     try { bytes = await readUploadedBytes(client, bucket, upload.data); }
@@ -91,7 +90,6 @@ export async function completeUpload(user: TrustedUser, uploadId: string): Promi
     try { validated = validateUpload(upload.data.fileName, upload.data.mimeType, bytes); }
     catch (error) { if (error instanceof UploadValidationError) throw new ApiError(400, error.message, 'invalid_upload'); throw error; }
     await client.send(new PutObjectCommand({ Bucket: bucket, Key: finalKey, Body: bytes, ContentType: validated.mimeType, ServerSideEncryption: 'AES256', IfNoneMatch: '*', Metadata: { sha256: createHash('sha256').update(bytes).digest('hex') } }), { abortSignal: AbortSignal.timeout(20_000) });
-    storedFinal = true;
     const content = validated.textContent.length > 24000 ? `${validated.textContent.slice(0, 23800)}\n[Text preview truncated. Review the attached original.]` : validated.textContent;
     const evidence: EvidenceDoc = { id: evidenceId, caseId: item.data.id, source: upload.data.source, title: upload.data.title, content, occurredAt: now(), reference: validated.fileName, fileName: validated.fileName, mimeType: validated.mimeType, fileKey: finalKey, createdAt: now() };
     const changes: StoreChange[] = [
@@ -101,10 +99,19 @@ export async function completeUpload(user: TrustedUser, uploadId: string): Promi
       auditChange(user, 'evidence.uploaded', 'Validated and attached an original file in private S3; prior approval cleared.', item.data.id),
     ];
     if (draft) changes.push({ key: draft.key, expectedVersion: draft.version, data: draftWithoutApproval(draft.data) });
-    await commit(wid, changes); committed = true;
+    try { await commit(wid, changes); }
+    catch (error) {
+      // A lost response can hide a successful transaction. Reconcile its immutable IDs.
+      const acceptedUpload = await getItem<PendingUpload>(wid, upload.key).catch(() => null);
+      const acceptedEvidence = acceptedUpload?.data.evidenceId === evidenceId
+        ? await getItem<EvidenceDoc>(wid, keys.evidence(item.data.id, evidenceId)).catch(() => null)
+        : null;
+      if (acceptedEvidence?.data.fileKey !== finalKey) throw error;
+    }
     await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: upload.data.tempKey })).catch(() => undefined);
   } finally {
-    if (storedFinal && !committed) await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: finalKey })).catch(() => undefined);
+    // Never delete a final object after an uncertain commit, even when reconciliation
+    // cannot confirm it yet. Unreferenced copies stay private for later cleanup.
     client.destroy();
   }
 }

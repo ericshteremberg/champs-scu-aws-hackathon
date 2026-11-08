@@ -1,7 +1,8 @@
-import {readFileSync,existsSync,writeFileSync} from 'node:fs';
+import {readFileSync,writeFileSync} from 'node:fs';
 import {CloudFormationClient,CreateStackCommand,UpdateStackCommand,DescribeStacksCommand,DescribeStackEventsCommand} from '@aws-sdk/client-cloudformation';
 import {LambdaClient,UpdateFunctionCodeCommand,waitUntilFunctionUpdated} from '@aws-sdk/client-lambda';
-if(existsSync('.dev.vars'))process.loadEnvFile('.dev.vars');
+import {loadAwsSession} from './load-aws-session.mjs';
+loadAwsSession();
 const region=process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1';
 if(region!=='us-east-1')throw new Error('This hackathon deployment uses us-east-1.');
 const stackName='causality-hackathon-dev';
@@ -30,7 +31,9 @@ console.log(JSON.stringify({resourcesReady:true,...outputs}));
 if(!process.argv.includes('--resources-only')){
  const code=readFileSync('.aws-build/backend.zip');
  const lambda=new LambdaClient({region});
- await lambda.send(new UpdateFunctionCodeCommand({FunctionName:outputs.FunctionName,ZipFile:code}));
- await waitUntilFunctionUpdated({client:lambda,maxWaitTime:120,minDelay:2,maxDelay:5},{FunctionName:outputs.FunctionName});
+ for(const FunctionName of [outputs.FunctionName,outputs.InvestigatorFunctionName]) {
+  await lambda.send(new UpdateFunctionCodeCommand({FunctionName,ZipFile:code}));
+  await waitUntilFunctionUpdated({client:lambda,maxWaitTime:120,minDelay:2,maxDelay:5},{FunctionName});
+ }
  console.log('AWS Lambda code uploaded.');
 }

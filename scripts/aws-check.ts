@@ -1,16 +1,15 @@
-import { existsSync } from 'node:fs';
 import { STSClient, GetCallerIdentityCommand } from '@aws-sdk/client-sts';
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
+import { loadAwsSession } from './load-aws-session.mjs';
 
-if (existsSync('.dev.vars')) process.loadEnvFile('.dev.vars');
-const region = process.env.AWS_REGION || 'us-east-1';
-const modelId = process.env.BEDROCK_MODEL_ID;
+loadAwsSession();
+const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1';
+const modelId = process.env.BEDROCK_MODEL_ID || 'us.amazon.nova-2-lite-v1:0';
 
 try {
   if (region !== 'us-east-1') throw new Error('Use us-east-1 for the SCU workshop environment.');
   const identity = await new STSClient({ region }).send(new GetCallerIdentityCommand({}));
   console.log(`AWS session verified in ${region}. Account ends in ${identity.Account?.slice(-4) || 'unknown'}.`);
-  if (!modelId) throw new Error('Set BEDROCK_MODEL_ID to an enabled tool-capable model or inference profile from the workshop catalog.');
   console.log(`Configured model: ${modelId}`);
   if (process.argv.includes('--invoke')) {
     const response = await new BedrockRuntimeClient({ region }).send(new ConverseCommand({

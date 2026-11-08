@@ -1,3 +1,5 @@
+> Historical prototype recording: these assets and capture commands belong to Casework at `c32e190`, before the integrated Causality AWS application. Use [the current demo guide](../DEMO.md) for the present product.
+
 # Recorded hackathon demo
 
 `casework-hackathon-demo.mp4` is a silent, 1920 x 1080, 30 fps walkthrough finished with Higgsfield's native Higgsedit editor. It follows a single $92 synthetic transaction through automated evidence collection, findings, source inspection, activity, response review, persistence, and Markdown/JSON export. Cursor movement and click rings make the interactions visible.
