@@ -18,9 +18,9 @@ export function StripeDraftWriter({ current, disabled }: { current: DisputeCase;
   const ready = enabled && !disabled && current.source === 'stripe' && current.status === 'ready' && current.draft?.status === 'approved' && !current.draft.sourceStale && !current.evidence.some(e => e.fileName || e.downloadUrl);
   return <section className="cw-panel cw-panel-body" aria-label="Save Stripe draft">
     <h3>Save a draft to Stripe</h3>
-    <p>{enabled ? 'Copies the approved text without submitting it immediately.' : 'Requires a write-capable Stripe connection. Read-only OAuth does not enable this action.'}</p>
+    <p>{enabled ? 'Saves approved text. Does not submit immediately.' : 'Requires Stripe write access.'}</p>
     {notice && <p role="status">{notice}</p>}
-    <button className="cw-button" disabled={!ready || busy} onClick={() => { setOpen(true); setAcknowledged(false); }}>Review draft write</button>
+    <button className="cw-button" disabled={!ready || busy} onClick={() => { setOpen(true); setAcknowledged(false); }}>Review draft</button>
     {open && <div>
       <p>Revision {current.draft?.revision} · {current.stripeDisputeId}</p>
       <pre style={{whiteSpace:'pre-wrap',maxHeight:260,overflow:'auto',font:'inherit'}}>{current.draft?.content}</pre>

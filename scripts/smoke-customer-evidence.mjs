@@ -55,7 +55,7 @@ async function main() {
       await expect(resend.getByRole('alert')).toHaveCount(0);
       await expect(resend.getByRole('button', { name: 'Attach to report' })).toHaveCount(0);
       await expect(resend).toContainText('Already attached.');
-      await expect(collector).toContainText('The live Resend record could not be reverified.');
+      await expect(collector).toContainText('Live record not reverified.');
       await resend.screenshot({ path: '.aws-build/resend-retained-mobile.png' });
       savedResendVerified = true;
     }

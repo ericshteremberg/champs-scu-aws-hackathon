@@ -367,7 +367,7 @@ test('unavailable Resend email shows saved evidence without offering a duplicate
   const collector = page.getByRole('article', { name: 'Get evidence from all providers' });
   await collector.getByLabel('Case to collect evidence for').selectOption(caseId);
   await collector.getByRole('button', { name: 'Get evidence', exact: true }).click();
-  await expect(collector).toContainText('Saved case evidence is available. The live Resend record could not be reverified.');
+  await expect(collector).toContainText('Saved evidence available. Live record not reverified.');
   await expect(collector).not.toContainText('Found and verified the email');
   expect(calls).not.toContain('import');
 });

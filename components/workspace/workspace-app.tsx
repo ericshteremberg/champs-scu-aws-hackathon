@@ -3099,11 +3099,10 @@ function CaseDetail({
                 <h2>
                   {frozen
                     ? "A preserved case record."
-                    : "Prepared. Then approved."}
+                    : "Review submission"}
                 </h2>
                 <p>
-                  Inspect the exact response and supporting records before
-                  submission.
+                  Review the response and sources.
                 </p>
               </div>
               {current.draft && <Badge status={current.draft.status} />}
@@ -3111,17 +3110,15 @@ function CaseDetail({
             <div className="cw-banner neutral">
               <ShieldCheck size={20} />
               <p>
-                Submission is a separate action. Approving a draft does not send
-                it to Stripe.
+                Approval does not submit to Stripe.
               </p>
             </div>
             {current.source === "stripe" && hasAttachments && (
               <div className="cw-banner neutral">
                 <FileText size={20} />
                 <p>
-                  This case contains file attachments. Export the report and
-                  submit it with the original files in Stripe Dashboard. File
-                  submission is not enabled in this build.
+                  Files require manual submission in Stripe. Export the report
+                  and include the originals.
                 </p>
               </div>
             )}
@@ -3129,9 +3126,8 @@ function CaseDetail({
               <div className="cw-banner">
                 <TriangleAlert size={20} />
                 <p>
-                  Your report has unsaved edits. This package shows the last
-                  saved response. Save and approve the new revision before
-                  reviewing submission.
+                  Unsaved edits. Save and approve the latest revision before
+                  submitting.
                 </p>
               </div>
             )}
@@ -3575,21 +3571,18 @@ function Integrations({
         <div>
           <h1>Connections</h1>
         </div>
-        <span className="cw-pill outline">
-          <ShieldCheck size={16} />
-          Workspace-scoped
-        </span>
+
       </div>
       {!isDesignPreview && <>
         <ProviderConnectors cases={state.cases} onImported={onConnectorImported} />
         <details className="cw-disclosure cw-connection-group">
-          <summary>Custom data sources <span>Installed endpoints and database setup</span></summary>
+          <summary>Custom data sources</summary>
           <LiveEvidenceConnectors onImported={onConnectorImported} />
           <EvidenceConnectors onImported={onConnectorImported} />
         </details>
       </>}
       <details className="cw-disclosure cw-connection-group" open={isDesignPreview || undefined}>
-      <summary>More sources & services <span>Manual imports, policies, analysis and archives</span></summary>
+      <summary>More sources & services</summary>
       <div className="cw-integration-grid">
         <section className="cw-panel cw-integration">
           <div className="cw-integration-head">

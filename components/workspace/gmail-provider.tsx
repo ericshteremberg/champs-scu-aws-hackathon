@@ -37,12 +37,12 @@ export function GmailConnector({ status, cases, onChange, onImported }: { status
   };
   return <article id="gmail-connection" className="cw-provider-card cw-gmail-card" aria-label="Gmail account authorization">
     <h3><Mail size={20} />Gmail <span className={`cw-pill${authorized ? ' green' : ''}`}>{authorized ? 'Authorized' : connection?.status === 'reconnect_required' ? 'Reconnect required' : 'Not connected'}</span></h3>
-    <p>Find and import emails for a case.</p>
-    <p className="cw-provider-note">Read-only mailbox access. Causality searches the case’s customer email and opens messages only on preview. No sending or deletion.</p>
+    <p>Customer conversations.</p>
+    <details className="cw-help"><summary>Access details</summary><p>Read-only. Searches the case email; opens messages on preview. No sending or deletion.</p></details>
     {error && <p className="cw-banner error" role="alert">{error}</p>}
     {notice && <p className="cw-banner neutral" role="status">{notice}</p>}
     {connection?.email && <p>Mailbox: <strong>{connection.email}</strong></p>}
-    {!status?.configured && <p className="cw-provider-note">Google app setup is required before connecting.</p>}
+    {!status?.configured && <p className="cw-provider-note">Google setup required.</p>}
     {(!connection || connection.status === 'disconnected') && <button className="cw-button primary" disabled={busy || !status?.configured} onClick={() => void run(connection?.revocationPending ? 'disconnect' : 'connect')}><Link2 size={16} />{connection?.revocationPending ? 'Retry Gmail revocation' : status?.configured ? 'Connect Gmail' : 'Gmail setup unavailable'}</button>}
     {authorized && <>
       <label className="cw-field"><span>Case for Gmail evidence</span><select value={caseId} disabled={busy} onChange={e => { setCaseId(e.target.value); setMessages([]); setPreview(null); setMore(false); setNotice(''); setError(''); }}><option value="">Choose a case</option>{cases.filter(c => ['needs_review', 'investigating', 'ready'].includes(c.status)).map(c => <option key={c.id} value={c.id}>{c.title} ({c.email})</option>)}</select></label>
@@ -50,9 +50,9 @@ export function GmailConnector({ status, cases, onChange, onImported }: { status
       <button className="cw-button" disabled={busy || !caseId} onClick={() => void run('search')}><Search size={16} />Find customer emails</button>
       {more && <p className="cw-provider-note">Showing up to 10 matches. Add older messages manually.</p>}
       {messages.length > 0 && <ul className="cw-gmail-results">{messages.map(m => <li key={m.id}><div><strong>{m.subject || '(No subject)'}</strong><p>{m.from}<br />{new Date(m.occurredAt).toLocaleString()}</p></div><button className="cw-button" disabled={busy} onClick={() => void run('preview', m.id)}>Preview email <span className="sr-only">{m.subject}</span></button></li>)}</ul>}
-      {preview && <section className="cw-gmail-preview" aria-label="Gmail message preview"><h4>{preview.subject || '(No subject)'}</h4><p>From: {preview.from}<br />To: {preview.to}<br />{new Date(preview.occurredAt).toLocaleString()}</p><pre>{preview.text}</pre><p className="cw-provider-note">Plain text only. Attachments and HTML are excluded.{preview.truncated && ' This is an excerpt truncated at 20,000 characters.'} Preview text is temporarily stored in AWS with a ten-minute expiry; automatic deletion can take longer. Imported evidence is retained with the case.</p><p>Confirm that this email is relevant to <strong>{selected?.title}</strong>. Importing clears any previous draft approval.</p><button className="cw-button primary" disabled={busy} onClick={() => void run('import', preview.id)}>Import reviewed email</button></section>}
+      {preview && <section className="cw-gmail-preview" aria-label="Gmail message preview"><h4>{preview.subject || '(No subject)'}</h4><p>From: {preview.from}<br />To: {preview.to}<br />{new Date(preview.occurredAt).toLocaleString()}</p><pre>{preview.text}</pre><details className="cw-help"><summary>Preview details</summary><p className="cw-provider-note">Plain text only. Attachments and HTML are excluded.{preview.truncated && ' This is an excerpt truncated at 20,000 characters.'} Preview text is temporarily stored in AWS with a ten-minute expiry; automatic deletion can take longer. Imported evidence is retained with the case.</p></details><p>Add to <strong>{selected?.title}</strong>? This clears report approval.</p><button className="cw-button primary" disabled={busy} onClick={() => void run('import', preview.id)}>Import reviewed email</button></section>}
     </>}
     {connection && connection.status !== 'disconnected' && (confirm ? <div className="cw-provider-disconnect"><p>Stop Gmail reads and revoke Google authorization? Imported case evidence will remain.</p><div className="cw-actions"><button className="cw-button" disabled={busy} onClick={() => setConfirm(false)}>Keep Gmail connection</button><button className="cw-button danger" disabled={busy} onClick={() => void run('disconnect')}>Confirm disconnect Gmail</button></div></div> : <button className="cw-button" disabled={busy} onClick={() => setConfirm(true)}><Unplug size={16} />Disconnect Gmail</button>)}
-    <p className="cw-provider-note"><a href="https://myaccount.google.com/connections" target="_blank" rel="noopener noreferrer">Manage Google Account connections</a></p>
+    <p className="cw-provider-note"><a href="https://myaccount.google.com/connections" target="_blank" rel="noopener noreferrer">Manage in Google</a></p>
   </article>;
 }
