@@ -1,0 +1,427 @@
+{
+  "version": 1,
+  "exportedAt": "2026-11-08T00:36:11.803Z",
+  "case": {
+    "id": "case_atm_1042",
+    "merchantId": "merchant_atmsphr_demo",
+    "merchantName": "ATMSPHR",
+    "customerLabel": "Sample customer 1042",
+    "claim": "I paid for two tickets but never received them.",
+    "reason": "Ticket not received",
+    "amount": 9200,
+    "currency": "USD",
+    "eventName": "After Hours: Fall Session",
+    "purchasedAt": "2026-11-02T18:03:00Z",
+    "openedAt": "2026-11-06T20:15:00Z",
+    "dueAt": "2026-11-14T07:59:00Z",
+    "sourceMode": "synthetic",
+    "status": "reviewed",
+    "summary": "Two tickets, a delivery trail, and a customer support conversation to connect.",
+    "orderRef": "ATM-1042",
+    "paymentRef": "pi_demo_atm_1042",
+    "tags": [
+      "Ticket delivery",
+      "Support available"
+    ],
+    "latestRunId": "8e51734b-ffdf-4a92-918b-3221e7237503"
+  },
+  "report": {
+    "summary": "The retrieved support conversation includes a customer acknowledgement of receipt. Review that message alongside the payment, ticket, and delivery records.",
+    "assessment": "supported",
+    "recommendation": "Review the customer acknowledgement and its link to this order, then use the supported facts to prepare your response.",
+    "findings": [
+      {
+        "id": "finding_1",
+        "title": "Payment captured",
+        "detail": "A fictional USD 92.00 payment maps to order ATM-1042.",
+        "stance": "neutral",
+        "evidenceIds": [
+          "case_atm_1042:payment"
+        ]
+      },
+      {
+        "id": "finding_2",
+        "title": "Dispute requires a response",
+        "detail": "I paid for two tickets but never received them.",
+        "stance": "neutral",
+        "evidenceIds": [
+          "case_atm_1042:dispute"
+        ]
+      },
+      {
+        "id": "finding_3",
+        "title": "Order confirmed for two tickets",
+        "detail": "Order ATM-1042 contains two general-admission tickets to After Hours: Fall Session.",
+        "stance": "neutral",
+        "evidenceIds": [
+          "case_atm_1042:order"
+        ]
+      },
+      {
+        "id": "finding_4",
+        "title": "First ticket issued",
+        "detail": "A ticket was created and linked to order ATM-1042. Issuance alone does not establish delivery.",
+        "stance": "neutral",
+        "evidenceIds": [
+          "case_atm_1042:ticket-1"
+        ]
+      },
+      {
+        "id": "finding_5",
+        "title": "Second ticket issued",
+        "detail": "A second ticket was created for the same order.",
+        "stance": "neutral",
+        "evidenceIds": [
+          "case_atm_1042:ticket-2"
+        ]
+      },
+      {
+        "id": "finding_6",
+        "title": "Confirmation email accepted",
+        "detail": "The email provider accepted the confirmation for processing. Inbox delivery and reading are not recorded.",
+        "stance": "neutral",
+        "evidenceIds": [
+          "case_atm_1042:email"
+        ]
+      },
+      {
+        "id": "finding_7",
+        "title": "Ticket-link SMS marked delivered",
+        "detail": "The SMS provider returned delivered for the order-linked message. Reading is not established.",
+        "stance": "supports_merchant",
+        "evidenceIds": [
+          "case_atm_1042:sms"
+        ]
+      },
+      {
+        "id": "finding_8",
+        "title": "Ticket recovery completed",
+        "detail": "An order-linked recovery flow completed. This records account access, not physical event attendance.",
+        "stance": "neutral",
+        "evidenceIds": [
+          "case_atm_1042:recovery"
+        ]
+      },
+      {
+        "id": "finding_9",
+        "title": "Customer asked for help finding tickets",
+        "detail": "Fictional customer message: \"My payment went through, but I cannot see the tickets for order ATM-1042.\"",
+        "stance": "neutral",
+        "evidenceIds": [
+          "case_atm_1042:support-1"
+        ]
+      },
+      {
+        "id": "finding_10",
+        "title": "Organizer explained ticket recovery",
+        "detail": "Fictional organizer message: \"Please open the ticket recovery link for order ATM-1042 and sign in with the purchase address.\"",
+        "stance": "neutral",
+        "evidenceIds": [
+          "case_atm_1042:support-2"
+        ]
+      },
+      {
+        "id": "finding_11",
+        "title": "Customer acknowledged finding both tickets",
+        "detail": "Fictional customer message: \"Found both tickets in my account for ATM-1042. Thank you.\"",
+        "stance": "supports_merchant",
+        "evidenceIds": [
+          "case_atm_1042:support-3"
+        ]
+      }
+    ],
+    "gaps": [
+      "Email acceptance does not prove inbox delivery. An SMS delivery status does not prove the message was read.",
+      "This is a fictional conversation for the demo. Acknowledged access does not establish attendance or determine a bank decision.",
+      "No case-linked scan records are available in this fixture. Scanning coverage is unknown; this does not establish nonattendance.",
+      "An immutable purchase-time policy and acceptance record are not available. Current terms cannot establish what this customer saw.",
+      "A provider delivery status does not establish that the message was read by the cardholder.",
+      "Attendance evidence is unavailable.",
+      "Policy evidence is unavailable."
+    ],
+    "responseDraft": "Re: Ticket not received\nOrder reference: ATM-1042\n\nThe following records were reviewed for this transaction:\n\nA fictional USD 92.00 payment maps to order ATM-1042. [case_atm_1042:payment]\n\nI paid for two tickets but never received them. [case_atm_1042:dispute]\n\nOrder ATM-1042 contains two general-admission tickets to After Hours: Fall Session. [case_atm_1042:order]\n\nA ticket was created and linked to order ATM-1042. Issuance alone does not establish delivery. [case_atm_1042:ticket-1]\n\nA second ticket was created for the same order. [case_atm_1042:ticket-2]\n\nThe email provider accepted the confirmation for processing. Inbox delivery and reading are not recorded. [case_atm_1042:email]\n\nThe SMS provider returned delivered for the order-linked message. Reading is not established. [case_atm_1042:sms]\n\nAn order-linked recovery flow completed. This records account access, not physical event attendance. [case_atm_1042:recovery]\n\nFictional customer message: \"My payment went through, but I cannot see the tickets for order ATM-1042.\" [case_atm_1042:support-1]\n\nFictional organizer message: \"Please open the ticket recovery link for order ATM-1042 and sign in with the purchase address.\" [case_atm_1042:support-2]\n\nFictional customer message: \"Found both tickets in my account for ATM-1042. Thank you.\" [case_atm_1042:support-3]\n\nEvidence limitations:\n- Email acceptance does not prove inbox delivery. An SMS delivery status does not prove the message was read.\n- This is a fictional conversation for the demo. Acknowledged access does not establish attendance or determine a bank decision.\n- No case-linked scan records are available in this fixture. Scanning coverage is unknown; this does not establish nonattendance.\n- An immutable purchase-time policy and acceptance record are not available. Current terms cannot establish what this customer saw.\n- A provider delivery status does not establish that the message was read by the cardholder.\n\nThe customer acknowledgement above is relevant to the claim of nonreceipt. It should be reviewed in the context of the complete conversation. [case_atm_1042:support-3]",
+    "caseId": "case_atm_1042",
+    "runId": "8e51734b-ffdf-4a92-918b-3221e7237503",
+    "generatedAt": "2026-11-08T00:35:49.978Z",
+    "evidenceIds": [
+      "case_atm_1042:payment",
+      "case_atm_1042:dispute",
+      "case_atm_1042:order",
+      "case_atm_1042:ticket-1",
+      "case_atm_1042:ticket-2",
+      "case_atm_1042:email",
+      "case_atm_1042:sms",
+      "case_atm_1042:recovery",
+      "case_atm_1042:support-1",
+      "case_atm_1042:support-2",
+      "case_atm_1042:support-3"
+    ],
+    "metrics": {
+      "durationMs": 2823,
+      "toolCalls": 8,
+      "recordCount": 11
+    },
+    "reviewedAt": "2026-11-08T00:36:07.473Z",
+    "reviewerNote": ""
+  },
+  "evidence": [
+    {
+      "caseId": "case_atm_1042",
+      "section": "summary",
+      "sourceMode": "synthetic",
+      "fetchedAt": "2026-11-08T00:35:47.509Z",
+      "status": "available",
+      "records": [
+        {
+          "id": "case_atm_1042:payment",
+          "source": "Stripe test fixture",
+          "sourceId": "pi_demo_atm_1042",
+          "occurredAt": "2026-11-02T18:03:00Z",
+          "title": "Payment captured",
+          "detail": "A fictional USD 92.00 payment maps to order ATM-1042.",
+          "fields": {
+            "chargeCaptured": true,
+            "refundAmount": 0,
+            "disputeStatus": "needs_response",
+            "orderRef": "ATM-1042",
+            "paymentRef": "pi_demo_atm_1042",
+            "amount": 9200,
+            "currency": "USD",
+            "stripeAccount": "acct_demo_atmsphr",
+            "liveMode": false
+          }
+        },
+        {
+          "id": "case_atm_1042:dispute",
+          "source": "Stripe test fixture",
+          "sourceId": "dp_demo_atm-1042",
+          "occurredAt": "2026-11-06T20:15:00Z",
+          "title": "Dispute requires a response",
+          "detail": "I paid for two tickets but never received them.",
+          "fields": {
+            "disputeStatus": "needs_response",
+            "reason": "product_not_received",
+            "evidenceDueAt": "2026-11-14T07:59:00Z",
+            "amount": 9200,
+            "currency": "USD"
+          }
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "caseId": "case_atm_1042",
+      "section": "order",
+      "sourceMode": "synthetic",
+      "fetchedAt": "2026-11-08T00:35:47.860Z",
+      "status": "available",
+      "records": [
+        {
+          "id": "case_atm_1042:order",
+          "source": "ATMSPHR order fixture",
+          "sourceId": "order_demo_1042",
+          "occurredAt": "2026-11-02T18:03:00Z",
+          "title": "Order confirmed for two tickets",
+          "detail": "Order ATM-1042 contains two general-admission tickets to After Hours: Fall Session.",
+          "fields": {
+            "orderRef": "ATM-1042",
+            "paymentRef": "pi_demo_atm_1042",
+            "quantity": 2,
+            "subtotal": 8000,
+            "fees": 1200,
+            "total": 9200,
+            "currency": "USD",
+            "status": "paid",
+            "eventStartsAt": "2026-11-07T05:00:00Z",
+            "eventTimezone": "America/Los_Angeles"
+          }
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "caseId": "case_atm_1042",
+      "section": "tickets",
+      "sourceMode": "synthetic",
+      "fetchedAt": "2026-11-08T00:35:48.212Z",
+      "status": "available",
+      "records": [
+        {
+          "id": "case_atm_1042:ticket-1",
+          "source": "ATMSPHR ticket fixture",
+          "sourceId": "ticket_demo_1042_a",
+          "occurredAt": "2026-11-02T18:03:04Z",
+          "title": "First ticket issued",
+          "detail": "A ticket was created and linked to order ATM-1042. Issuance alone does not establish delivery.",
+          "fields": {
+            "orderRef": "ATM-1042",
+            "ticketStatus": "issued",
+            "transferredFrom": null,
+            "transferredTo": null,
+            "scanRecorded": false
+          }
+        },
+        {
+          "id": "case_atm_1042:ticket-2",
+          "source": "ATMSPHR ticket fixture",
+          "sourceId": "ticket_demo_1042_b",
+          "occurredAt": "2026-11-02T18:03:04Z",
+          "title": "Second ticket issued",
+          "detail": "A second ticket was created for the same order.",
+          "fields": {
+            "orderRef": "ATM-1042",
+            "ticketStatus": "issued",
+            "transferredFrom": null,
+            "transferredTo": null,
+            "scanRecorded": false
+          }
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "caseId": "case_atm_1042",
+      "section": "delivery",
+      "sourceMode": "synthetic",
+      "fetchedAt": "2026-11-08T00:35:48.564Z",
+      "status": "partial",
+      "records": [
+        {
+          "id": "case_atm_1042:email",
+          "source": "Resend delivery fixture",
+          "sourceId": "email_demo_1042",
+          "occurredAt": "2026-11-02T18:03:12Z",
+          "title": "Confirmation email accepted",
+          "detail": "The email provider accepted the confirmation for processing. Inbox delivery and reading are not recorded.",
+          "fields": {
+            "channel": "email",
+            "providerStatus": "accepted",
+            "delivered": null,
+            "read": null,
+            "errorCode": null,
+            "orderRef": "ATM-1042"
+          }
+        },
+        {
+          "id": "case_atm_1042:sms",
+          "source": "Twilio delivery fixture",
+          "sourceId": "sms_demo_1042",
+          "occurredAt": "2026-11-02T18:04:02Z",
+          "title": "Ticket-link SMS marked delivered",
+          "detail": "The SMS provider returned delivered for the order-linked message. Reading is not established.",
+          "fields": {
+            "channel": "sms",
+            "providerStatus": "delivered",
+            "delivered": true,
+            "read": null,
+            "errorCode": null,
+            "orderRef": "ATM-1042"
+          }
+        }
+      ],
+      "limitations": [
+        "Email acceptance does not prove inbox delivery. An SMS delivery status does not prove the message was read."
+      ]
+    },
+    {
+      "caseId": "case_atm_1042",
+      "section": "history",
+      "sourceMode": "synthetic",
+      "fetchedAt": "2026-11-08T00:35:48.917Z",
+      "status": "available",
+      "records": [
+        {
+          "id": "case_atm_1042:recovery",
+          "source": "ATMSPHR recovery fixture",
+          "sourceId": "recovery_demo_1042",
+          "occurredAt": "2026-11-02T18:10:41Z",
+          "title": "Ticket recovery completed",
+          "detail": "An order-linked recovery flow completed. This records account access, not physical event attendance.",
+          "fields": {
+            "orderRef": "ATM-1042",
+            "recoveryCompleted": true,
+            "recoveredTicketCount": 2
+          }
+        }
+      ],
+      "limitations": []
+    },
+    {
+      "caseId": "case_atm_1042",
+      "section": "support",
+      "sourceMode": "synthetic",
+      "fetchedAt": "2026-11-08T00:35:49.269Z",
+      "status": "partial",
+      "records": [
+        {
+          "id": "case_atm_1042:support-1",
+          "source": "Matched support export fixture",
+          "sourceId": "thread_demo_1042:message_1",
+          "occurredAt": "2026-11-02T18:08:10Z",
+          "title": "Customer asked for help finding tickets",
+          "detail": "Fictional customer message: \"My payment went through, but I cannot see the tickets for order ATM-1042.\"",
+          "fields": {
+            "orderRef": "ATM-1042",
+            "messageRole": "customer",
+            "customerAcknowledgedReceipt": false,
+            "threadMatch": "explicit_order_reference"
+          }
+        },
+        {
+          "id": "case_atm_1042:support-2",
+          "source": "Matched support export fixture",
+          "sourceId": "thread_demo_1042:message_2",
+          "occurredAt": "2026-11-02T18:09:20Z",
+          "title": "Organizer explained ticket recovery",
+          "detail": "Fictional organizer message: \"Please open the ticket recovery link for order ATM-1042 and sign in with the purchase address.\"",
+          "fields": {
+            "orderRef": "ATM-1042",
+            "messageRole": "organizer",
+            "customerAcknowledgedReceipt": false,
+            "threadMatch": "explicit_order_reference"
+          }
+        },
+        {
+          "id": "case_atm_1042:support-3",
+          "source": "Matched support export fixture",
+          "sourceId": "thread_demo_1042:message_3",
+          "occurredAt": "2026-11-02T18:12:18Z",
+          "title": "Customer acknowledged finding both tickets",
+          "detail": "Fictional customer message: \"Found both tickets in my account for ATM-1042. Thank you.\"",
+          "fields": {
+            "orderRef": "ATM-1042",
+            "messageRole": "customer",
+            "customerAcknowledgedReceipt": true,
+            "threadMatch": "explicit_order_reference"
+          }
+        }
+      ],
+      "limitations": [
+        "This is a fictional conversation for the demo. Acknowledged access does not establish attendance or determine a bank decision."
+      ]
+    },
+    {
+      "caseId": "case_atm_1042",
+      "section": "attendance",
+      "sourceMode": "synthetic",
+      "fetchedAt": "2026-11-08T00:35:49.621Z",
+      "status": "unavailable",
+      "records": [],
+      "limitations": [
+        "No case-linked scan records are available in this fixture. Scanning coverage is unknown; this does not establish nonattendance."
+      ]
+    },
+    {
+      "caseId": "case_atm_1042",
+      "section": "policy",
+      "sourceMode": "synthetic",
+      "fetchedAt": "2026-11-08T00:35:49.973Z",
+      "status": "unavailable",
+      "records": [],
+      "limitations": [
+        "An immutable purchase-time policy and acceptance record are not available. Current terms cannot establish what this customer saw."
+      ]
+    }
+  ],
+  "investigationMode": "demo"
+}
