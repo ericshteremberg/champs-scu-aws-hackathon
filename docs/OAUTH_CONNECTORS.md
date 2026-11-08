@@ -12,7 +12,7 @@ Click **Connect Stripe** to install Causality's read-only external test app on t
 
 Stripe disconnect deletes Causality's saved tokens and stops its reads. It does not uninstall the app at Stripe. The UI links to Stripe Installed Apps and explains that uninstalling Causality there revokes the provider grant. If a callback fails after installation, or Stripe reports the app is already installed during reconnection, uninstall it before trying again. The Stripe Apps documentation does not establish that the separate Connect deauthorization API is appropriate here, so this implementation does not call it.
 
-Only project and schema metadata are read from Supabase. Saving a table/column scope is not a completed semantic mapping or live evidence import. Verified dispute/payment/order linking and OAuth-backed evidence retrieval remain to be built. The existing merchant-hosted endpoint workflow remains independently available.
+Selected Stripe dispute import and reviewed order-linked Supabase evidence are implemented in [the linked-evidence workflow](LINKED_EVIDENCE.md). After approving columns, customers explicitly map the order/payment relationship and direct related tables. Queries require a server-verified Stripe payment; imports require a reviewed snapshot. The existing merchant-hosted endpoint workflow remains independently available.
 
 ## Stripe runtime
 
@@ -34,7 +34,7 @@ Only project and schema metadata are read from Supabase. Saving a table/column s
 - Disconnect clears the project/scope and invalidates pending state before revocation. Failed revocations retain a private token solely for retry; the disconnected status blocks its use for reads and new authorizations. If the provider remains unavailable, remove Causality in the Supabase organization's Authorized apps. A token produced during a disconnect race is revoked on a best-effort basis and never republished locally.
 - Project selection is validated against the projects returned by the authorized account. Its organization is taken from that response, not supplied by the browser. Changing projects clears scope approval.
 - Schema discovery uses a fixed parameterized query against `information_schema.columns`, restricted to `public`, via `/v1/projects/{ref}/database/query/read-only`. It reads no customer rows and accepts no caller SQL. There is a 1,000-column limit; only simple SQL identifiers are supported. Approval rechecks the schema, rejects unknown/duplicate fields and saves at most 30 tables with 100 columns each.
-- Supabase's `database:read` OAuth scope permits broader reads than the selected evidence scope. The app must enforce row and field restrictions when evidence queries are added. OAuth permission itself is not case-scoped. The read-only query and revocation endpoints are beta provider APIs.
+- Supabase's `database:read` OAuth scope permits broader reads than the selected evidence scope. The linked-evidence API enforces approved field selections and verified payment-to-order filters. OAuth permission itself is not case-scoped. The read-only query and revocation endpoints are beta provider APIs.
 
 ## Routes and infrastructure
 
@@ -47,6 +47,7 @@ Only project and schema metadata are read from Supabase. Saving a table/column s
 | `POST /api/providers/stripe/start` | Same-origin authenticated start using the private test link and Stripe browser cookie |
 | `GET /api/providers/stripe/callback` | Authenticated, single-use state validation; server-side token exchange and fixed result redirect |
 | `POST /api/providers/stripe` | Explicit `verify` read check or local `disconnect` |
+| `GET/POST /api/providers/evidence` | Mapping status, selected dispute import and reviewed linked-record previews/imports |
 
 The Worker continues to authenticate and proxy to private Lambda. The callback does not bypass team login. Provider routes use `Referrer-Policy: no-referrer`; hosted Worker invocation logging is disabled to avoid retaining callback query strings. Application error logging stays limited to event/error type, with no request body or URL.
 
@@ -66,7 +67,7 @@ Unit tests cover callback replay/expiry/browser/workspace binding, denial, PKCE,
 
 After deployment, run `node scripts/smoke-provider-oauth.mjs stripe` and `node scripts/smoke-provider-oauth.mjs supabase` only for disconnected providers to verify hosted start and denied-callback paths without granting customer access. These checks alone do not prove successful customer consent, token exchange, refresh or provider reads against a real account. Keep those results separate from the actual Supabase project-list read recorded above. Real token refresh, Supabase schema reads and successful Stripe customer authorization still need customer testing.
 
-Eric's customer test: open Connections, authorize the intended Stripe account, confirm its displayed ID/mode and click Verify read access. Authorize Supabase, choose the intended project and review its table/column scope. Report errors without copying codes, tokens or private invitation URLs. Once both connections are verified, implement provider-specific dispute import and validate each order/payment/merchant relationship before enabling live evidence queries. Keep refund actions and Stripe evidence submission disabled throughout the connector test.
+Eric's customer test: open Connections, authorize the intended Stripe account, confirm its displayed ID/mode and click Verify read access. Authorize Supabase, choose the intended project and review its table/column scope. Report errors without copying codes, tokens or private invitation URLs. Once both connections are verified, follow [the linked-evidence workflow](LINKED_EVIDENCE.md) to import a selected dispute, save its approved order mapping and review linked records. Keep refund actions and Stripe evidence submission disabled throughout the connector test.
 
 References: [Supabase OAuth guide](https://supabase.com/docs/guides/integrations/build-a-supabase-oauth-integration), [read-only query](https://supabase.com/docs/reference/api/v1-read-only-query), [Management API OpenAPI contract](https://raw.githubusercontent.com/supabase/supabase/master/apps/docs/spec/api_v1_openapi.json), [Stripe Apps OAuth](https://docs.stripe.com/stripe-apps/api-authentication/oauth), [Stripe external testing and uninstall](https://docs.stripe.com/stripe-apps/test-app).
 

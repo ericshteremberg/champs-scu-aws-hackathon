@@ -34,3 +34,12 @@
 .cw-imap-form input:not([type="checkbox"]), .cw-imap-card select { width: 100%; min-width: 0; max-width: 100%; }
 .cw-imap-consent { display: flex; align-items: start; gap: 10px; line-height: 1.5; }
 .cw-imap-consent input { flex-shrink: 0; margin-top: 4px; }
+
+.cw-evidence-card { grid-column: 1 / -1; grid-row: 4; }
+.cw-evidence-card .cw-field { margin: 16px 0; }
+.cw-evidence-card select { width: 100%; min-width: 0; max-width: 100%; }
+.cw-evidence-card p, .cw-evidence-card label { overflow-wrap: anywhere; }
+.cw-evidence-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 16px; }
+.cw-evidence-preview dl > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; padding: 6px 0; }
+.cw-evidence-preview dt, .cw-evidence-preview dd { margin: 0; overflow-wrap: anywhere; }
+.cw-evidence-preview dd { white-space: pre-wrap; }

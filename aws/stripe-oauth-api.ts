@@ -39,7 +39,7 @@ async function request(path: string, init: RequestInit): Promise<unknown> {
     }
     const reader = response.body?.getReader(); if (!reader) throw new Error('Empty response');
     let size = 0; const chunks: Uint8Array[] = [];
-    while (true) { const next = await reader.read(); if (next.done) break; size += next.value.length; if (size > 256 * 1024) { await reader.cancel(); throw new ApiError(413, 'Stripe returned more data than this connection check supports.', 'provider_response_limit'); } chunks.push(next.value); }
+    while (true) { const next = await reader.read(); if (next.done) break; size += next.value.length; if (size > 256 * 1024) { await reader.cancel(); throw new ApiError(413, 'Stripe returned more data than this evidence read supports.', 'provider_response_limit'); } chunks.push(next.value); }
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
   } catch (error) {
     if (error instanceof ApiError) throw error;
@@ -58,11 +58,35 @@ export async function exchangeStripeOAuthToken(app: StripeOAuthApp, fields: { gr
 export async function verifyStripeOAuthRead(tokens: StripeOAuthTokens): Promise<{ disputeReadVerified: true; chargeReadVerified: boolean }> {
   // No developer key, account override, expanded objects, or write endpoint is used here.
   const headers = { Authorization: `Bearer ${tokens.accessToken}` };
-  const result = z.object({ object: z.literal('list'), data: z.array(z.object({ id: z.string().regex(/^dp_[A-Za-z0-9]+$/), livemode: z.boolean(), charge: z.string().regex(/^ch_[A-Za-z0-9]+$/).nullable() })).max(1) }).safeParse(await request('/v1/disputes?limit=1', { method: 'GET', headers }));
+  const result = z.object({ object: z.literal('list'), data: z.array(z.object({ id: z.string().regex(/^(?:dp|du)_[A-Za-z0-9]+$/), livemode: z.boolean(), charge: z.string().regex(/^ch_[A-Za-z0-9]+$/).nullable() })).max(1) }).safeParse(await request('/v1/disputes?limit=1', { method: 'GET', headers }));
   if (!result.success || result.data.data.some(d => d.livemode !== (tokens.mode === 'live'))) throw new ApiError(502, 'Stripe returned an unexpected dispute response.', 'provider_invalid_response');
   const chargeId = result.data.data[0]?.charge;
   if (!chargeId) return { disputeReadVerified: true, chargeReadVerified: false };
   const charge = z.object({ id: z.string(), livemode: z.boolean() }).safeParse(await request(`/v1/charges/${encodeURIComponent(chargeId)}`, { method: 'GET', headers }));
   if (!charge.success || charge.data.id !== chargeId || charge.data.livemode !== (tokens.mode === 'live')) throw new ApiError(502, 'Stripe returned an unexpected payment response.', 'provider_invalid_response');
   return { disputeReadVerified: true, chargeReadVerified: true };
+}
+
+export const stripeDisputeId = z.string().regex(/^(?:dp|du)_[A-Za-z0-9]{1,120}$/);
+const stripeChargeId = z.string().regex(/^ch_[A-Za-z0-9]{1,120}$/);
+const stripePaymentId = z.string().regex(/^pi_[A-Za-z0-9]{1,120}$/);
+const disputeSchema = z.object({ id: stripeDisputeId, object: z.literal('dispute'), livemode: z.boolean(), amount: z.number().int().positive().max(999999999), currency: z.string().regex(/^[a-z]{3}$/), charge: stripeChargeId, payment_intent: stripePaymentId.nullable().optional(), reason: z.string().min(1).max(100), status: z.string().min(1).max(100), created: z.number().int().min(1).max(4102444800), evidence_details: z.object({ due_by: z.number().int().min(0).max(4102444800).nullable() }) });
+const allowedDispute = (d: z.infer<typeof disputeSchema>, tokens: StripeOAuthTokens) => {
+  if (d.livemode !== (tokens.mode === 'live')) throw new ApiError(502, 'Stripe returned a different environment.', 'provider_invalid_response');
+  return { id: d.id, amount: d.amount, currency: d.currency, reason: d.reason, status: d.status, dueAt: d.evidence_details.due_by ? new Date(d.evidence_details.due_by * 1000).toISOString() : '', createdAt: new Date(d.created * 1000).toISOString() };
+};
+export async function listStripeOAuthDisputes(tokens: StripeOAuthTokens) {
+  const value = z.object({ object: z.literal('list'), data: z.array(disputeSchema).max(10), has_more: z.boolean() }).safeParse(await request('/v1/disputes?limit=10', { method: 'GET', headers: { Authorization: `Bearer ${tokens.accessToken}` } }));
+  if (!value.success) throw new ApiError(502, 'Stripe returned unsupported dispute records.', 'provider_invalid_response');
+  return { disputes: value.data.data.map(d => allowedDispute(d, tokens)), moreAvailable: value.data.has_more };
+}
+export async function readStripeOAuthDispute(tokens: StripeOAuthTokens, id: string) {
+  if (!stripeDisputeId.safeParse(id).success) throw new ApiError(400, 'Choose a valid dispute.', 'invalid_request');
+  const headers = { Authorization: `Bearer ${tokens.accessToken}` };
+  const parsed = disputeSchema.safeParse(await request(`/v1/disputes/${encodeURIComponent(id)}`, { method: 'GET', headers }));
+  if (!parsed.success || parsed.data.id !== id) throw new ApiError(502, 'Stripe returned an unexpected dispute.', 'provider_invalid_response');
+  const summary = allowedDispute(parsed.data, tokens);
+  const charge = z.object({ id: stripeChargeId, object: z.literal('charge'), livemode: z.boolean(), payment_intent: stripePaymentId.nullable(), currency: z.string(), amount: z.number().int().nonnegative(), billing_details: z.object({ email: z.string().max(254).nullable(), name: z.string().max(200).nullable() }).optional() }).safeParse(await request(`/v1/charges/${parsed.data.charge}`, { method: 'GET', headers }));
+  if (!charge.success || charge.data.id !== parsed.data.charge || charge.data.livemode !== (tokens.mode === 'live') || charge.data.currency !== summary.currency || charge.data.amount < summary.amount || (parsed.data.payment_intent && parsed.data.payment_intent !== charge.data.payment_intent)) throw new ApiError(502, 'The dispute and payment could not be verified together.', 'provider_invalid_response');
+  return { ...summary, chargeId: charge.data.id, paymentIntentId: charge.data.payment_intent, email: z.string().email().safeParse(charge.data.billing_details?.email).success ? charge.data.billing_details!.email! : '', customerName: charge.data.billing_details?.name || 'Stripe customer', accountId: tokens.accountId, mode: tokens.mode };
 }

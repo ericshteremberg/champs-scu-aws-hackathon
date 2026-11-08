@@ -1,0 +1,116 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Stored, StoreChange, TrustedUser } from '../aws/types.ts';
+const fixture = vi.hoisted(() => ({ rows: new Map<string, Stored<unknown>>(), dispute: vi.fn(), disputes: vi.fn(), schema: vi.fn(), query: vi.fn() }));
+vi.mock('../aws/store.ts', async original => {
+  const actual = await original<typeof import('../aws/store.ts')>(); const { ConflictError } = await import('../aws/types.ts');
+  return { ...actual,
+    getItem: async (wid: string, key: string) => structuredClone(fixture.rows.get(`${wid}|${key}`) ?? null),
+    queryItems: async (wid: string, prefix: string) => [...fixture.rows].filter(([key]) => key.startsWith(`${wid}|${prefix}`)).map(([, row]) => structuredClone(row)),
+    commit: async (wid: string, changes: StoreChange[]) => {
+      if (new Set(changes.map(c => c.key)).size !== changes.length) throw new Error('Duplicate transaction key');
+      for (const c of changes) if ((fixture.rows.get(`${wid}|${c.key}`)?.version ?? null) !== c.expectedVersion) throw new ConflictError();
+      for (const c of changes) { if (c.check) continue; if (c.delete) fixture.rows.delete(`${wid}|${c.key}`); else fixture.rows.set(`${wid}|${c.key}`, structuredClone({ key: c.key, version: (c.expectedVersion ?? 0) + 1, data: c.data })); }
+    },
+  };
+});
+vi.mock('../aws/stripe-oauth-api.ts', async original => ({ ...await original<typeof import('../aws/stripe-oauth-api.ts')>(), readStripeOAuthDispute: fixture.dispute, listStripeOAuthDisputes: fixture.disputes }));
+vi.mock('../aws/supabase-api.ts', async original => ({ ...await original<typeof import('../aws/supabase-api.ts')>(), fetchSupabaseSchema: fixture.schema, querySupabaseReadOnly: fixture.query }));
+import { providerEvidenceAction, providerEvidenceStatus } from '../aws/provider-evidence.ts';
+import { executeAction, getWorkspaceState } from '../aws/workspace.ts';
+import { workspaceIdForUser, keys } from '../aws/store.ts';
+import { handler } from '../aws/handler.ts';
+import type { OrderEvidenceMapping } from '../lib/providers/types.ts';
+const user: TrustedUser = { userId: 'linked_owner', email: 'owner@example.test', displayName: 'Owner' };
+const other = { ...user, userId: 'linked_other' }, wid = workspaceIdForUser(user.userId);
+const key = (name: string) => `${wid}|${name}`;
+const mapping: OrderEvidenceMapping = { order: { table: 'orders', idColumn: 'id', paymentColumn: 'payment_ref', paymentKind: 'payment_intent', columns: ['id', 'payment_ref', 'status'] }, related: [{ table: 'tickets', section: 'tickets', orderColumn: 'order_id', columns: ['order_id', 'status'] }] };
+const schema = [{ name: 'orders', columns: ['id', 'payment_ref', 'status', 'private_token'] }, { name: 'tickets', columns: ['order_id', 'status'] }];
+const dispute = { id: 'du_example', accountId: 'acct_customer', mode: 'live', chargeId: 'ch_payment', paymentIntentId: 'pi_payment', status: 'needs_response', reason: 'product_not_received', amount: 5000, currency: 'usd', email: 'customer@example.test', customerName: 'Customer', dueAt: '2026-12-01T00:00:00Z', createdAt: '2026-11-01T00:00:00Z' };
+const act = (action: string, fields = {}) => providerEvidenceAction(user, { action, ...fields });
+const save = () => act('save_mapping', { mapping, confirmed: true });
+let caseId: string;
+function seed(name: string, data: unknown) { const old = fixture.rows.get(key(name)); fixture.rows.set(key(name), { key: name, version: (old?.version ?? 0) + 1, data }); }
+const preview = async () => (await act('preview_records', { caseId }) as { preview: { id: string } }).preview;
+const importRecords = (previewId: string) => act('import_records', { caseId, previewId, confirmed: true });
+beforeEach(async () => {
+  fixture.rows.clear(); vi.clearAllMocks();
+  fixture.dispute.mockResolvedValue(dispute); fixture.disputes.mockResolvedValue({ disputes: [dispute], moreAvailable: false }); fixture.schema.mockResolvedValue(schema);
+  fixture.query.mockImplementation(async (_token: string, _ref: string, sql: string) => sql.includes('public."tickets"') ? [{ order_id: 'ORDER-1', status: 'delivered' }] : sql.startsWith('SELECT "id", "payment_ref", "status"') ? [{ id: 'ORDER-1', payment_ref: 'pi_payment', status: 'paid' }] : [{ id: 'ORDER-1', payment_ref: 'pi_payment' }]);
+  await executeAction(user, { action: 'createWorkspace', name: 'Linked evidence' }); await executeAction(other, { action: 'createWorkspace', name: 'Other' });
+  seed('provider#stripe', { status: 'authorized', updatedAt: new Date().toISOString(), accountId: dispute.accountId, mode: 'live' });
+  seed('provider-token#stripe', { accessToken: 'synthetic_stripe_private', refreshToken: 'synthetic_stripe_refresh', accountId: dispute.accountId, mode: 'live', expiresAt: Date.now() + 3600000 });
+  seed('provider#supabase', { status: 'authorized', updatedAt: new Date().toISOString(), project: { ref: 'abcdefghijklmnopqrst', name: 'Tickets', organization: 'Example', region: 'us-east-1' }, approvedTables: schema });
+  seed('provider-token#supabase', { accessToken: 'synthetic_supabase_private', refreshToken: 'synthetic_supabase_refresh', expiresAt: Date.now() + 3600000 });
+  caseId = (await act('import_stripe_dispute', { disputeId: dispute.id, confirmed: true }) as { caseId: string }).caseId;
+});
+describe('customer-selected Stripe disputes and linked Supabase evidence', () => {
+  it('requires authentication, confirmation and server-owned payment references', async () => {
+    expect(await handler({ kind: 'api', path: '/api/providers/evidence', method: 'POST', body: { action: 'stripe_disputes' } })).toMatchObject({ status: 401 });
+    for (const input of [{ action: 'import_stripe_dispute', disputeId: dispute.id }, { action: 'preview_records', caseId, paymentRef: 'pi_other' }, { action: 'save_mapping', mapping, confirmed: true, projectRef: 'differentprojectxxxx' }, { action: 'import_records', caseId, previewId: crypto.randomUUID(), confirmed: true, records: [] }, { action: 'refund' }]) await expect(providerEvidenceAction(user, input)).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(fixture.query).not.toHaveBeenCalled();
+  });
+  it('imports exactly one selected dispute, preserves local work and hides credentials', async () => {
+    await executeAction(user, { action: 'updateCase', caseId, title: 'My reviewed title' });
+    expect(await act('import_stripe_dispute', { disputeId: dispute.id, confirmed: true })).toMatchObject({ imported: false, caseId });
+    const state = await getWorkspaceState(user); expect(state.cases).toHaveLength(1); expect(state.cases[0]).toMatchObject({ title: 'My reviewed title', source: 'stripe', stripeDisputeId: dispute.id, orderRef: 'pi_payment', amount: 5000 });
+    expect(state.cases[0].evidence).toHaveLength(1);
+    expect(JSON.stringify([state, await providerEvidenceStatus(user)])).not.toContain('synthetic_');
+    fixture.dispute.mockResolvedValueOnce({ ...dispute, id: 'du_closed', status: 'won' });
+    await expect(act('import_stripe_dispute', { disputeId: 'du_closed', confirmed: true })).rejects.toMatchObject({ code: 'dispute_not_actionable' });
+  });
+  it('rechecks schema when saving and previewing, then imports only the reviewed snapshot', async () => {
+    await save(); expect(fixture.query).not.toHaveBeenCalled();
+    expect(await providerEvidenceStatus(user)).toEqual({ mapping, eligibleCaseIds: [caseId] });
+    const result = await preview(); expect(fixture.schema).toHaveBeenCalledTimes(2);
+    expect(fixture.query.mock.calls.map(c => c[3])).toEqual([['pi_payment'], ['ORDER-1'], ['ORDER-1']]);
+    expect(fixture.query.mock.calls.every(c => c[0] === 'synthetic_supabase_private' && c[1] === 'abcdefghijklmnopqrst')).toBe(true);
+    fixture.query.mockRejectedValue(new Error('must not query again on import'));
+    expect(await importRecords(result.id)).toMatchObject({ imported: true, count: 2 });
+    const state = await getWorkspaceState(user), evidence = state.cases[0].evidence.filter(e => e.source === 'database');
+    expect(evidence).toHaveLength(2); expect(evidence[1].provenance?.fields).toBeDefined();
+    expect(evidence.every(e => e.content.includes('not the event time'))).toBe(true);
+    await expect(importRecords(result.id)).rejects.toMatchObject({ code: 'evidence_preview_expired' });
+  });
+  it('requires a fresh preview and clears draft approval on import', async () => {
+    await save(); await expect(importRecords(crypto.randomUUID())).rejects.toMatchObject({ code: 'evidence_preview_expired' });
+    await executeAction(user, { action: 'generateDraft', caseId });
+    const state = await getWorkspaceState(user); await executeAction(user, { action: 'approveDraft', caseId, revision: state.cases[0].draft!.revision });
+    const p = await preview(); await importRecords(p.id);
+    const item = (await getWorkspaceState(user)).cases[0]; expect(item.status).toBe('needs_review'); expect(item.draft?.status).toBe('draft'); expect(item.draft?.sourceStale).toBe(true);
+    await expect(importRecords((await preview()).id)).rejects.toMatchObject({ code: 'evidence_already_imported' });
+  });
+  it('invalidates previews when a case, mapping or connection changes, or TTL expires', async () => {
+    await save(); const p = await preview(); await executeAction(user, { action: 'updateCase', caseId, title: 'Changed' });
+    await expect(importRecords(p.id)).rejects.toMatchObject({ code: 'evidence_preview_expired' });
+    const p2 = await preview(); await save(); await expect(importRecords(p2.id)).rejects.toMatchObject({ code: 'evidence_preview_expired' });
+    const p3 = await preview(); (fixture.rows.get(key(`provider-evidence-preview#${caseId}`))!.data as { ttlEpochSeconds: number }).ttlEpochSeconds = 1;
+    await expect(importRecords(p3.id)).rejects.toMatchObject({ code: 'evidence_preview_expired' });
+    await preview(); const s = fixture.rows.get(key('provider#supabase'))!; seed(s.key, s.data);
+    expect((await providerEvidenceStatus(user)).mapping).toBeNull(); await expect(preview()).rejects.toMatchObject({ code: 'mapping_required' });
+  });
+  it('does not query an unselected project, an unapproved column or a manual case', async () => {
+    await expect(act('save_mapping', { mapping: { ...mapping, order: { ...mapping.order, columns: [...mapping.order.columns, 'private_token'] } }, confirmed: true })).rejects.toMatchObject({ code: 'mapping_scope_denied' });
+    fixture.schema.mockResolvedValueOnce([{ name: 'orders', columns: ['id'] }]); await expect(save()).rejects.toMatchObject({ code: 'mapping_scope_denied' });
+    await save(); const state = await executeAction(user, { action: 'addCase', title: 'Manual', customerName: 'Name', amount: 5000, reason: 'Not received', dueAt: '2026-12-01' });
+    const manual = state.cases.find(c => c.source === 'manual')!; await expect(act('preview_records', { caseId: manual.id })).rejects.toMatchObject({ code: 'payment_link_required' });
+    seed('provider#supabase', { status: 'authorized', updatedAt: new Date().toISOString() }); await expect(preview()).rejects.toMatchObject({ code: 'mapping_scope_required' }); expect(fixture.query).not.toHaveBeenCalled();
+  });
+  it('blocks another workspace, a different account and closed local cases', async () => {
+    await save(); await expect(providerEvidenceAction(other, { action: 'preview_records', caseId })).rejects.toMatchObject({ code: 'provider_disconnected' });
+    (fixture.rows.get(key(keys.case(caseId)))!.data as { status: string }).status = 'submitted'; await expect(preview()).rejects.toMatchObject({ status: 409 });
+    seed('provider#stripe', { status: 'authorized', accountId: 'acct_other', mode: 'live' }); await expect(preview()).rejects.toMatchObject({ code: 'provider_account_mismatch' });
+    expect(fixture.query).not.toHaveBeenCalled();
+  });
+  it('rejects changed payment associations before querying rows', async () => {
+    await save(); fixture.dispute.mockResolvedValueOnce({ ...dispute, paymentIntentId: 'pi_someoneelse' });
+    await expect(preview()).rejects.toMatchObject({ code: 'payment_link_changed' }); expect(fixture.query).not.toHaveBeenCalled();
+  });
+  it('disconnect wins an in-flight provider read and prevents a preview from being saved', async () => {
+    await save(); fixture.query.mockImplementationOnce(async () => { seed('provider#supabase', { status: 'disconnected' }); return [{ id: 'ORDER-1', payment_ref: 'pi_payment', status: 'paid' }]; });
+    await expect(preview()).rejects.toMatchObject({ code: 'conflict' }); expect(fixture.rows.has(key(`provider-evidence-preview#${caseId}`))).toBe(false);
+  });
+  it('drops a dispute list if Stripe disconnects during the read', async () => {
+    fixture.disputes.mockImplementationOnce(async () => { seed('provider#stripe', { status: 'disconnected' }); return { disputes: [dispute] }; });
+    await expect(act('stripe_disputes')).rejects.toMatchObject({ code: 'conflict' });
+  });
+});

@@ -7,6 +7,7 @@ import './provider-connectors.css';
 import { ImapConnector } from './imap-provider';
 import { GmailConnector } from './gmail-provider';
 import type { WorkspaceState } from '../../lib/domain';
+import { ProviderEvidence } from './provider-evidence';
 import { StripeAccountConnector } from './stripe-provider';
 
 const outcomes: Record<string, string> = {
@@ -93,7 +94,7 @@ export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceStat
   const approve = () => run('approve', async () => {
     const result = await api<{ connection: SupabaseConnection }>('/api/providers/supabase', { action: 'approve_tables', tables });
     saveConnection(result.connection); setSchema(null);
-    setNotice('Evidence scope saved. Live imports will be available after verified payment-to-order mapping is connected.');
+    setNotice('Evidence scope saved. Map these columns to a verified Stripe payment below.');
   });
   const disconnect = () => run('disconnect', async () => {
     const result = await api<{ connection: SupabaseConnection | null }>('/api/providers/supabase', { action: 'disconnect' });
@@ -109,14 +110,14 @@ export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceStat
       <article className="cw-provider-card" aria-label="Supabase account">
         <h3><Database size={20} />Supabase <span className={`cw-pill${authorized ? ' green' : ''}`}>{authorized ? 'Authorized' : connection?.status === 'reconnect_required' ? 'Reconnect required' : 'Not connected'}</span></h3>
         <p>Allow read access to project and database information. Review which project, tables and columns Causality should use.</p>
-        <p className="cw-provider-note">Supabase grants broader database read access. Causality currently reads project and schema metadata only. Evidence row access will require a verified dispute and approved mapping.</p>
+        <p className="cw-provider-note">Supabase grants broader database read access. Causality limits evidence queries to approved columns and records linked to a verified Stripe payment. Review and save your mapping below.</p>
         {!connection || connection.status === 'disconnected' ? <div className="cw-actions">
           {connection?.revocationPending ? <button className="cw-button" disabled={!!busy} onClick={() => void disconnect()}>Retry Supabase revocation</button> : <button className="cw-button primary" disabled={!!busy || !status?.supabase.configured} onClick={() => void connect()}>{busy === 'connect' ? <LoaderCircle size={16} /> : <Link2 size={16} />}{busy === 'loading' ? 'Loading…' : status?.supabase.configured ? 'Connect Supabase' : 'Setup unavailable'}</button>}
         </div> : <>
           {connection.project && <p>Selected project: <strong>{connection.project.name}</strong> <span className="cw-provider-note">({connection.project.organization})</span></p>}
           {authorized && <div className="cw-actions"><button className="cw-button" disabled={!!busy} onClick={() => void loadProjects()}>{projects.length ? 'Refresh projects' : connection.project ? 'Change project' : 'Choose project'}</button>{connection.project && <button className="cw-button" disabled={!!busy} onClick={() => void loadSchema()}>Review tables and columns</button>}</div>}
           {!!projects.length && authorized && <div className="cw-provider-project"><label className="cw-field"><span>Supabase project</span><select value={selected} disabled={!!busy} onChange={e => setSelected(e.target.value)}><option value="">Select a project</option>{projects.map(p => <option key={p.ref} value={p.ref}>{p.name} ({p.organization})</option>)}</select></label><button className="cw-button primary" disabled={!!busy || !selected} onClick={() => void selectProject()}>Use selected project</button></div>}
-          {!!connection.approvedTables?.length && <p>Saved scope: {connection.approvedTables.length} tables, {connection.approvedTables.reduce((sum, t) => sum + t.columns.length, 0)} columns. Live dispute import is not available yet.</p>}
+          {!!connection.approvedTables?.length && <p>Saved scope: {connection.approvedTables.length} tables, {connection.approvedTables.reduce((sum, t) => sum + t.columns.length, 0)} columns. Set up your evidence mapping below.</p>}
           {schema && schema.length > 0 && <fieldset className="cw-provider-scope" disabled={!!busy}><legend>Approved evidence columns, public schema</legend><p>Select only evidence fields such as order IDs, timestamps and delivery status. Leave passwords, tokens, QR payloads and unrelated personal data unchecked.</p>{schema.map(table => <details key={table.name}><summary>{table.name}</summary><div className="cw-provider-columns">{table.columns.map(column => <label key={column}><input type="checkbox" checked={tables.some(t => t.name === table.name && t.columns.includes(column))} onChange={() => toggleColumn(table.name, column)} />{column}</label>)}</div></details>)}<button className="cw-button primary" disabled={!tables.length} onClick={() => void approve()}>Save approved scope</button></fieldset>}
           {confirmDisconnect ? <div className="cw-provider-disconnect"><p>Stop Supabase access and clear the selected project and scope?</p><div className="cw-actions"><button className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(false)}>Keep connection</button><button className="cw-button danger" disabled={!!busy} onClick={() => void disconnect()}>Confirm disconnect Supabase</button></div></div> : <button className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(true)}><Unplug size={16} />Disconnect Supabase</button>}
         </>}
@@ -124,6 +125,7 @@ export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceStat
       <GmailConnector status={status?.gmail} cases={cases} onImported={onImported} onChange={connection => setStatus(current => current ? { ...current, gmail: { configured: current.gmail?.configured || false, connection } } : current)} />
       <ImapConnector status={status?.imap} cases={cases} onImported={onImported} onChange={connection => setStatus(current => current ? { ...current, imap: { configured: current.imap?.configured || false, connection } } : current)} />
       <StripeAccountConnector status={status?.stripe} onChange={connection => setStatus(current => current ? { ...current, stripe: { ...current.stripe, connection } } : current)} />
+      {status && <ProviderEvidence key={`${status.supabase.connection?.updatedAt}:${status.stripe.connection?.updatedAt}`} status={status} cases={cases} onImported={onImported} />}
     </div>
   </section>;
 }

@@ -50,3 +50,32 @@ describe('Stripe Apps API boundary', () => {
     http.mockResolvedValueOnce(new Response('x'.repeat(270000))); await expect(verifyStripeOAuthRead(tokens)).rejects.toMatchObject({ code: 'provider_response_limit' });
   });
 });
+
+describe('selected dispute evidence reads', () => {
+  const dispute = { id: 'du_fictional', object: 'dispute', charge: 'ch_fictional', payment_intent: 'pi_fictional', livemode: true, amount: 5000, currency: 'usd', reason: 'product_not_received', status: 'needs_response', created: 1793491200, evidence_details: { due_by: 1796083200 }, evidence: { private_unrequested: 'excluded' } };
+  const charge = { id: 'ch_fictional', object: 'charge', payment_intent: 'pi_fictional', livemode: true, amount: 5000, currency: 'usd', billing_details: { email: 'customer@example.test', name: 'Customer' }, metadata: { private_unrequested: 'excluded' } };
+  it('accepts current du_ dispute IDs for the connection check', async () => {
+    http.mockResolvedValueOnce(Response.json({ object: 'list', data: [dispute] })).mockResolvedValueOnce(Response.json(charge));
+    expect(await verifyStripeOAuthRead(tokens)).toEqual({ disputeReadVerified: true, chargeReadVerified: true });
+  });
+  it('lists a maximum of ten summaries without returning full evidence or customer records', async () => {
+    http.mockResolvedValueOnce(Response.json({ object: 'list', data: [dispute], has_more: true }));
+    const { listStripeOAuthDisputes } = await import('../aws/stripe-oauth-api.ts');
+    const result = await listStripeOAuthDisputes(tokens); expect(result).toMatchObject({ disputes: [{ id: dispute.id, amount: 5000 }], moreAvailable: true }); expect(JSON.stringify(result)).not.toContain('private_unrequested');
+    expect(http.mock.calls[0][0]).toBe('https://api.stripe.com/v1/disputes?limit=10');
+  });
+  it('resolves the charge with the customer token and strips unrelated fields', async () => {
+    http.mockResolvedValueOnce(Response.json(dispute)).mockResolvedValueOnce(Response.json(charge));
+    const { readStripeOAuthDispute } = await import('../aws/stripe-oauth-api.ts');
+    const result = await readStripeOAuthDispute(tokens, dispute.id); expect(result).toMatchObject({ chargeId: charge.id, paymentIntentId: charge.payment_intent, accountId: tokens.accountId, email: 'customer@example.test' });
+    expect(JSON.stringify(result)).not.toContain('private_unrequested'); expect(JSON.stringify(result)).not.toContain(tokens.accessToken);
+    for (const [, init] of http.mock.calls) { expect(init?.method).toBe('GET'); expect(new Headers(init?.headers).get('Authorization')).toBe(`Bearer ${tokens.accessToken}`); expect(new Headers(init?.headers).has('Stripe-Account')).toBe(false); }
+  });
+  it('rejects mismatched payments, environments, currency and charge amount', async () => {
+    const { readStripeOAuthDispute } = await import('../aws/stripe-oauth-api.ts');
+    for (const change of [{ id: 'ch_another' }, { payment_intent: 'pi_another' }, { livemode: false }, { currency: 'eur' }, { amount: 4999 }]) {
+      http.mockResolvedValueOnce(Response.json(dispute)).mockResolvedValueOnce(Response.json({ ...charge, ...change })); await expect(readStripeOAuthDispute(tokens, dispute.id)).rejects.toMatchObject({ code: 'provider_invalid_response' });
+    }
+    http.mockClear(); await expect(readStripeOAuthDispute(tokens, '../charges/all')).rejects.toMatchObject({ code: 'invalid_request' }); expect(http).not.toHaveBeenCalled();
+  });
+});

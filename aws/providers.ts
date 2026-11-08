@@ -93,7 +93,7 @@ async function active(wid: string) {
   return { connection, token };
 }
 
-async function access(wid: string) {
+export async function supabaseProviderAccess(wid: string) {
   const loaded = await active(wid);
   if (loaded.token.data.refreshing) throw new ApiError(409, 'Authorization refresh is in progress. If it does not finish, disconnect and authorize again.', 'provider_refresh_busy');
   if (loaded.token.data.expiresAt > Date.now() + 60_000) return loaded;
@@ -142,7 +142,7 @@ export async function supabaseAction(user: TrustedUser, input: unknown) {
   if (!parsed.success) throw new ApiError(400, 'Choose a valid Supabase connection action.', 'invalid_request');
   const wid = (await requireWorkspace(user)).data.id; const action = parsed.data;
   if (action.action === 'disconnect') return disconnect(user, wid);
-  const { connection, token } = await access(wid);
+  const { connection, token } = await supabaseProviderAccess(wid);
   const assertCurrent = () => commit(wid, [{ key: connectionKey, expectedVersion: connection.version, check: true }, { key: tokenKey, expectedVersion: token.version, check: true }]);
   try {
     if (action.action === 'projects' || action.action === 'select_project') {

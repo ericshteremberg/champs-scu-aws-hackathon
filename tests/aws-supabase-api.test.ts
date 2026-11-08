@@ -57,3 +57,14 @@ describe('Supabase network boundary', () => {
     await expect(fetchSupabaseProjects('synthetic_token')).rejects.toMatchObject({ code: 'provider_response_limit' });
   });
 });
+
+it('sends server-built evidence SQL and bound values only to the read-only endpoint', async () => {
+  const { querySupabaseReadOnly } = await import('../aws/supabase-api.ts');
+  http.mockResolvedValueOnce(Response.json([{ id: 'order1' }]));
+  const query = 'SELECT "id" FROM public."orders" WHERE "payment_ref"::text = $1 LIMIT 2';
+  await querySupabaseReadOnly('synthetic_customer_access', 'abcdefghijklmnopqrst', query, ['pi_verified']);
+  const [url, init] = http.mock.calls[0];
+  expect(url).toBe('https://api.supabase.com/v1/projects/abcdefghijklmnopqrst/database/query/read-only');
+  expect(init?.method).toBe('POST'); expect(JSON.parse(String(init?.body))).toEqual({ query, parameters: ['pi_verified'] });
+  expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer synthetic_customer_access');
+});

@@ -50,7 +50,7 @@ async function request(path: string, init: RequestInit): Promise<unknown> {
     while (true) {
       const next = await reader.read(); if (next.done) break;
       size += next.value.length;
-      if (size > 256 * 1024) { await reader.cancel(); throw new ApiError(413, 'Supabase returned too much metadata. Narrow the project before connecting.', 'provider_response_limit'); }
+      if (size > 256 * 1024) { await reader.cancel(); throw new ApiError(413, 'Supabase returned too much data. Narrow the selected schema or evidence fields.', 'provider_response_limit'); }
       chunks.push(next.value);
     }
     return JSON.parse(Buffer.concat(chunks).toString('utf8'));
@@ -96,4 +96,10 @@ export async function fetchSupabaseSchema(accessToken: string, ref: string): Pro
     const columns = tables.get(row.table_name) ?? []; columns.push(row.column_name); tables.set(row.table_name, columns);
   }
   return [...tables].map(([name, columns]) => ({ name, columns }));
+}
+
+// Server-only helper. Browser routes never accept SQL or a project override.
+export async function querySupabaseReadOnly(accessToken: string, ref: string, query: string, parameters: string[]): Promise<unknown> {
+  if (!projectRef.safeParse(ref).success) throw new ApiError(400, 'Choose a valid Supabase project.');
+  return request(`/v1/projects/${ref}/database/query/read-only`, { method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ query, parameters }) });
 }

@@ -72,7 +72,7 @@ async function active(wid: string) {
   return { connection, token };
 }
 
-async function access(wid: string): Promise<{ connection: Stored<StripeProviderConnection>; token: Stored<Tokens> }> {
+export async function stripeProviderAccess(wid: string): Promise<{ connection: Stored<StripeProviderConnection>; token: Stored<Tokens> }> {
   const loaded = await active(wid);
   if (loaded.token.data.refreshing) throw new ApiError(409, 'Stripe authorization refresh is in progress. If it does not finish, disconnect and authorize again.', 'provider_refresh_busy');
   if (loaded.token.data.expiresAt > Date.now() + 60_000) return loaded;
@@ -105,7 +105,7 @@ export async function stripeProviderAction(user: TrustedUser, input: unknown) {
     await commit(wid, changes);
     return { connection: data };
   }
-  const { connection, token } = await access(wid);
+  const { connection, token } = await stripeProviderAccess(wid);
   try {
     const verified = await verifyStripeOAuthRead(token.data);
     const timestamp = new Date().toISOString();

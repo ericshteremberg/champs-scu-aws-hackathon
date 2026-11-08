@@ -9,6 +9,7 @@ async function setup(page: Page, connection: SupabaseConnection | null = null, s
   expect((await page.request.post(`${base}/api/workspace`, { headers: { ...headers, Origin: base }, data: { action: 'createWorkspace', name: 'Provider UI test' } })).status()).toBe(200);
   const status: ProviderStatus = { supabase: { configured: true, connection }, stripe, gmail, imap: { configured: true, connection: null } };
   const requests: Record<string, unknown>[] = [];
+  await page.route('**/api/providers/evidence', route => route.fulfill({ json: { mapping: null, eligibleCaseIds: [] } }));
   await page.route('**/api/providers', route => route.fulfill({ json: status }));
   await page.route('**/api/providers/stripe', async route => {
     const body = route.request().postDataJSON(); requests.push({ provider: 'stripe', ...body });
@@ -51,7 +52,7 @@ test('customer selects project, approves only checked columns and disconnects', 
   await panel.getByRole('checkbox', { name: 'payment_ref', exact: true }).check();
   await expect(panel.getByRole('checkbox', { name: 'private_token' })).not.toBeChecked();
   await panel.getByRole('button', { name: 'Save approved scope' }).click();
-  await expect(panel.getByRole('status')).toContainText('Live imports will be available after verified payment-to-order mapping');
+  await expect(panel.getByRole('status')).toContainText('Map these columns to a verified Stripe payment');
   expect(requests.at(-1)).toEqual({ action: 'approve_tables', tables: [{ name: 'orders', columns: ['id', 'payment_ref'] }] });
   await panel.getByRole('button', { name: 'Disconnect Supabase', exact: true }).click();
   await panel.getByRole('button', { name: 'Confirm disconnect Supabase' }).click();
