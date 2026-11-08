@@ -83,11 +83,14 @@ The current limits are 90 evidence records per case, 300 KB per database item, 3
 
 ## Division of work
 
+The four role branches and detailed startup instructions are in [the team handoffs](handoffs/README.md). Each branch shares the verified application baseline and includes all four role documents.
+
 | Owner | Next responsibility |
 | --- | --- |
-| Eric | Deploy the case endpoint, confirm the real complaint and account routing, select corroborated support records, rehearse the business story |
-| Aiden | Maintain credentials and reproducible deployments, rehearse the verified browser flow, and preserve cancellation and source/revision safeguards |
-| Both | Review original sources, measure current preparation time, record the demo, and complete submission |
+| Aiden | Connect the merchant client to AWS, improve claim-specific investigation quality, preserve safeguards, and coordinate integration/deployment |
+| Eric | Polish the organizer review workflow and give the integration teammate the actual backend access and case context |
+| Teammate 2 | Implement and verify the merchant-owned, case-scoped ATMSPHR evidence API |
+| Teammate 3 | Evaluate sourced reports, prepare the pitch and recording, and assemble submission materials |
 
 ## Submission
 
