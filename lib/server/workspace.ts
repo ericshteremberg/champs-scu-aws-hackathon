@@ -112,7 +112,7 @@ export async function executeAction(user:ChatGPTUser,input:unknown):Promise<Work
     const analysis=analysisJson?JSON.parse(analysisJson):{findings:[]};
     const citations=reportEvidenceIds({content:action.content,findings:analysis.findings||[]});
     if(citations.some(id=>!ids.has(id)) || (ids.size && !/(?<!\\)\[([^\]\n]{1,240})\]/.test(action.content)))throw new ApiError(422,'Keep valid citations to this case’s evidence in the response.','invalid_citation');
-    analysisJson=JSON.stringify({...analysis,evidenceIds:citations});
+    analysisJson=JSON.stringify({...analysis,evidenceIds:citations,...(analysis.factInventory?{claimControl:'human_edited'}:{})});
    }
    const updated=await db.update(drafts).set({content:action.content,analysisJson,status:'draft',approvedAt:null,approvedBy:null,revision:sql`${drafts.revision} + 1`}).where(and(eq(drafts.workspaceId,wid),eq(drafts.caseId,row.id),eq(drafts.revision,action.revision),mutableCaseGuard(wid,row.id))).returning({id:drafts.caseId});if(!updated.length)throw new ApiError(409,'This draft changed. Refresh it before saving.','stale_draft');}
   await db.batch([db.update(cases).set({status:'needs_review',updatedAt:now()}).where(and(eq(cases.workspaceId,wid),eq(cases.id,row.id),mutableCaseGuard(wid,row.id))),db.insert(auditLogs).values(auditValues(wid,user,'draft.saved','Saved draft changes; prior approval cleared.',row.id))]);break;

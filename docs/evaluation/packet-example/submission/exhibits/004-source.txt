@@ -1,0 +1,18 @@
+SOURCE TRANSCRIPT — NOT AN ORIGINAL SCREENSHOT
+Second ticket issued
+Evidence ID: case_atm_1042:ticket-2
+Recorded at: 2026-11-02T18:03:04Z
+Reference: Synthetic: ticket_demo_1042_b
+
+A second ticket was created for the same order.
+
+STRUCTURED SOURCE FIELDS
+{
+  "orderRef": "ATM-1042",
+  "ticketStatus": "issued",
+  "transferredFrom": null,
+  "transferredTo": null,
+  "scanRecorded": false
+}
+
+SOURCE QUALIFICATIONS

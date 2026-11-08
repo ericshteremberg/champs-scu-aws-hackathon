@@ -1,0 +1,23 @@
+SOURCE TRANSCRIPT — NOT AN ORIGINAL SCREENSHOT
+Order confirmed for two tickets
+Evidence ID: case_atm_1042:order
+Recorded at: 2026-11-02T18:03:00Z
+Reference: Synthetic: order_demo_1042
+
+Order ATM-1042 contains two general-admission tickets to After Hours: Fall Session.
+
+STRUCTURED SOURCE FIELDS
+{
+  "orderRef": "ATM-1042",
+  "paymentRef": "pi_demo_atm_1042",
+  "quantity": 2,
+  "subtotal": 8000,
+  "fees": 1200,
+  "total": 9200,
+  "currency": "USD",
+  "status": "paid",
+  "eventStartsAt": "2026-11-07T05:00:00Z",
+  "eventTimezone": "America/Los_Angeles"
+}
+
+SOURCE QUALIFICATIONS

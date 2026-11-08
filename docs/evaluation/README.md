@@ -1,5 +1,7 @@
 # Evaluation and local rehearsal
 
+Latest implementation: [verified fact inventory, challenge-all preparation policy and CLI packets](../FACT_INVENTORY.md). [Six final live inventory evaluations](inventory-results.md) supersede the earlier prompt-only behavior below. The local runner now writes `inventory-runs/`; use `review-inventory-runs.mjs` for that batch. Historical `prompt-runs/` artifacts remain unchanged.
+
 This directory owns evaluation tools, source review and demo rehearsal. The user subsequently authorized prompt fixes, regression tests and a real Bedrock rerun on this branch. Submission work remains deferred; the selected track is AWS.
 
 [Contributor checkout and combined-branch verification](CONTRIBUTOR-HANDOFF.md) describes how to get the current branch, the merged mainline work and the remaining product limits.

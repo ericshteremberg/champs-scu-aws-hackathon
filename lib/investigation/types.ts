@@ -1,5 +1,6 @@
 import type { ConverseCommandInput, ConverseCommandOutput } from '@aws-sdk/client-bedrock-runtime';
 import type { DisputeCase, Finding } from '../domain.ts';
+import type { FactInventory, PresentationPlan } from './facts.ts';
 
 export const EVIDENCE_SECTIONS = ['summary', 'order', 'tickets', 'delivery', 'history', 'support', 'attendance', 'policy'] as const;
 export type EvidenceSection = (typeof EVIDENCE_SECTIONS)[number];
@@ -47,6 +48,9 @@ export interface InvestigationResult {
   evidenceIds: string[];
   modelId?: string;
   metrics: { durationMs: number; toolCalls: number; recordCount: number; modelCalls: number };
+  factInventory?: FactInventory;
+  presentation?: PresentationPlan;
+  claimControl?: 'code_generated' | 'human_edited';
 }
 
 export interface InvestigationCredentials { accessKeyId: string; secretAccessKey: string; sessionToken?: string }

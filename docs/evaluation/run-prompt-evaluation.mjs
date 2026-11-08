@@ -36,7 +36,7 @@ const source = {
   note: 'Actual locally bundled source; includes uncommitted files. No claim about the deployed Lambda build.',
 };
 const { runInvestigation, INVESTIGATION_PROMPT, TICKET_DEMO_CASES, localEvidence } = await import(pathToFileURL(resolve(bundle)).href);
-const output = 'docs/evaluation/prompt-runs';
+const output = 'docs/evaluation/inventory-runs';
 mkdirSync(output, { recursive: true });
 const batch = randomUUID();
 const client = new BedrockRuntimeClient({ region, maxAttempts: 2, requestHandler: new FetchHttpHandler({ requestTimeout: 45000 }) });
@@ -71,6 +71,7 @@ try {
       if (!sourceStable) throw new Error('Source changed during live evaluation. Do not compare this batch as a fixed build.');
       const saved = {
         order: item.orderRef, caseId: item.id, startedAt, finishedAt: run.finishedAt, batch, repeat,
+        case: { id: item.id, title: item.title, orderRef: item.orderRef, reason: item.reason, amount: item.amount, currency: item.currency, source: item.source },
         repoCommit: source.commit, execution: 'local engine, real Bedrock; no deployed API or storage',
         source, promptSha256: sha256(INVESTIGATION_PROMPT), sourceStable,
         inputProvenance: 'synthetic fixture (lib/ticket-demo.ts) normalized through aws/investigations.ts localEvidence',

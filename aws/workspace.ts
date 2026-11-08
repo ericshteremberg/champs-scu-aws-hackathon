@@ -168,7 +168,7 @@ export async function executeAction(user: TrustedUser, input: unknown): Promise<
         const ids = new Set((await listEvidence(wid, row.data.id)).map(record => record.data.id));
         const citations = reportEvidenceIds({ content: action.content, findings: existing.data.analysis?.findings ?? [] });
         if (citations.some(id => !ids.has(id)) || (ids.size && !/(?<!\\)\[([^\]\n]{1,240})\]/.test(action.content))) throw new ApiError(422, 'Keep valid citations to this case’s evidence in the response.', 'invalid_citation');
-        if (data.analysis) data = { ...data, analysis: { ...data.analysis, evidenceIds: citations } };
+        if (data.analysis) data = { ...data, analysis: { ...data.analysis, evidenceIds: citations, ...(data.analysis.factInventory ? { claimControl: 'human_edited' as const } : {}) } };
       }
       await commit(wid, [caseChange(row, { ...row.data, status: 'needs_review', updatedAt: now() }), { key: keys.draft(row.data.id), expectedVersion: existing?.version ?? null, data }, auditChange(user, 'draft.saved', 'Saved draft changes; prior approval cleared.', row.data.id)]); break;
     }

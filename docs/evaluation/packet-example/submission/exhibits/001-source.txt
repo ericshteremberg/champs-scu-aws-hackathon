@@ -1,0 +1,22 @@
+SOURCE TRANSCRIPT — NOT AN ORIGINAL SCREENSHOT
+Payment captured
+Evidence ID: case_atm_1042:payment
+Recorded at: 2026-11-02T18:03:00Z
+Reference: Synthetic: pi_demo_atm_1042
+
+A fictional USD 92.00 payment maps to order ATM-1042.
+
+STRUCTURED SOURCE FIELDS
+{
+  "chargeCaptured": true,
+  "refundAmount": 0,
+  "disputeStatus": "needs_response",
+  "orderRef": "ATM-1042",
+  "paymentRef": "pi_demo_atm_1042",
+  "amount": 9200,
+  "currency": "USD",
+  "stripeAccount": "acct_demo_atmsphr",
+  "liveMode": false
+}
+
+SOURCE QUALIFICATIONS

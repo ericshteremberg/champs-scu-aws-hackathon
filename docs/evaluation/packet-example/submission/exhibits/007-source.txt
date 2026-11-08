@@ -1,0 +1,18 @@
+SOURCE TRANSCRIPT — NOT AN ORIGINAL SCREENSHOT
+Customer acknowledged finding both tickets
+Evidence ID: case_atm_1042:support-3
+Recorded at: 2026-11-02T18:12:18Z
+Reference: Synthetic: thread_demo_1042:message_3
+
+Fictional customer message: "Found both tickets in my account for ATM-1042. Thank you."
+
+STRUCTURED SOURCE FIELDS
+{
+  "orderRef": "ATM-1042",
+  "messageRole": "customer",
+  "customerAcknowledgedReceipt": true,
+  "threadMatch": "explicit_order_reference"
+}
+
+SOURCE QUALIFICATIONS
+This is a fictional conversation for the demo. Acknowledged access does not establish attendance or determine a bank decision.

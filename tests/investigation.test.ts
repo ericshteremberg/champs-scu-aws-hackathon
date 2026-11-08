@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ConverseCommandOutput } from '@aws-sdk/client-bedrock-runtime';
 import { runInvestigation, validateEnvelope } from '../lib/investigation/engine.ts';
 import { fetchMerchantSection, normalizeMerchantSection } from '../lib/investigation/merchant.ts';
-import { buildSampleReport, CitationAliases, validateReport } from '../lib/investigation/report.ts';
+import { CitationAliases, validateReport } from '../lib/investigation/report.ts';
 import { EVIDENCE_SECTIONS, type EvidenceEnvelope, type EvidenceSection, type InvestigationEvent, type InvestigationInput } from '../lib/investigation/types.ts';
 
 const timestamp = '2026-11-07T18:00:00.000Z';
@@ -36,237 +36,98 @@ function wire(section: EvidenceSection = 'summary') {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('portable investigation engine', () => {
-  it('sends the evidence-response contract on retrieval and finish calls', async () => {
-    let calls = 0;
-    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
-      calls++;
-      const system = request.system?.map(block => block.text || '').join('\n') || '';
-      for (const rule of [
-        'mixed: records point both ways OR materially support',
-        'insufficient: key evidence cannot establish either side',
-        'email accepted for processing is not inbox delivery',
-        'A complaint about missing tickets does not assert nonattendance',
-        "cite the provider's retry outcome record",
-        'only the next evidence-review step',
-        "eventStartsAt converted to the record's eventTimezone",
-        'Do not restate source limitations',
-        "actual merchant response to the payment provider in the merchant's voice",
-      ]) expect(system).toContain(rule);
-      const finish = request.toolConfig?.tools?.find(tool => tool.toolSpec?.name === 'finish_report')?.toolSpec;
-      expect(finish?.description).toContain('mixed includes evidence backing the complaint');
-      if (calls === 1) return modelResponse((['order', 'tickets', 'delivery', 'support'] as const).map(section => ({ name: 'get_evidence', input: { section } })));
-      return modelResponse([{ name: 'finish_report', input: report() }]);
-    });
-    await runInvestigation(input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke }));
-    expect(calls).toBe(2);
-  });
-
-  it('retrieves scoped records, preserves IDs, and labels sample output honestly', async () => {
-    const options = input();
-    const result = await runInvestigation(options);
+  it('retrieves all eight sections in code, summary first, and labels sample output honestly', async () => {
+    const options = input(); const result = await runInvestigation(options);
     expect(result.content).toContain('not analyzed by a language model');
-    expect(result.content).toContain('[record_summary]');
+    expect(result.factInventory?.facts[0].evidenceIds).toEqual(['record_summary']);
     expect(result.metrics).toMatchObject({ toolCalls: 8, modelCalls: 0, recordCount: 6 });
     expect(result.assessment).toBe('insufficient');
-    expect(result.gaps).toContain('attendance history is unavailable.');
+    expect(result.factInventory?.coverage.find(section => section.section === 'attendance')?.sourceLimitations).toContain('attendance history is unavailable.');
+    expect(vi.mocked(options.readEvidence).mock.calls.map(([section]) => section)).toEqual(EVIDENCE_SECTIONS);
     expect(options.events.at(-1)?.type).toBe('completed');
-    expect(options.assertActive).toHaveBeenCalled();
   });
-
-  it('does not interpret brackets in quoted source text as fabricated citations', async () => {
-    const options = input({ readEvidence: async section => { const value = envelope(section); if (value.records[0]) value.records[0].detail = 'The email contains [image attached] in its body.'; return value; } });
-    const result = await runInvestigation(options);
-    expect(result.content).toContain('\\[image attached\\]');
+  it('keeps quoted free text in the internal inventory rather than promoting it to an outgoing claim', async () => {
+    const result = await runInvestigation(input({ readEvidence: async section => { const value = envelope(section); if (value.records[0]) value.records[0].detail = 'The email contains [image attached] in its body.'; return value; } }));
+    expect(result.factInventory?.facts[0].text).toContain('\\[image attached\\]');
+    expect(result.content).not.toContain('image attached');
     expect(result.evidenceIds).not.toContain('image attached');
   });
-
-  it('preserves zero-decimal currency units in sample drafts', () => {
-    const value = buildSampleReport({ ...caseData, currency: 'jpy', amount: 5000 }, [envelope('summary')]);
-    expect(value.content).toContain('¥5,000');
+  it('preserves zero-decimal currency units in code-generated intake values', async () => {
+    const result = await runInvestigation(input({ case: { ...caseData, currency: 'jpy', amount: 5000 } }));
+    expect(result.content).toContain('¥5,000');
   });
-
-  it('rejects another case or malformed evidence before adding it to context', async () => {
-    const options = input({ readEvidence: async section => ({ ...envelope(section), caseId: 'other_case' }) });
+  it('rejects another case before retaining its records or calling the model', async () => {
+    const invoke = vi.fn(); const options = input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke, readEvidence: async section => ({ ...envelope(section), caseId: 'other_case' }) });
     await expect(runInvestigation(options)).rejects.toMatchObject({ code: 'evidence_scope_mismatch' });
-    expect(options.events.some(event => event.type === 'tool_completed')).toBe(false);
-  });
-
-  it('validates summary first even when the model wants another section', async () => {
-    const invoke = vi.fn(async () => modelResponse([{ name: 'get_evidence', input: { section: 'delivery' } }]));
-    const options = input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke, readEvidence: async () => { throw new Error('Mapping changed'); } });
-    await expect(runInvestigation(options)).rejects.toThrow('Mapping changed');
     expect(invoke).not.toHaveBeenCalled();
-  });
-
-  it('executes model tool calls and blocks attempts to expand case scope', async () => {
-    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>()
-      .mockResolvedValueOnce(modelResponse([{ name: 'get_evidence', input: { section: 'delivery', caseId: 'other_case' } }, ...(['order','tickets','delivery','support'] as const).map(section => ({ name: 'get_evidence', input: { section } }))]))
-      .mockResolvedValueOnce(modelResponse([{ name: 'finish_report', input: report() }]));
-    const options = input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke });
-    const result = await runInvestigation(options);
-    expect(result.modelId).toBe('test-model');
-    expect(result.metrics.modelCalls).toBe(2);
-    expect(options.events.some(event => event.type === 'blocked')).toBe(true);
-    expect(result.gaps).toContain('Policy records were not requested during this investigation.');
-    expect(options.readEvidence).toHaveBeenCalledTimes(5);
-  });
-
-  it('rejects invented citations, then accepts a corrected report', async () => {
-    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>()
-      .mockResolvedValueOnce(modelResponse((['order','tickets','delivery','support'] as const).map(section => ({ name: 'get_evidence', input: { section } }))))
-      .mockResolvedValueOnce(modelResponse([{ name: 'finish_report', input: { ...report(), content: 'The ticket was received. [invented_record]' } }]))
-      .mockResolvedValueOnce(modelResponse([{ name: 'finish_report', input: report() }]));
-    const options = input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke });
-    const result = await runInvestigation(options);
-    expect(result.evidenceIds).toEqual(['record_summary']);
-    expect(options.events.filter(event => event.type === 'blocked')).toHaveLength(1);
-  });
-
-  it('shows short aliases to Bedrock and persists only canonical evidence references', async () => {
-    let calls = 0;
-    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
-      calls++;
-      if (calls === 1) {
-        const initial = JSON.parse(request.messages![0].content![0].text!);
-        expect(initial.initialSummary.records[0]).toMatchObject({ id: 'E1', sourceId: 'original_summary' });
-        return modelResponse((['order','tickets','delivery','support'] as const).map(section => ({ name: 'get_evidence', input: { section } })));
-      }
-      const returned = request.messages!.at(-1)!.content!.map(block => block.toolResult?.content?.[0].json as { records: { id: string }[] });
-      expect(returned.map(section => section.records[0].id)).toEqual(['E2','E3','E4','E5']);
-      return modelResponse([{ name: 'finish_report', input: { ...report(), content: 'Payment is recorded. [E1] Support is attached. [E5]', summary: 'Payment and support records are attached. [E1] [E5]', findings: [{ ...report().findings[0], detail: 'The source records include payment and support. [E1] [E5]', evidenceIds: ['E1','E5'] }] } }]);
-    });
-    const options = input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke });
-    const result = await runInvestigation(options);
-    expect(result.content).toContain('[record_summary]'); expect(result.content).toContain('[record_support]');
-    expect(result.summary).toContain('[record_summary]');
-    expect(result.findings[0].evidenceIds).toEqual(['record_summary','record_support']);
-    expect(result.findings[0].detail).toContain('[record_support]');
-    expect(JSON.stringify(result)).not.toMatch(/\[E\d+\]/);
-    expect(options.events.flatMap(event => event.evidenceIds || [])).toContain('record_summary');
-    expect(options.events.flatMap(event => event.evidenceIds || []).some(id => /^E\d+$/.test(id))).toBe(false);
-  });
-
-  it('rejects invented aliases with actionable valid-reference feedback before accepting a corrected report', async () => {
-    let calls = 0;
-    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
-      calls++;
-      if (calls === 1) return modelResponse((['order','tickets','delivery','support'] as const).map(section => ({ name: 'get_evidence', input: { section } })));
-      if (calls === 2) return modelResponse([{ name: 'finish_report', input: { ...report(), content: 'The ticket was received. [E999]', findings: [{ ...report().findings[0], evidenceIds: ['E999'] }] } }]);
-      const feedback = request.messages!.at(-1)!.content![0].toolResult!;
-      expect(feedback.status).toBe('error');
-      expect(feedback.content![0].text).toContain('E1, E2, E3, E4, E5');
-      expect(feedback.content![0].text).toContain('"field":"content","reference":"E999"');
-      expect(feedback.content![0].text).toContain('"field":"findings[0].evidenceIds","reference":"E999"');
-      expect(feedback.content![0].text).toContain('[E1] [E2]');
-      expect(feedback.content![0].text).toContain('Do not cite sourceId');
-      return modelResponse([{ name: 'finish_report', input: { ...report(), content: 'The payment record is attached. [E1]', findings: [{ ...report().findings[0], evidenceIds: ['E1'] }] } }]);
-    });
-    const options = input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke });
-    const result = await runInvestigation(options);
-    expect(result.evidenceIds).toEqual(['record_summary']);
-    expect(options.events.filter(event => event.type === 'blocked')).toHaveLength(1);
-    expect(result.metrics.modelCalls).toBe(3);
-  });
-
-  it('offers only unread sections and forces Nova to finish once all sections have been retrieved', async () => {
-    let calls = 0;
-    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
-      calls++;
-      if (calls === 1) {
-        expect(request.toolConfig?.toolChoice).toEqual({ any: {} });
-        const retrieval = request.toolConfig!.tools![0].toolSpec!;
-        expect((retrieval.inputSchema!.json as { properties: { section: { enum: string[] } } }).properties.section.enum).not.toContain('summary');
-        return modelResponse(EVIDENCE_SECTIONS.filter(section => section !== 'summary').map(section => ({ name: 'get_evidence', input: { section } })));
-      }
-      expect(request.toolConfig!.tools!.map(tool => tool.toolSpec?.name)).toEqual(['finish_report']);
-      expect(request.toolConfig!.toolChoice).toEqual({ tool: { name: 'finish_report' } });
-      return modelResponse([{ name: 'finish_report', input: { ...report(), content: 'The payment record is attached. [E1]', findings: [{ ...report().findings[0], evidenceIds: ['E1'] }] } }]);
-    });
-    const result = await runInvestigation(input({ mode: 'bedrock', modelId: 'us.amazon.nova-2-lite-v1:0', invokeModel: invoke }));
-    expect(result.metrics.modelCalls).toBe(2);
-    expect(result.evidenceIds).toEqual(['record_summary']);
-  });
-
-  it('returns exactly one tool result for each repeated section request without fetching it again', async () => {
-    let calls = 0;
-    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
-      calls++;
-      if (calls === 1) return modelResponse((['order','order','tickets','delivery','support'] as const).map(section => ({ name: 'get_evidence', input: { section } })));
-      const results = request.messages!.at(-1)!.content!.map(block => block.toolResult!);
-      expect(results.map(result => result.toolUseId)).toEqual(['tool_0','tool_1','tool_2','tool_3','tool_4']);
-      expect(results.map(result => result.status)).toEqual(['success','error','success','success','success']);
-      expect(results[1].content![0].text).toContain('already retrieved');
-      return modelResponse([{ name: 'finish_report', input: report() }]);
-    });
-    const options = input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke });
-    await runInvestigation(options);
-    expect(vi.mocked(options.readEvidence).mock.calls.filter(([section]) => section === 'order')).toHaveLength(1);
-  });
-
-  it('reserves the last two model calls for reporting while retaining unrequested-source gaps', async () => {
-    let calls = 0;
-    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
-      calls++;
-      if (calls === 1) return modelResponse((['order','tickets','delivery','support'] as const).map(section => ({ name: 'get_evidence', input: { section } })));
-      if (calls < 11) return { $metadata: {}, usage: { inputTokens: 10, outputTokens: 10, totalTokens: 20 }, metrics: { latencyMs: 1 }, output: { message: { role: 'assistant', content: [{ text: 'Considering the next step.' }] } }, stopReason: 'end_turn' };
-      expect(request.toolConfig!.tools!.map(tool => tool.toolSpec?.name)).toEqual(['finish_report']);
-      expect(request.toolConfig!.toolChoice).toEqual({ tool: { name: 'finish_report' } });
-      return modelResponse([{ name: 'finish_report', input: report() }]);
-    });
-    const result = await runInvestigation(input({ mode: 'bedrock', modelId: 'us.amazon.nova-2-lite-v1:0', invokeModel: invoke }));
-    expect(result.metrics.modelCalls).toBe(11);
-    expect(result.gaps).toContain('Policy records were not requested during this investigation.');
-  });
-
-  it('identifies a missing content field for the model without exposing schema details in persisted events', async () => {
-    let calls = 0;
-    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
-      calls++;
-      if (calls === 1) return modelResponse((['order','tickets','delivery','support'] as const).map(section => ({ name: 'get_evidence', input: { section } })));
-      if (calls === 2) {
-        const { content: _content, ...incomplete } = report();
-        return modelResponse([{ name: 'finish_report', input: incomplete }]);
-      }
-      const feedback = request.messages!.at(-1)!.content![0].toolResult!.content![0].text!;
-      expect(feedback).toContain('"field":"content"');
-      expect(feedback).toContain('expected string, received undefined');
-      expect(feedback).toContain('complete report, not just the changed fields');
-      const schema = request.toolConfig!.tools!.find(tool => tool.toolSpec?.name === 'finish_report')!.toolSpec!.inputSchema!.json as { properties: { content: { minLength: number; maxLength: number }; findings: { maxItems: number } } };
-      expect(schema.properties.content).toMatchObject({ minLength: 1, maxLength: 50000 });
-      expect(schema.properties.findings.maxItems).toBe(30);
-      return modelResponse([{ name: 'finish_report', input: report() }]);
-    });
-    const options = input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke });
-    const result = await runInvestigation(options);
-    expect(result.metrics.modelCalls).toBe(3);
-    const blocked = options.events.filter(event => event.type === 'blocked');
-    expect(blocked[0].detail).toBe('The investigation did not produce the required report format.');
-    expect(blocked[0].detail).not.toContain('undefined');
-  });
-
-  it('never silently substitutes sample results when AWS fails', async () => {
-    const invoke = vi.fn(async () => { throw Object.assign(new Error('Sensitive upstream detail'), {name:'AccessDeniedException'}); });
-    await expect(runInvestigation(input({ mode:'bedrock',modelId:'test-model',invokeModel:invoke }))).rejects.toMatchObject({code:'bedrock_failed'});
-  });
-
-  it('blocks further requests after revocation during source retrieval', async () => {
-    const controller = new AbortController();
-    const read = vi.fn(async (section: EvidenceSection) => { controller.abort(); return envelope(section); });
-    const options = input({ signal:controller.signal, readEvidence:read });
-    await expect(runInvestigation(options)).rejects.toMatchObject({code:'stopped'});
-    expect(read).toHaveBeenCalledTimes(1);
     expect(options.events.some(event => event.type === 'tool_completed')).toBe(false);
   });
-
+  it('fails summary verification before reading further sections', async () => {
+    const invoke = vi.fn(); const read = vi.fn(async () => { throw new Error('Mapping changed'); });
+    await expect(runInvestigation(input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke, readEvidence: read }))).rejects.toThrow('Mapping changed');
+    expect(read).toHaveBeenCalledTimes(1); expect(invoke).not.toHaveBeenCalled();
+  });
+  it('sends only code-selected facts and an ID-only presentation tool to the model', async () => {
+    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>(async request => {
+      expect(request.system?.[0].text).toContain('Do not return factual prose');
+      expect(request.toolConfig?.tools?.map(tool => tool.toolSpec?.name)).toEqual(['finish_report']);
+      const supplied = JSON.parse(request.messages![0].content![0].text!);
+      expect(supplied.facts).toEqual([]); // Generic free text is not approved affirmative evidence.
+      return modelResponse([{ name: 'finish_report', input: { sections: [] } }]);
+    });
+    const result = await runInvestigation(input({ mode: 'bedrock', modelId: 'us.amazon.nova-2-lite-v1:0', invokeModel: invoke }));
+    expect(result.claimControl).toBe('code_generated'); expect(result.modelId).toBe('us.amazon.nova-2-lite-v1:0');
+    expect(result.content).toContain('NO VERIFIED AFFIRMATIVE SUPPORT SELECTED');
+    expect(result.metrics.modelCalls).toBe(1);
+  });
+  it('rejects model-authored claims and accepts a corrected presentation without publishing the claims', async () => {
+    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>()
+      .mockResolvedValueOnce(modelResponse([{ name: 'finish_report', input: { sections: [], content: 'Customer received the tickets. [invented]' } }]))
+      .mockResolvedValueOnce(modelResponse([{ name: 'finish_report', input: { sections: [] } }]));
+    const options = input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke });
+    const result = await runInvestigation(options);
+    expect(result.content).not.toContain('Customer received the tickets');
+    expect(options.events.filter(event => event.type === 'blocked')).toHaveLength(1);
+    expect(result.metrics.modelCalls).toBe(2);
+  });
+  it('rejects unknown IDs and bounds correction attempts at three calls', async () => {
+    const invoke = vi.fn(async () => modelResponse([{ name: 'finish_report', input: { sections: [{ section: 'summary', factIds: ['F999'] }] } }]));
+    await expect(runInvestigation(input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke }))).rejects.toMatchObject({ code: 'model_limit' });
+    expect(invoke).toHaveBeenCalledTimes(3);
+  });
+  it('does not expose retrieval or action tools to the model', async () => {
+    const invoke = vi.fn(async () => modelResponse([{ name: 'get_evidence', input: { section: 'summary', caseId: 'other' } }]));
+    await expect(runInvestigation(input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke }))).rejects.toMatchObject({ code: 'tool_scope_denied' });
+  });
+  it('does not publish plain assistant prose as a report', async () => {
+    const invoke = vi.fn(async () => ({ $metadata: {}, stopReason: 'end_turn' as const, usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 }, metrics: { latencyMs: 1 }, output: { message: { role: 'assistant' as const, content: [{ text: 'The merchant should win.' }] } } }));
+    await expect(runInvestigation(input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke }))).rejects.toMatchObject({ code: 'model_limit' });
+    expect(invoke).toHaveBeenCalledTimes(3);
+  });
+  it('never silently substitutes sample results when AWS fails', async () => {
+    const invoke = vi.fn(async () => { throw Object.assign(new Error('Sensitive upstream detail'), { name: 'AccessDeniedException' }); });
+    await expect(runInvestigation(input({ mode: 'bedrock', modelId: 'test-model', invokeModel: invoke }))).rejects.toMatchObject({ code: 'bedrock_failed' });
+  });
+  it('blocks further work after cancellation during source retrieval', async () => {
+    const controller = new AbortController(); const read = vi.fn(async (section: EvidenceSection) => { controller.abort(); return envelope(section); });
+    const options = input({ signal: controller.signal, readEvidence: read });
+    await expect(runInvestigation(options)).rejects.toMatchObject({ code: 'stopped' });
+    expect(read).toHaveBeenCalledTimes(1); expect(options.events.some(event => event.type === 'tool_completed')).toBe(false);
+  });
+  it('blocks publication after cancellation during the model call', async () => {
+    const controller = new AbortController();
+    const invoke = vi.fn(async () => { controller.abort(); return modelResponse([{ name: 'finish_report', input: { sections: [] } }]); });
+    const options = input({ mode: 'bedrock', modelId: 'test-model', signal: controller.signal, invokeModel: invoke });
+    await expect(runInvestigation(options)).rejects.toMatchObject({ code: 'stopped' });
+    expect(options.events.some(event => event.type === 'completed')).toBe(false);
+  });
   it('awaits persisted event callbacks before proceeding', async () => {
     const events: string[] = [];
     await runInvestigation(input({ onEvent: async event => { await Promise.resolve(); events.push(event.type); }, readEvidence: async section => { expect(events.at(-1)).toBe('tool_requested'); return envelope(section); } }));
     expect(events.at(-1)).toBe('completed');
   });
-
-  it('bounds even repeated cached or invalid model tool calls', async () => {
-    const invoke = vi.fn(async () => modelResponse(Array.from({length:17}, () => ({name:'get_evidence',input:{section:'summary'}}))));
-    await expect(runInvestigation(input({mode:'bedrock',modelId:'test-model',invokeModel:invoke}))).rejects.toMatchObject({code:'tool_limit'});
+  it('rejects cross-section source ID reuse', async () => {
+    await expect(runInvestigation(input({ readEvidence: async section => { const value = envelope(section); for (const record of value.records) record.id = 'duplicate'; return value; } }))).rejects.toMatchObject({ code: 'duplicate_evidence' });
   });
 });
 

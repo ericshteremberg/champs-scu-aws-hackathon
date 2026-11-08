@@ -1,0 +1,16 @@
+SOURCE TRANSCRIPT — NOT AN ORIGINAL SCREENSHOT
+Ticket recovery completed
+Evidence ID: case_atm_1042:recovery
+Recorded at: 2026-11-02T18:10:41Z
+Reference: Synthetic: recovery_demo_1042
+
+An order-linked recovery flow completed. This records account access, not physical event attendance.
+
+STRUCTURED SOURCE FIELDS
+{
+  "orderRef": "ATM-1042",
+  "recoveryCompleted": true,
+  "recoveredTicketCount": 2
+}
+
+SOURCE QUALIFICATIONS

@@ -1,0 +1,20 @@
+SOURCE TRANSCRIPT — NOT AN ORIGINAL SCREENSHOT
+Ticket-link SMS marked delivered
+Evidence ID: case_atm_1042:sms
+Recorded at: 2026-11-02T18:04:02Z
+Reference: Synthetic: sms_demo_1042
+
+The SMS provider returned delivered for the order-linked message. Reading is not established.
+
+STRUCTURED SOURCE FIELDS
+{
+  "channel": "sms",
+  "providerStatus": "delivered",
+  "delivered": true,
+  "read": null,
+  "errorCode": null,
+  "orderRef": "ATM-1042"
+}
+
+SOURCE QUALIFICATIONS
+Email acceptance does not prove inbox delivery. An SMS delivery status does not prove the message was read.

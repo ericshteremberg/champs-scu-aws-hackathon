@@ -1,5 +1,7 @@
 # Causality evaluation results
 
+Latest: [the verified fact inventory evaluation](inventory-results.md) replaces model-written factual prose with code-controlled claims/citations and an ID-only model layout. The observations below remain historical baseline and prompt-only comparisons. See [the implementation](../FACT_INVENTORY.md) for outgoing selection versus full internal review.
+
 Owner: teammate 3 (`codex/demo-evaluation`). Last edited: 2026-11-07.
 
 This file separates three things: what the fixtures say (written before looking at any model output), what each run produced, and what a reviewer decided. Every input is a fictional fixture from [`lib/ticket-demo.ts`](../../lib/ticket-demo.ts). None of it is ATMSPHR customer evidence, and nothing here measures savings, accuracy across real cases, or dispute outcomes.

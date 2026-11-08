@@ -114,7 +114,7 @@ function classify(row: Evidence): EvidenceSection {
   if (/ticket.*issu|issu.*ticket/i.test(text)) return 'tickets';
   return 'order';
 }
-export function localEvidence(item: CaseDoc, records: Evidence[], section: EvidenceSection): EvidenceEnvelope {
+export function localEvidence(item: Pick<CaseDoc, 'id' | 'source'>, records: Evidence[], section: EvidenceSection): EvidenceEnvelope {
   const selected = records.filter(record => classify(record) === section);
   const limitations = [...new Set(selected.flatMap(record => record.provenance?.limitations || []))];
   for (const record of selected) if (record.fileName && !record.content) limitations.push(`The attachment ${record.fileName} requires manual review. Its contents have not been extracted.`);

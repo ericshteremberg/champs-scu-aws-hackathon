@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "caseId": "case_atm_1042",
+  "appealPolicy": "challenge_all",
+  "preparedAt": "2026-11-08T04:35:42.630Z",
+  "synthetic": true,
+  "status": "review_required",
+  "submitted": false,
+  "assessment": "supported",
+  "selectedFactIds": [
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6",
+    "F7",
+    "F9",
+    "F10",
+    "F13"
+  ],
+  "selectedEvidenceIds": [
+    "case_atm_1042:payment",
+    "case_atm_1042:order",
+    "case_atm_1042:ticket-1",
+    "case_atm_1042:ticket-2",
+    "case_atm_1042:sms",
+    "case_atm_1042:recovery",
+    "case_atm_1042:support-3"
+  ],
+  "excludedEvidenceIds": [
+    "case_atm_1042:dispute",
+    "case_atm_1042:email",
+    "case_atm_1042:support-1",
+    "case_atm_1042:support-2"
+  ],
+  "modelCalls": 0,
+  "responseSha256": "2d845fd8e2dcbcd068ed121a06fb6225a0d498924ea77b4fbf21d2b03a42b236",
+  "exhibits": [
+    {
+      "evidenceId": "case_atm_1042:payment",
+      "reference": "Synthetic: pi_demo_atm_1042",
+      "text": "submission/exhibits/001-source.txt",
+      "textSha256": "fe4f0787658ef726d9b4a835ea81c95b7093735d87d0128bf41377ff484b1dfb",
+      "kind": "source_transcript",
+      "screenshot": "submission/exhibits/001-transcript.png",
+      "screenshotKind": "rendered_transcript_not_original",
+      "screenshotSha256": "b2e6e3519da0e39065631d21a2a2fd2a9a534fa8da6afed094097b97886a3b99"
+    },
+    {
+      "evidenceId": "case_atm_1042:order",
+      "reference": "Synthetic: order_demo_1042",
+      "text": "submission/exhibits/002-source.txt",
+      "textSha256": "38ee52f49abf020bbd69ea2dd060d4e514ad8391237bf25e25dc59f2e487f75d",
+      "kind": "source_transcript",
+      "screenshot": "submission/exhibits/002-transcript.png",
+      "screenshotKind": "rendered_transcript_not_original",
+      "screenshotSha256": "4ac37f5cd1812103466201ab23f33eaf03192795f060de630de15947574c3abe"
+    },
+    {
+      "evidenceId": "case_atm_1042:ticket-1",
+      "reference": "Synthetic: ticket_demo_1042_a",
+      "text": "submission/exhibits/003-source.txt",
+      "textSha256": "c12011b7c2a572cfcb7a7eee5fc16323a214c3a726ce97cb13d0c48757064c96",
+      "kind": "source_transcript",
+      "screenshot": "submission/exhibits/003-transcript.png",
+      "screenshotKind": "rendered_transcript_not_original",
+      "screenshotSha256": "f340bfbfbef7b662965496cf7707faac0644b7bef54d6df6af5b11e6fc1ac5dc"
+    },
+    {
+      "evidenceId": "case_atm_1042:ticket-2",
+      "reference": "Synthetic: ticket_demo_1042_b",
+      "text": "submission/exhibits/004-source.txt",
+      "textSha256": "6e858663f15459b8475649f19000f89e97079f7900c14bdb2e872af9f22b0527",
+      "kind": "source_transcript",
+      "screenshot": "submission/exhibits/004-transcript.png",
+      "screenshotKind": "rendered_transcript_not_original",
+      "screenshotSha256": "2d70e527554f186e4bdc58e976416a2f694328dbc892525f2cc329151da2413b"
+    },
+    {
+      "evidenceId": "case_atm_1042:sms",
+      "reference": "Synthetic: sms_demo_1042",
+      "text": "submission/exhibits/005-source.txt",
+      "textSha256": "ca3ce450fe4c094776a144ff42a5493645611f7fcf5998e541a66f88c2a14307",
+      "kind": "source_transcript",
+      "screenshot": "submission/exhibits/005-transcript.png",
+      "screenshotKind": "rendered_transcript_not_original",
+      "screenshotSha256": "2ef703ee2c36e72a4a13255ee28bc5ad4eeac85dca456728fbded2101e999b52"
+    },
+    {
+      "evidenceId": "case_atm_1042:recovery",
+      "reference": "Synthetic: recovery_demo_1042",
+      "text": "submission/exhibits/006-source.txt",
+      "textSha256": "e7b53b5a82775ddfc99749d5f86590854f9fd9941578f58acc631ca10778b9af",
+      "kind": "source_transcript",
+      "screenshot": "submission/exhibits/006-transcript.png",
+      "screenshotKind": "rendered_transcript_not_original",
+      "screenshotSha256": "19639e87eea4193daffb740715dcf76735b3d16cbc20b750008f689d9ac2a342"
+    },
+    {
+      "evidenceId": "case_atm_1042:support-3",
+      "reference": "Synthetic: thread_demo_1042:message_3",
+      "text": "submission/exhibits/007-source.txt",
+      "textSha256": "4fbe892122ea08f023d68fd0fb53a77eec0cf7de39200e95c2d83601c5948c45",
+      "kind": "source_transcript",
+      "screenshot": "submission/exhibits/007-transcript.png",
+      "screenshotKind": "rendered_transcript_not_original",
+      "screenshotSha256": "4cb8de8b17a8cfab37c43dfac4e9d0547b720760dcf964e86a5b4de056352d13"
+    }
+  ],
+  "screenshotsRequested": true,
+  "reviewNotes": [
+    "Submission contains only code-selected supporting facts and their necessary qualifications.",
+    "Internal review contains the full inventory, counterevidence, gaps and original source metadata; it is not an outgoing submission document.",
+    "Imported approval metadata and local file provenance are not independently authenticated. The rebuilt packet requires review.",
+    "Rendered transcripts are not original screenshots. Original files are included only when supplied explicitly and byte-validated. No outcome is guaranteed."
+  ]
+}

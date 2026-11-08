@@ -109,6 +109,7 @@ test("a sample investigation preserves source inspection and revision-bound revi
     page.getByRole("button", { name: "Approve draft", exact: true }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.getByRole("note").filter({ hasText: "Human-edited response" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Approve draft", exact: true }),
   ).toBeEnabled();

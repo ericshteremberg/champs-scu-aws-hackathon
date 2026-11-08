@@ -1,5 +1,7 @@
 # Prompt revision: live Bedrock rerun
 
+Historical checkpoint: model-written prose in this evaluation has since been replaced by [the verified inventory pipeline](inventory-results.md). The raw runs below are retained; they do not describe the current model output contract.
+
 Evaluated November 7, 2026 Pacific. Mode: **live Bedrock**, model `us.amazon.nova-2-lite-v1:0`, region `us-east-1`. All inputs are the three fictional ticket fixtures. Six investigations completed: two per case.
 
 ## Result

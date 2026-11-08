@@ -75,6 +75,17 @@ describe('AWS durable investigations', () => {
     expect((await getItem<CaseDoc>(wid, keys.case(caseId)))?.data.activeRunId).toBeUndefined();
   });
 
+  it('labels saved human changes separately from code-generated fact claims', async () => {
+    const run = await startInvestigation(user, caseId, 'sample'); await job(run.id);
+    const previous = (await draft())!.data;
+    expect(previous.analysis?.claimControl).toBe('code_generated');
+    await executeAction(user, { action: 'saveDraft', caseId, revision: previous.revision, content: `${previous.content}\nReviewer note: inspected the sources.` });
+    const changed = (await draft())!.data;
+    expect(changed.analysis?.claimControl).toBe('human_edited');
+    expect(changed.analysis?.factInventory).toEqual(previous.analysis?.factInventory);
+    expect(changed.status).toBe('draft'); expect(changed.approvedAt).toBeUndefined();
+  });
+
   it('permits only one active run per case and scopes polling and cancellation to the owner', async () => {
     const run = await startInvestigation(user, caseId, 'sample');
     await expect(startInvestigation(user, caseId, 'sample')).rejects.toMatchObject({ code: 'run_active' });

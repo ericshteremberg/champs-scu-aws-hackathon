@@ -1,5 +1,7 @@
 # Causality
 
+The report engine now uses a [code-controlled fact inventory and CLI evidence packets](docs/FACT_INVENTORY.md). See the [latest inventory evaluation](docs/evaluation/inventory-results.md) and [requested backend review](docs/handoffs/05-fact-inventory-review.md). The merchant evidence API remains the source boundary; the model arranges eligible fact IDs rather than writing factual claims.
+
 Causality investigates payment disputes using the records behind a transaction: tickets, delivery attempts, support messages, payment history, and relevant policies. The operator reviews sourced findings, edits a response, approves its exact revision, and exports or archives the packet.
 
 The hackathon deployment uses an **AWS backend and database**. Cloudflare Workers serves the existing Causality interface and an authenticated bridge. Private AWS Lambda runs the application, DynamoDB stores its records, S3 stores attachments and approved archives, and Amazon Bedrock performs the investigation.

@@ -2561,6 +2561,7 @@ function CaseDetail({
         amount: current.amount,
         currency: current.currency,
         orderRef: current.orderRef,
+        reason: current.reason,
       },
       draft: current.draft,
       findings: current.findings,
@@ -2975,6 +2976,7 @@ function CaseDetail({
                   </span>
                 </div>
                 <div className="cw-analysis-next">
+                  {analysis.factInventory && <p><strong>Challenge requested for every case.</strong> Evidence strength is a separate assessment. The outgoing response uses selected supporting facts; the internal inventory retains excluded records and gaps.</p>}
                   <strong>Recommended next step</strong>
                   <p>{analysis.recommendation}</p>
                 </div>
@@ -3033,6 +3035,7 @@ function CaseDetail({
             ) : null}
             {current.draft ? (
               <>
+                {analysis?.factInventory && <p role="note">{analysis.claimControl === "human_edited" ? "Human-edited response: the fact inventory does not verify changes to the generated text." : "Factual wording and citations are supplied by code. The model arranges eligible facts only."}</p>}
                 <Field
                   label="Merchant response draft"
                   hint="Edits are saved only when you choose Save changes. Approval and export apply to this exact saved version."
