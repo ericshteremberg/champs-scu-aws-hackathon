@@ -4,7 +4,7 @@ Branch: `codex/atmsphr-evidence-api`
 
 Starting application revision: `e78d7a1322fea09ed64ee2611c966ea9f662723f`
 
-Deliver a merchant-owned endpoint returning evidence for one authorized ticket dispute. Causality's AWS backend and merchant API client exist; ATMSPHR's endpoint and production connection remain unimplemented.
+Deliver a merchant-owned endpoint returning evidence for one authorized ticket dispute. The service is now implemented and tested under `integrations/atmsphr/`, but deployment and the production connection remain outstanding. See [implementation status and next steps](../ATMSPHR_NEXT_STEPS.md) before using the original milestones below.
 
 Read [team coordination](README.md), [the API contract](../EVIDENCE_API.md), `lib/investigation/merchant.ts`, and the import/summary checks in `aws/investigations.ts` before implementing anything. The schemas in the code determine what the running consumer accepts.
 

@@ -79,6 +79,8 @@ Use ATM-1044 to show that missing delivery history does not justify claiming rec
 
 ## Connect the first ATMSPHR case
 
+The merchant evidence service is implemented locally with verified schema mappings and tests, but is not deployed or connected. See [the current implementation handoff and next steps](ATMSPHR_NEXT_STEPS.md).
+
 Eric needs to deploy and verify the merchant-owned endpoint described in [EVIDENCE_API.md](EVIDENCE_API.md). Causality does not deploy it automatically or obtain database credentials.
 
 Verify the actual organizer, Stripe account and mode, payment, order, and selected support thread. Do not join solely on an email address. Configure `MERCHANT_EVIDENCE_URL`, `MERCHANT_EVIDENCE_TOKEN`, and `MERCHANT_WORKSPACE_ID` on Lambda. Import the approved external case ID, inspect the verified summary mapping, then investigate and review the result.
