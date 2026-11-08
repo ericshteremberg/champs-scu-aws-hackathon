@@ -1,6 +1,6 @@
 # Causality
 
-A desktop chargeback investigation workspace, built from the Causality Paper design. The landing page pairs the Enterprise product story with rounded surfaces, a subtle Paper shader, and a receipt-filled wordmark footer.
+A desktop chargeback investigation workspace, built from the Causality Paper design. The landing page pairs the Enterprise product story with rounded surfaces, an original animated evidence illustration, and a receipt-filled wordmark footer.
 
 ## What works
 
