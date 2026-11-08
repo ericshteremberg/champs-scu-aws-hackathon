@@ -14,6 +14,11 @@
       "Type": "String",
       "Default": "",
       "Description": "Existing Secrets Manager app registration, never a client secret value."
+    },
+    "StripeOAuthSecretArn": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Existing Secrets Manager Stripe app registration, never a developer key value."
     }
   },
   "Resources": {
@@ -265,6 +270,29 @@
                 "Ref": "AWS::NoValue"
               }
             ]
+          },
+          {
+            "Fn::If": [
+              "HasStripeOAuth",
+              {
+                "PolicyName": "StripeOAuthRegistration",
+                "PolicyDocument": {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Action": "secretsmanager:GetSecretValue",
+                      "Resource": {
+                        "Ref": "StripeOAuthSecretArn"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
           }
         ]
       }
@@ -307,6 +335,9 @@
             },
             "CAUSALITY_FRONTEND_ORIGIN": {
               "Ref": "FrontendOrigin"
+            },
+            "STRIPE_OAUTH_SECRET_ARN": {
+              "Ref": "StripeOAuthSecretArn"
             }
           }
         }
@@ -402,6 +433,18 @@
           "Fn::Equals": [
             {
               "Ref": "SupabaseOAuthSecretArn"
+            },
+            ""
+          ]
+        }
+      ]
+    },
+    "HasStripeOAuth": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "StripeOAuthSecretArn"
             },
             ""
           ]

@@ -13,6 +13,8 @@ if(existing && existing.StackStatus?.includes('IN_PROGRESS'))throw new Error('Th
 const params={StackName:stackName,TemplateBody:readFileSync('infra/aws-backend.json','utf8'),Capabilities:['CAPABILITY_IAM'],Parameters:[{ParameterKey:'FrontendOrigin',...(process.env.CAUSALITY_FRONTEND_ORIGIN?{ParameterValue:process.env.CAUSALITY_FRONTEND_ORIGIN}:existing?{UsePreviousValue:true}:{ParameterValue:'https://not-configured.example.invalid'})},{ParameterKey:'BedrockModelId',ParameterValue:process.env.BEDROCK_MODEL_ID || 'us.amazon.nova-2-lite-v1:0'}]};
 const providerRegistration=JSON.parse(readFileSync('integrations/oauth/supabase-registration.json','utf8'));
 params.Parameters.push({ParameterKey:'SupabaseOAuthSecretArn',ParameterValue:process.env.SUPABASE_OAUTH_SECRET_ARN || providerRegistration.secretArn});
+const stripeRegistration=JSON.parse(readFileSync('integrations/oauth/stripe-secret-location.json','utf8'));
+params.Parameters.push({ParameterKey:'StripeOAuthSecretArn',ParameterValue:process.env.STRIPE_OAUTH_SECRET_ARN || stripeRegistration.arn});
 let changed=true;
 try{await cloudformation.send(existing?new UpdateStackCommand(params):new CreateStackCommand(params));}catch(error){if(error.name==='ValidationError' && error.message.includes('No updates'))changed=false;else throw error;}
 let stack,lastStatus='';

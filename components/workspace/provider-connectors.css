@@ -5,6 +5,7 @@
 .cw-provider-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 24px; }
 .cw-provider-card { border: 1px solid var(--cw-border, #dededb); border-radius: 12px; padding: 20px; min-width: 0; }
 .cw-provider-card h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 0; }
+.cw-provider-card strong { overflow-wrap: anywhere; }
 .cw-provider-card > .cw-button { margin-top: 16px; }
 .cw-provider-note { font-size: 13px; color: var(--cw-muted, #62625c); }
 .cw-provider-project, .cw-provider-disconnect { display: grid; gap: 12px; margin-top: 16px; }

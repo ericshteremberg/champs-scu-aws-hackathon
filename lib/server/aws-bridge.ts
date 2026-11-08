@@ -21,9 +21,10 @@ export async function proxyAwsApi(request: Request, env: AwsBridgeEnvironment): 
  }
  let body:unknown;
  if(text){try{body=JSON.parse(text);}catch{return reply({error:'Send a valid JSON request.'},400);}}
- const oauthStart=url.pathname==='/api/providers/supabase/start' && request.method==='POST';
- const oauthCallback=url.pathname==='/api/providers/supabase/callback' && request.method==='GET';
- const cookieName='__Host-causality-supabase';
+ const oauthRoute=/^\/api\/providers\/(supabase|stripe)\/(start|callback)$/.exec(url.pathname);
+ const oauthStart=oauthRoute?.[2]==='start' && request.method==='POST';
+ const oauthCallback=oauthRoute?.[2]==='callback' && request.method==='GET';
+ const cookieName=`__Host-causality-${oauthRoute?.[1] || 'unused'}`;
  const cookie=request.headers.get('cookie')?.split(';').map(part=>part.trim()).find(part=>part.startsWith(`${cookieName}=`))?.slice(cookieName.length+1);
  const oauthBinding=oauthStart?Array.from(crypto.getRandomValues(new Uint8Array(32)),value=>value.toString(16).padStart(2,'0')).join(''):oauthCallback && /^[a-f0-9]{64}$/.test(cookie||'')?cookie:undefined;
  const finish=(response:Response)=>{

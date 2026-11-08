@@ -4,12 +4,17 @@ import { useEffect, useState } from 'react';
 import { Database, Link2, LoaderCircle, ShieldCheck, Unplug } from 'lucide-react';
 import type { ProviderStatus, SchemaTable, SupabaseConnection, SupabaseProject } from '../../lib/providers/types';
 import './provider-connectors.css';
+import { StripeAccountConnector } from './stripe-provider';
 
 const outcomes: Record<string, string> = {
   authorized: 'Supabase authorized. Choose the project you want to connect.',
   denied: 'Authorization was canceled. You can connect when you are ready.',
   invalid_state: 'This authorization attempt expired or belongs to another browser. Start again here.',
   failed: 'Authorization could not be completed. Start again or contact the workspace operator.',
+  stripe_authorized: 'Stripe authorized. Confirm the account shown below, then verify read access.',
+  stripe_denied: 'Stripe authorization was canceled. You can connect when you are ready.',
+  stripe_invalid_state: 'This Stripe authorization attempt expired or belongs to another browser. Start again here.',
+  stripe_failed: 'Stripe authorization could not be completed. Start again. If Causality is already installed in Stripe, uninstall it before reconnecting.',
 };
 
 async function api<T>(path: string, body?: unknown): Promise<T> {
@@ -81,7 +86,7 @@ export function ProviderConnectors() {
   const approve = () => run('approve', async () => {
     const result = await api<{ connection: SupabaseConnection }>('/api/providers/supabase', { action: 'approve_tables', tables });
     saveConnection(result.connection); setSchema(null);
-    setNotice('Evidence scope saved. Live imports will be available after Stripe authorization and payment-to-order mapping are connected.');
+    setNotice('Evidence scope saved. Live imports will be available after verified payment-to-order mapping is connected.');
   });
   const disconnect = () => run('disconnect', async () => {
     const result = await api<{ connection: SupabaseConnection | null }>('/api/providers/supabase', { action: 'disconnect' });
@@ -109,7 +114,7 @@ export function ProviderConnectors() {
           {confirmDisconnect ? <div className="cw-provider-disconnect"><p>Stop Supabase access and clear the selected project and scope?</p><div className="cw-actions"><button className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(false)}>Keep connection</button><button className="cw-button danger" disabled={!!busy} onClick={() => void disconnect()}>Confirm disconnect Supabase</button></div></div> : <button className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(true)}><Unplug size={16} />Disconnect Supabase</button>}
         </>}
       </article>
-      <article className="cw-provider-card" aria-label="Stripe account authorization"><h3>Stripe <span className="cw-pill">Coming next</span></h3><p>Connect disputes and payments to the matching orders in your business data.</p><p className="cw-provider-note">Stripe authorization is not available yet. You can prepare your Supabase connection now.</p><button className="cw-button" disabled>Connect Stripe</button></article>
+      <StripeAccountConnector status={status?.stripe} onChange={connection => setStatus(current => current ? { ...current, stripe: { ...current.stripe, connection } } : current)} />
     </div>
   </section>;
 }

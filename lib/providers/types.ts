@@ -9,5 +9,14 @@ export type SupabaseConnection = {
 };
 export type ProviderStatus = {
   supabase: { configured: boolean; connection: SupabaseConnection | null };
-  stripe: { configured: false; reason: string };
+  stripe: { configured: boolean; connection?: StripeProviderConnection | null; reason?: string };
+};
+export type StripeProviderConnection = {
+  status: 'disconnected' | 'authorized' | 'reconnect_required';
+  updatedAt: string;
+  accountId?: string;
+  mode?: 'live' | 'test';
+  lastVerifiedAt?: string;
+  chargeReadVerified?: boolean;
+  uninstallRequired?: boolean;
 };

@@ -39,4 +39,13 @@ describe('private AWS API bridge',()=>{
   const value=request('/api/providers/supabase/callback?oauthBinding='+ 'a'.repeat(64));value.headers.set('x-oauth-binding','a'.repeat(64));
   await proxyAwsApi(value,env);expect(JSON.parse(mocks.send.mock.calls[0][1].body).oauthBinding).toBeUndefined();
  });
+ it('keeps Stripe and Supabase browser bindings separate',async()=>{
+  const started=await proxyAwsApi(request('/api/providers/stripe/start',{}),env);
+  expect(started.headers.get('Set-Cookie')).toContain('__Host-causality-stripe=');
+  const callback=request('/api/providers/stripe/callback?state=synthetic');callback.headers.set('Cookie','__Host-causality-supabase='+ 'a'.repeat(64));
+  await proxyAwsApi(callback,env);expect(JSON.parse(mocks.send.mock.calls.at(-1)![1].body).oauthBinding).toBeUndefined();
+  callback.headers.set('Cookie','__Host-causality-stripe='+ 'b'.repeat(64));
+  mocks.send.mockResolvedValue(Response.json({status:302,redirect:origin+'/workspace?view=integrations&provider_result=stripe_denied'}));
+  const finished=await proxyAwsApi(callback,env);expect(JSON.parse(mocks.send.mock.calls.at(-1)![1].body).oauthBinding).toBe('b'.repeat(64));expect(finished.headers.get('Set-Cookie')).toContain('__Host-causality-stripe=;');
+ });
 });

@@ -5,6 +5,7 @@ import { ApiError, type Stored, type StoreChange, type TrustedUser } from './typ
 import { auditChange, requireWorkspace } from './workspace.ts';
 import { exchangeSupabaseToken, fetchSupabaseProjects, fetchSupabaseSchema, frontendOrigin, loadSupabaseApp, projectRef, revokeSupabaseToken, tableSelection, type SupabaseTokens } from './supabase-api.ts';
 import type { ProviderStatus, SchemaTable, SupabaseConnection } from '../lib/providers/types.ts';
+import { stripeProviderStatus } from './stripe-provider.ts';
 
 const connectionKey = 'provider#supabase';
 const tokenKey = 'provider-token#supabase';
@@ -31,7 +32,8 @@ function publicConnection(row: Stored<SupabaseConnection> | null): SupabaseConne
 
 export async function providerStatus(user: TrustedUser): Promise<ProviderStatus> {
   const wid = (await requireWorkspace(user)).data.id;
-  return { supabase: { configured: !!process.env.SUPABASE_OAUTH_SECRET_ARN, connection: publicConnection(await getItem<SupabaseConnection>(wid, connectionKey)) }, stripe: { configured: false, reason: 'Stripe authorization is not available yet. Developer registration is pending.' } };
+  const [supabase, stripe] = await Promise.all([getItem<SupabaseConnection>(wid, connectionKey), stripeProviderStatus(wid)]);
+  return { supabase: { configured: !!process.env.SUPABASE_OAUTH_SECRET_ARN, connection: publicConnection(supabase) }, stripe };
 }
 
 export async function startSupabase(user: TrustedUser, binding: string | undefined) {
