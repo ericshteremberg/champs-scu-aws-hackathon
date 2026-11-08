@@ -33,6 +33,10 @@
     "EVIDENCE_BUCKET_ORIGIN": "https://causality-hackathon-dev-evidencebucket-evmipvnuxndt.s3.us-east-1.amazonaws.com"
   },
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false
+    }
   }
 }

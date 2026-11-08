@@ -11,6 +11,8 @@ let existing;
 try{existing=(await cloudformation.send(new DescribeStacksCommand({StackName:stackName}))).Stacks?.[0];}catch(error){if(error.name!=='ValidationError')throw error;}
 if(existing && existing.StackStatus?.includes('IN_PROGRESS'))throw new Error('The AWS stack is already updating. Wait for it to finish.');
 const params={StackName:stackName,TemplateBody:readFileSync('infra/aws-backend.json','utf8'),Capabilities:['CAPABILITY_IAM'],Parameters:[{ParameterKey:'FrontendOrigin',...(process.env.CAUSALITY_FRONTEND_ORIGIN?{ParameterValue:process.env.CAUSALITY_FRONTEND_ORIGIN}:existing?{UsePreviousValue:true}:{ParameterValue:'https://not-configured.example.invalid'})},{ParameterKey:'BedrockModelId',ParameterValue:process.env.BEDROCK_MODEL_ID || 'us.amazon.nova-2-lite-v1:0'}]};
+const providerRegistration=JSON.parse(readFileSync('integrations/oauth/supabase-registration.json','utf8'));
+params.Parameters.push({ParameterKey:'SupabaseOAuthSecretArn',ParameterValue:process.env.SUPABASE_OAUTH_SECRET_ARN || providerRegistration.secretArn});
 let changed=true;
 try{await cloudformation.send(existing?new UpdateStackCommand(params):new CreateStackCommand(params));}catch(error){if(error.name==='ValidationError' && error.message.includes('No updates'))changed=false;else throw error;}
 let stack,lastStatus='';

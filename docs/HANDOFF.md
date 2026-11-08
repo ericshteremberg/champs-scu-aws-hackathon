@@ -12,7 +12,7 @@ The deployment has no Cloudflare database or R2 binding. The temporary developme
 - Direct AWS acceptance passed: six DynamoDB samples and owner isolation, all three background ticket outcomes, private S3 uploads/downloads, cancellation, concurrent approval preservation, and approved archives.
 - Published browser acceptance passed with `npm run test:dev:smoke`: authenticated frontend and signed Lambda bridge, real Bedrock investigation, approval/export, S3 archive, browser S3 upload, and private original download, with no JavaScript errors.
 - Real ATMSPHR evidence, production Stripe, refund actions, and customer messaging are not connected.
-- Customer Stripe/Supabase OAuth is not implemented. [Eric's registration handoff](handoffs/05-eric-oauth-registration.md) defines the developer app setup, planned callbacks, private credential storage and return to Aiden. These are preparation steps, not a verified customer connection.
+- Supabase customer authorization, project selection, schema metadata review and table/column approval are implemented. [OAuth connector status](OAUTH_CONNECTORS.md) describes the AWS secret, state/token lifecycle, routes, checks and remaining work. Real customer consent and metadata access still need Eric's test. Stripe developer registration remains blocked; OAuth-based dispute import and payment-to-order mapping are not implemented.
 
 All six bundled cases are synthetic. The three ticket cases demonstrate receipt acknowledgement, delivery failures, and insufficient evidence. **Sample investigation** is deterministic. **AWS investigation** calls Bedrock. AWS failures remain errors and never silently become sample results.
 

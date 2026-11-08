@@ -1,0 +1,17 @@
+.cw-provider-panel { margin-bottom: 24px; padding: 24px; }
+.cw-provider-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.cw-provider-heading h2 { margin: 0 0 8px; }
+.cw-provider-heading p, .cw-provider-card p { line-height: 1.6; }
+.cw-provider-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 24px; }
+.cw-provider-card { border: 1px solid var(--cw-border, #dededb); border-radius: 12px; padding: 20px; min-width: 0; }
+.cw-provider-card h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 0; }
+.cw-provider-card > .cw-button { margin-top: 16px; }
+.cw-provider-note { font-size: 13px; color: var(--cw-muted, #62625c); }
+.cw-provider-project, .cw-provider-disconnect { display: grid; gap: 12px; margin-top: 16px; }
+.cw-provider-scope { min-width: 0; margin: 20px 0; border: 1px solid var(--cw-border, #dededb); border-radius: 8px; padding: 12px; }
+.cw-provider-scope details { border-bottom: 1px solid var(--cw-border, #dededb); padding: 10px 0; }
+.cw-provider-scope summary { cursor: pointer; overflow-wrap: anywhere; }
+.cw-provider-scope > .cw-button { margin-top: 16px; }
+.cw-provider-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px 0; }
+.cw-provider-columns label { display: flex; align-items: start; gap: 8px; font-size: 13px; overflow-wrap: anywhere; }
+@media (max-width: 800px) { .cw-provider-grid { grid-template-columns: 1fr; } .cw-provider-panel, .cw-provider-card { padding: 16px; } .cw-provider-columns { grid-template-columns: 1fr; } }

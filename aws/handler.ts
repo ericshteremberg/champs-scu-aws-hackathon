@@ -6,6 +6,7 @@ import { prepareUpload, completeUpload, getDownload, archiveApprovedCase } from 
 import { configuration, listStripeIntegration, connectStripe, disconnectStripe, syncStripe, submitStripe, handleStripeWebhook } from './stripe.ts';
 import { listEvidenceConnections, executeConnectorAction, getConnectorInstallation } from './connectors.ts';
 import { listManagedConnections, executeManagedConnectorAction, parseLiveImport } from './managed-connectors.ts';
+import { providerStatus, startSupabase, finishSupabase, supabaseAction } from './providers.ts';
 
 const userSchema=z.object({userId:z.string().min(1).max(200),email:z.string().max(320),displayName:z.string().max(320),fullName:z.string().max(320).nullable().optional()});
 const id=z.string().min(1).max(200);
@@ -17,7 +18,7 @@ const investigationAction=z.discriminatedUnion('action',[
 const archiveSchema=z.object({caseId:id,revision:z.number().int().positive()}).strict();
 const finalizeSchema=z.object({uploadId:id}).strict();
 const submissionSchema=z.object({caseId:id,confirmed:z.literal(true),draftRevision:z.number().int().positive()}).strict();
-const apiSchema=z.object({kind:z.literal('api'),method:z.enum(['GET','POST']),path:z.string().max(1024),user:userSchema.optional(),body:z.unknown().optional(),rawBody:z.string().max(65536).optional(),stripeSignature:z.string().max(4096).optional()}).strict();
+const apiSchema=z.object({kind:z.literal('api'),method:z.enum(['GET','POST']),path:z.string().max(8192),user:userSchema.optional(),body:z.unknown().optional(),rawBody:z.string().max(65536).optional(),stripeSignature:z.string().max(4096).optional(),oauthBinding:z.string().regex(/^[a-f0-9]{64}$/).optional()}).strict();
 const jobSchema=z.object({kind:z.literal('investigation'),workspaceId:id,caseId:id,runId:id}).strict();
 function parse<T>(schema:z.ZodType<T>,input:unknown):T {const value=schema.safeParse(input);if(!value.success)throw new ApiError(400,'The request does not match the API contract.','invalid_request');return value.data;}
 
@@ -33,6 +34,10 @@ async function route(raw:unknown) {
   if(path==='/api/stripe/webhook' && event.method==='POST')return {status:200,body:await handleStripeWebhook(event.rawBody||'',event.stripeSignature||'')};
   if(!event.user)throw new ApiError(401,'Sign in to continue.','unauthenticated');
   const user=event.user as TrustedUser;
+  if(path==='/api/providers' && event.method==='GET')return {status:200,body:await providerStatus(user)};
+  if(path==='/api/providers/supabase/start' && event.method==='POST')return {status:200,body:await startSupabase(user,event.oauthBinding)};
+  if(path==='/api/providers/supabase/callback' && event.method==='GET')return {status:302,redirect:await finishSupabase(user,url,event.oauthBinding)};
+  if(path==='/api/providers/supabase' && event.method==='POST')return {status:200,body:await supabaseAction(user,event.body)};
   if(path==='/api/runtime' && event.method==='GET')return {status:200,body:{storage:'aws',uploads:'presigned'}};
   if(path==='/api/workspace')return {status:200,body:event.method==='GET'?await getWorkspaceState(user):await executeAction(user,event.body)};
   if(path==='/api/connectors/live'){

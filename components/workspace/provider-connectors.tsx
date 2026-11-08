@@ -1,0 +1,115 @@
+"use client";
+
+import { useEffect, useState } from 'react';
+import { Database, Link2, LoaderCircle, ShieldCheck, Unplug } from 'lucide-react';
+import type { ProviderStatus, SchemaTable, SupabaseConnection, SupabaseProject } from '../../lib/providers/types';
+import './provider-connectors.css';
+
+const outcomes: Record<string, string> = {
+  authorized: 'Supabase authorized. Choose the project you want to connect.',
+  denied: 'Authorization was canceled. You can connect when you are ready.',
+  invalid_state: 'This authorization attempt expired or belongs to another browser. Start again here.',
+  failed: 'Authorization could not be completed. Start again or contact the workspace operator.',
+};
+
+async function api<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(path, { method: body ? 'POST' : 'GET', headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
+  const value = await response.json() as T & { error?: string };
+  if (!response.ok) throw new Error(value.error || 'The connection could not be updated. Try again.');
+  return value as T;
+}
+
+export function ProviderConnectors() {
+  const [status, setStatus] = useState<ProviderStatus | null>(null);
+  const [busy, setBusy] = useState('loading');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [projects, setProjects] = useState<SupabaseProject[]>([]);
+  const [selected, setSelected] = useState('');
+  const [schema, setSchema] = useState<SchemaTable[] | null>(null);
+  const [tables, setTables] = useState<SchemaTable[]>([]);
+  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
+  const connection = status?.supabase.connection;
+  const authorized = connection?.status === 'authorized';
+
+  useEffect(() => {
+    let alive = true;
+    const url = new URL(window.location.href);
+    const outcome = url.searchParams.get('provider_result');
+    if (outcome && outcomes[outcome]) {
+      url.searchParams.delete('provider_result');
+      window.history.replaceState(window.history.state, '', url);
+    }
+    api<ProviderStatus>('/api/providers').then(value => { if (alive) { setStatus(value); setSelected(value.supabase.connection?.project?.ref || ''); } }).catch(e => { if (alive) setError(e.message); }).finally(() => { if (alive) { setBusy(''); if (outcome && outcomes[outcome]) setNotice(outcomes[outcome]); } });
+    return () => { alive = false; };
+  }, []);
+
+  const saveConnection = (value: SupabaseConnection | null) => {
+    setStatus(current => current ? { ...current, supabase: { ...current.supabase, connection: value } } : current);
+  };
+  const run = async (label: string, action: () => Promise<void>) => {
+    setBusy(label); setError(''); setNotice('');
+    try { await action(); } catch (e) { setError(e instanceof Error ? e.message : 'The request failed.'); }
+    finally { setBusy(''); }
+  };
+  const connect = () => run('connect', async () => {
+    const result = await api<{ authorizationUrl: string }>('/api/providers/supabase/start', {});
+    const url = new URL(result.authorizationUrl);
+    if (url.origin !== 'https://api.supabase.com' || url.pathname !== '/v1/oauth/authorize') throw new Error('The provider authorization address is invalid.');
+    window.location.assign(url.toString());
+  });
+  const loadProjects = () => run('projects', async () => {
+    const result = await api<{ projects: SupabaseProject[] }>('/api/providers/supabase', { action: 'projects' });
+    setProjects(result.projects);
+    if (!result.projects.length) setNotice('No projects are available to this authorization. Check your Supabase organization access.');
+  });
+  const selectProject = () => run('select', async () => {
+    const result = await api<{ connection: SupabaseConnection }>('/api/providers/supabase', { action: 'select_project', projectRef: selected });
+    saveConnection(result.connection); setSchema(null); setTables([]);
+    setNotice('Project selected. Review its table and column names next.');
+  });
+  const loadSchema = () => run('schema', async () => {
+    const result = await api<{ schema: SchemaTable[] }>('/api/providers/supabase', { action: 'schema' });
+    setSchema(result.schema); setTables(connection?.approvedTables || []);
+    setNotice(result.schema.length ? 'Choose the tables and columns Causality may use for evidence. No customer rows were read.' : 'No supported tables were found in the public schema.');
+  });
+  const toggleColumn = (table: string, column: string) => setTables(current => {
+    const existing = current.find(t => t.name === table)?.columns || [];
+    const columns = existing.includes(column) ? existing.filter(c => c !== column) : [...existing, column];
+    return [...current.filter(t => t.name !== table), ...(columns.length ? [{ name: table, columns }] : [])];
+  });
+  const approve = () => run('approve', async () => {
+    const result = await api<{ connection: SupabaseConnection }>('/api/providers/supabase', { action: 'approve_tables', tables });
+    saveConnection(result.connection); setSchema(null);
+    setNotice('Evidence scope saved. Live imports will be available after Stripe authorization and payment-to-order mapping are connected.');
+  });
+  const disconnect = () => run('disconnect', async () => {
+    const result = await api<{ connection: SupabaseConnection | null }>('/api/providers/supabase', { action: 'disconnect' });
+    saveConnection(result.connection); setProjects([]); setSelected(''); setSchema(null); setTables([]); setConfirmDisconnect(false);
+    setNotice(result.connection?.revocationPending ? 'Causality access is disabled. Supabase revocation could not be confirmed. Retry revocation or remove Causality in your Supabase organization’s Authorized apps.' : 'Supabase disconnected. Saved project and evidence scope were cleared.');
+  });
+
+  return <section className="cw-panel cw-provider-panel" aria-label="Business account connections">
+    <div className="cw-provider-heading"><div><h2>Connect your business</h2><p>Authorize your accounts here. No database password or custom endpoint required.</p></div><ShieldCheck size={24} /></div>
+    {error && <p className="cw-banner error" role="alert">{error}</p>}
+    {notice && <p className="cw-banner neutral" role="status">{notice}</p>}
+    <div className="cw-provider-grid">
+      <article className="cw-provider-card" aria-label="Supabase account">
+        <h3><Database size={20} />Supabase <span className={`cw-pill${authorized ? ' green' : ''}`}>{authorized ? 'Authorized' : connection?.status === 'reconnect_required' ? 'Reconnect required' : 'Not connected'}</span></h3>
+        <p>Allow read access to project and database information. Review which project, tables and columns Causality should use.</p>
+        <p className="cw-provider-note">Supabase grants broader database read access. Causality currently reads project and schema metadata only. Evidence row access will require a verified dispute and approved mapping.</p>
+        {!connection || connection.status === 'disconnected' ? <div className="cw-actions">
+          {connection?.revocationPending ? <button className="cw-button" disabled={!!busy} onClick={() => void disconnect()}>Retry Supabase revocation</button> : <button className="cw-button primary" disabled={!!busy || !status?.supabase.configured} onClick={() => void connect()}>{busy === 'connect' ? <LoaderCircle size={16} /> : <Link2 size={16} />}{busy === 'loading' ? 'Loading…' : status?.supabase.configured ? 'Connect Supabase' : 'Setup unavailable'}</button>}
+        </div> : <>
+          {connection.project && <p>Selected project: <strong>{connection.project.name}</strong> <span className="cw-provider-note">({connection.project.organization})</span></p>}
+          {authorized && <div className="cw-actions"><button className="cw-button" disabled={!!busy} onClick={() => void loadProjects()}>{projects.length ? 'Refresh projects' : connection.project ? 'Change project' : 'Choose project'}</button>{connection.project && <button className="cw-button" disabled={!!busy} onClick={() => void loadSchema()}>Review tables and columns</button>}</div>}
+          {!!projects.length && authorized && <div className="cw-provider-project"><label className="cw-field"><span>Supabase project</span><select value={selected} disabled={!!busy} onChange={e => setSelected(e.target.value)}><option value="">Select a project</option>{projects.map(p => <option key={p.ref} value={p.ref}>{p.name} ({p.organization})</option>)}</select></label><button className="cw-button primary" disabled={!!busy || !selected} onClick={() => void selectProject()}>Use selected project</button></div>}
+          {!!connection.approvedTables?.length && <p>Saved scope: {connection.approvedTables.length} tables, {connection.approvedTables.reduce((sum, t) => sum + t.columns.length, 0)} columns. Live dispute import is not available yet.</p>}
+          {schema && schema.length > 0 && <fieldset className="cw-provider-scope" disabled={!!busy}><legend>Approved evidence columns, public schema</legend><p>Select only evidence fields such as order IDs, timestamps and delivery status. Leave passwords, tokens, QR payloads and unrelated personal data unchecked.</p>{schema.map(table => <details key={table.name}><summary>{table.name}</summary><div className="cw-provider-columns">{table.columns.map(column => <label key={column}><input type="checkbox" checked={tables.some(t => t.name === table.name && t.columns.includes(column))} onChange={() => toggleColumn(table.name, column)} />{column}</label>)}</div></details>)}<button className="cw-button primary" disabled={!tables.length} onClick={() => void approve()}>Save approved scope</button></fieldset>}
+          {confirmDisconnect ? <div className="cw-provider-disconnect"><p>Stop Supabase access and clear the selected project and scope?</p><div className="cw-actions"><button className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(false)}>Keep connection</button><button className="cw-button danger" disabled={!!busy} onClick={() => void disconnect()}>Confirm disconnect Supabase</button></div></div> : <button className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(true)}><Unplug size={16} />Disconnect Supabase</button>}
+        </>}
+      </article>
+      <article className="cw-provider-card" aria-label="Stripe account authorization"><h3>Stripe <span className="cw-pill">Coming next</span></h3><p>Connect disputes and payments to the matching orders in your business data.</p><p className="cw-provider-note">Stripe authorization is not available yet. You can prepare your Supabase connection now.</p><button className="cw-button" disabled>Connect Stripe</button></article>
+    </div>
+  </section>;
+}

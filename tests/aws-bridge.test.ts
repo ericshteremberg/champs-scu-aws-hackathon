@@ -16,4 +16,27 @@ describe('private AWS API bridge',()=>{
  it('hides AWS exception details and expired credentials',async()=>{mocks.send.mockRejectedValue(new Error('synthetic backend secret detail'));const response=await proxyAwsApi(request(),env);expect(response.status).toBe(502);expect(await response.text()).not.toContain('secret detail');});
  it('allows only HTTPS signed download redirects and never caches API responses',async()=>{mocks.send.mockResolvedValue(Response.json({status:302,redirect:'https://bucket.s3.us-east-1.amazonaws.com/private'}));const response=await proxyAwsApi(request('/api/evidence/evidence_fixture'),env);expect(response.status).toBe(302);expect(response.headers.get('Cache-Control')).toContain('no-store');mocks.send.mockResolvedValue(Response.json({status:302,redirect:'javascript:alert(1)'}));expect((await proxyAwsApi(request(),env)).status).toBe(502);});
  it('advertises S3 uploads without invoking business APIs',async()=>{const response=await proxyAwsApi(request('/api/runtime'),env);expect(await response.json()).toEqual({storage:'aws',uploads:'presigned'});expect(mocks.send).not.toHaveBeenCalled();});
+ it('issues a secure browser binding only after an authenticated same-origin OAuth start',async()=>{
+  const response=await proxyAwsApi(request('/api/providers/supabase/start',{}),env);
+  const payload=JSON.parse(mocks.send.mock.calls[0][1].body);
+  expect(payload.oauthBinding).toMatch(/^[a-f0-9]{64}$/);
+  expect(response.headers.get('Set-Cookie')).toBe(`__Host-causality-supabase=${payload.oauthBinding}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`);
+  expect(response.headers.get('Referrer-Policy')).toBe('no-referrer');
+ });
+ it('forwards only the callback binding cookie and strips it on return',async()=>{
+  const binding='a'.repeat(64); const value=request('/api/providers/supabase/callback?state=synthetic&code=synthetic');
+  value.headers.set('Cookie',`unrelated=private; __Host-causality-supabase=${binding}`);
+  value.headers.set('x-oauth-binding','spoof');
+  mocks.send.mockResolvedValue(Response.json({status:302,redirect:origin+'/workspace?view=integrations&provider_result=authorized'}));
+  const response=await proxyAwsApi(value,env);const payload=JSON.parse(mocks.send.mock.calls[0][1].body);
+  expect(payload.oauthBinding).toBe(binding);expect(JSON.stringify(payload)).not.toContain('unrelated');
+  expect(response.headers.get('Set-Cookie')).toContain('Max-Age=0');
+  expect(response.headers.get('Location')).not.toContain('code=');
+  mocks.send.mockResolvedValue(Response.json({status:302,redirect:'https://untrusted.test/workspace'}));
+  expect((await proxyAwsApi(value,env)).status).toBe(502);
+ });
+ it('does not accept a callback binding supplied through query parameters or headers',async()=>{
+  const value=request('/api/providers/supabase/callback?oauthBinding='+ 'a'.repeat(64));value.headers.set('x-oauth-binding','a'.repeat(64));
+  await proxyAwsApi(value,env);expect(JSON.parse(mocks.send.mock.calls[0][1].body).oauthBinding).toBeUndefined();
+ });
 });

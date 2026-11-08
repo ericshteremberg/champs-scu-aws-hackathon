@@ -2,7 +2,9 @@
 
 Causality's Connections wizard saves a reviewed mapping, previews fictional evidence, and downloads the installation files. The packaged connector creates the evidence endpoint; a business does not write an HTTP handler or case query. After deployment, the business connects and manages its approved case in the app. The AWS investigator uses the same evidence contract for ticketing and rentals.
 
-This release provides a guided installer and an AWS-backed live connection registry. Supabase OAuth authorization, schema discovery, and automatic hosting are not implemented. Saving or previewing a mapping does not connect a live database. The wizard examples describe fictional schemas and records, not the production ATMSPHR or Rentul database. The specialized production-schema adapter remains in `integrations/atmsphr/`.
+The Connections page now also provides [Supabase OAuth onboarding](OAUTH_CONNECTORS.md): authorize an account, select a project, inspect public-schema table/column names and save an approved evidence scope. It does not yet read customer rows or import live disputes. Stripe registration and verified payment-to-order mapping remain outstanding. This path requires no merchant-hosted endpoint.
+
+The installation instructions below describe the separate guided installer and AWS-backed live endpoint registry. Saving or previewing a mapping does not connect a live database. The wizard examples describe fictional schemas and records, not the production ATMSPHR or Rentul database. The specialized production-schema adapter remains in `integrations/atmsphr/`.
 
 ## 1. Download and install the connector
 

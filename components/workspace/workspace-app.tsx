@@ -1,5 +1,7 @@
 "use client";
 
+import { ProviderConnectors } from "./provider-connectors";
+
 import { useDialogMotion } from "./use-dialog-motion";
 
 import {
@@ -3660,6 +3662,7 @@ function Integrations({
         </span>
       </div>
       {!isDesignPreview && <>
+        <ProviderConnectors />
         <LiveEvidenceConnectors onImported={onConnectorImported} />
         <EvidenceConnectors onImported={onConnectorImported} />
       </>}
@@ -3726,7 +3729,7 @@ function Integrations({
           </Button>
         </section>
 
-        <section className="cw-panel cw-integration">
+        {(isDesignPreview || connected || stripe?.configured) && <section className="cw-panel cw-integration">
           <div className="cw-integration-head">
             <span className="cw-integration-brand stripe">S</span>
             <h2>Stripe</h2>
@@ -3823,7 +3826,7 @@ function Integrations({
               </Button>
             )}
           </div>
-        </section>
+        </section>}
         <section className="cw-panel cw-integration">
           <div className="cw-integration-head">
             <span className="cw-integration-brand">

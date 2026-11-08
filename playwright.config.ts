@@ -10,7 +10,7 @@ if (!/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(baseURL)) {
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: ["investigation-ui.spec.ts", "connector-setup.spec.ts", "live-connectors.spec.ts"],
+  testMatch: ["investigation-ui.spec.ts", "connector-setup.spec.ts", "live-connectors.spec.ts", "provider-connectors.spec.ts"],
   workers: 1,
   timeout: 45_000,
   expect: { timeout: 20_000 },

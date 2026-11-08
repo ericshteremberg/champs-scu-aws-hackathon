@@ -21,6 +21,17 @@ export async function proxyAwsApi(request: Request, env: AwsBridgeEnvironment): 
  }
  let body:unknown;
  if(text){try{body=JSON.parse(text);}catch{return reply({error:'Send a valid JSON request.'},400);}}
+ const oauthStart=url.pathname==='/api/providers/supabase/start' && request.method==='POST';
+ const oauthCallback=url.pathname==='/api/providers/supabase/callback' && request.method==='GET';
+ const cookieName='__Host-causality-supabase';
+ const cookie=request.headers.get('cookie')?.split(';').map(part=>part.trim()).find(part=>part.startsWith(`${cookieName}=`))?.slice(cookieName.length+1);
+ const oauthBinding=oauthStart?Array.from(crypto.getRandomValues(new Uint8Array(32)),value=>value.toString(16).padStart(2,'0')).join(''):oauthCallback && /^[a-f0-9]{64}$/.test(cookie||'')?cookie:undefined;
+ const finish=(response:Response)=>{
+  if(oauthStart && response.ok)response.headers.set('Set-Cookie',`${cookieName}=${oauthBinding}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`);
+  if(oauthCallback)response.headers.set('Set-Cookie',`${cookieName}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`);
+  if(oauthStart || oauthCallback)response.headers.set('Referrer-Policy','no-referrer');
+  return response;
+ };
  let fullName=request.headers.get('oai-authenticated-user-full-name');
  if(fullName && request.headers.get('oai-authenticated-user-full-name-encoding')==='percent-encoded-utf-8'){try{fullName=decodeURIComponent(fullName);}catch{fullName=null;}}
  try{
@@ -28,14 +39,14 @@ export async function proxyAwsApi(request: Request, env: AwsBridgeEnvironment): 
   const client=new AwsClient({region,service:'lambda',accessKeyId:env.AWS_ACCESS_KEY_ID,secretAccessKey:env.AWS_SECRET_ACCESS_KEY,sessionToken:env.AWS_SESSION_TOKEN,retries:0});
   const response=await client.fetch(`https://lambda.${region}.amazonaws.com/2015-03-31/functions/${encodeURIComponent(env.AWS_BACKEND_FUNCTION)}/invocations`,{
    method:'POST',headers:{'Content-Type':'application/json','X-Amz-Invocation-Type':'RequestResponse'},
-   body:JSON.stringify({kind:'api',method:request.method,path:url.pathname+url.search,user:{userId,email,fullName,displayName:fullName||email},body,rawBody:url.pathname==='/api/stripe/webhook'?text:undefined,stripeSignature:request.headers.get('stripe-signature')||undefined}),
+   body:JSON.stringify({kind:'api',method:request.method,path:url.pathname+url.search,user:{userId,email,fullName,displayName:fullName||email},body,oauthBinding,rawBody:url.pathname==='/api/stripe/webhook'?text:undefined,stripeSignature:request.headers.get('stripe-signature')||undefined}),
    signal:AbortSignal.any([request.signal,AbortSignal.timeout(28000)]),
   });
   if(!response.ok || response.headers.has('X-Amz-Function-Error')) return reply({error:'The AWS backend could not complete the request. Check its deployment and workshop session.',code:'aws_backend_failed'},502);
   const result=await response.json() as {status:number;body?:unknown;redirect?:string};
   if(!Number.isInteger(result.status)||result.status<200||result.status>599)throw new Error('Invalid backend response');
-  if(result.redirect){const target=new URL(result.redirect);if(target.protocol!=='https:')throw new Error('Invalid download URL');return new Response(null,{status:302,headers:{Location:target.toString(),'Cache-Control':'private, no-store'}});}
-  return reply(result.body,result.status);
+  if(result.redirect){const target=new URL(result.redirect);if(target.protocol!=='https:' || (oauthCallback && (target.origin!==url.origin || target.pathname!=='/workspace')))throw new Error('Invalid redirect URL');return finish(new Response(null,{status:302,headers:{Location:target.toString(),'Cache-Control':'private, no-store'}}));}
+  return finish(reply(result.body,result.status));
  }catch{
   return reply({error:'The AWS backend is unavailable. Check the deployment and workshop session.',code:'aws_backend_unavailable'},502);
  }

@@ -9,6 +9,11 @@
     "BedrockModelId": {
       "Type": "String",
       "Default": "us.amazon.nova-2-lite-v1:0"
+    },
+    "SupabaseOAuthSecretArn": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Existing Secrets Manager app registration, never a client secret value."
     }
   },
   "Resources": {
@@ -40,6 +45,10 @@
         ],
         "SSESpecification": {
           "SSEEnabled": true
+        },
+        "TimeToLiveSpecification": {
+          "AttributeName": "ttlEpochSeconds",
+          "Enabled": true
         }
       }
     },
@@ -233,6 +242,29 @@
                 }
               ]
             }
+          },
+          {
+            "Fn::If": [
+              "HasSupabaseOAuth",
+              {
+                "PolicyName": "SupabaseOAuthRegistration",
+                "PolicyDocument": {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Action": "secretsmanager:GetSecretValue",
+                      "Resource": {
+                        "Ref": "SupabaseOAuthSecretArn"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
           }
         ]
       }
@@ -269,7 +301,13 @@
             "BEDROCK_MODEL_ID": {
               "Ref": "BedrockModelId"
             },
-            "FUNCTION_NAME": "causality-hackathon-investigator"
+            "FUNCTION_NAME": "causality-hackathon-investigator",
+            "SUPABASE_OAUTH_SECRET_ARN": {
+              "Ref": "SupabaseOAuthSecretArn"
+            },
+            "CAUSALITY_FRONTEND_ORIGIN": {
+              "Ref": "FrontendOrigin"
+            }
           }
         }
       }
@@ -355,6 +393,20 @@
       "Value": {
         "Ref": "InvestigatorFunction"
       }
+    }
+  },
+  "Conditions": {
+    "HasSupabaseOAuth": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "SupabaseOAuthSecretArn"
+            },
+            ""
+          ]
+        }
+      ]
     }
   }
 }

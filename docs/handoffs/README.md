@@ -2,6 +2,8 @@
 
 For the current cross-computer provider setup, use [Eric's OAuth registration handoff](05-eric-oauth-registration.md). It starts from the latest `codex/aiden-aws-harness`, separates developer registration from customer authorization, and returns configuration to Aiden for connector implementation. The role-branch baseline below is historical.
 
+Eric's [registration results](05-eric-oauth-results.md) have now been integrated. Follow the [current OAuth connector status](../OAUTH_CONNECTORS.md) for the deployed Supabase authorization flow, checks and remaining Stripe blocker.
+
 All four role branches start from the same planning commit on top of verified application commit `e78d7a1322fea09ed64ee2611c966ea9f662723f`. Each contains these handoffs so every teammate can see the boundaries and dependencies. The branches are independent places to work; this planning change does not update `main` or redeploy the app.
 
 | Owner | Branch | Start here | Main responsibility |

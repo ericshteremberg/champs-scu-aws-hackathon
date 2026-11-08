@@ -12,7 +12,7 @@ export default {
   const secure=(response:Response)=>{
    const result=new Response(response.body,response);
    result.headers.set('X-Content-Type-Options','nosniff');
-   result.headers.set('Referrer-Policy','strict-origin-when-cross-origin');
+   result.headers.set('Referrer-Policy',new URL(request.url).pathname.startsWith('/api/providers')?'no-referrer':'strict-origin-when-cross-origin');
    result.headers.set('Permissions-Policy','camera=(), microphone=(), geolocation=()');
    if(standalone || new URL(request.url).pathname.startsWith('/api/')) result.headers.set('Cache-Control','private, no-store');
    if(!import.meta.env.DEV && !result.headers.has('Content-Security-Policy')) result.headers.set('Content-Security-Policy',`default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ${bucketOrigin}; object-src 'none'; base-uri 'self'; form-action 'self'`);
