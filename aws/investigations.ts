@@ -6,7 +6,7 @@ import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import { FetchHttpHandler } from '@smithy/fetch-http-handler';
 import type { Evidence, EvidenceSource, InvestigationConfig, InvestigationRun } from '../lib/domain.ts';
-import { runInvestigation } from '../lib/investigation/engine.ts';
+import { investigationLimits, runInvestigation } from '../lib/investigation/engine.ts';
 import { fetchMerchantSection } from '../lib/investigation/merchant.ts';
 import { fetchPublicMerchantSection } from './merchant-network.ts';
 import { loadManagedConnection } from './managed-connectors.ts';
@@ -158,7 +158,8 @@ export async function processInvestigation(input: { workspaceId: string; caseId:
   if (queued.data.expiresAt <= now()) { await closeRun(wid, runId, 'failed', 'This investigation expired before the worker started.'); return; }
   const item = await ownedCase(wid, caseId); const initialDraft = await getDraft(wid, caseId);
   const workerToken = randomUUID();
-  const running: RunDoc = { ...queued.data, status: 'running', workerToken, expiresAt: new Date(Date.now() + 120_000).toISOString() };
+  const limits = investigationLimits(queued.data.modelId);
+  const running: RunDoc = { ...queued.data, status: 'running', workerToken, expiresAt: new Date(Date.now() + limits.totalTimeoutMs).toISOString() };
   try {
     assertSnapshot(running, item.data, initialDraft?.data);
     await commit(wid, [{ key: queued.key, expectedVersion: queued.version, data: running }, { key: item.key, expectedVersion: item.version, data: { ...item.data, activeRunExpiresAt: running.expiresAt } }]);
@@ -167,15 +168,15 @@ export async function processInvestigation(input: { workspaceId: string; caseId:
     if (error instanceof InvestigationError) { await closeRun(wid, runId, 'stale', error.message); return; }
     throw error;
   }
-  const signal = AbortSignal.timeout(120_000);
+  const signal = AbortSignal.timeout(limits.totalTimeoutMs);
   let modelClient: BedrockRuntimeClient | undefined;
   try {
     const records = await listEvidence(wid, caseId); const pending = new Map<string, EvidenceDoc>(); let sequence = 0; let summaryVerified = false;
     const snapshot = async () => {
-      if (signal.aborted) throw new InvestigationError('time_limit', 'The investigation reached its two-minute limit.');
+      if (signal.aborted) throw new InvestigationError('time_limit', `The investigation reached its ${limits.totalTimeoutMs / 60_000}-minute limit.`);
       const [run, current, draft] = await Promise.all([getItem<RunDoc>(wid, keys.run(runId)), ownedCase(wid, caseId), getDraft(wid, caseId)]);
       if (!run || run.data.status !== 'running' || run.data.workerToken !== workerToken) throw new InvestigationError('cancelled', 'The investigation is no longer active.');
-      if (run.data.expiresAt <= now()) throw new InvestigationError('time_limit', 'The investigation reached its two-minute limit.');
+      if (run.data.expiresAt <= now()) throw new InvestigationError('time_limit', `The investigation reached its ${limits.totalTimeoutMs / 60_000}-minute limit.`);
       assertSnapshot(run.data, current.data, draft?.data);
       const managed = await caseConnection(wid, current.data, run.data);
       return { run, current, draft, managed };
@@ -204,7 +205,7 @@ export async function processInvestigation(input: { workspaceId: string; caseId:
       const supplements = local.records.filter(r => !remoteRecords.some(remote => remote.id === r.id));
       return { ...fetched.evidence, caseId, status: supplements.length ? 'partial' : fetched.evidence.status, records: [...remoteRecords, ...supplements], limitations: [...fetched.evidence.limitations, ...(supplements.length ? local.limitations : [])] };
     };
-    if (running.mode === 'bedrock') modelClient = new BedrockRuntimeClient({ region: region(), maxAttempts: 1, requestHandler: new FetchHttpHandler({ requestTimeout: 45_000 }) });
+    if (running.mode === 'bedrock') modelClient = new BedrockRuntimeClient({ region: region(), maxAttempts: 1, requestHandler: new FetchHttpHandler({ requestTimeout: limits.requestTimeoutMs }) });
     const result = await runInvestigation({ case: item.data, requirePolicy: records.some(r => r.data.source === 'policy' || r.data.provenance?.section === 'policy'), mode: running.mode, modelId: running.modelId, region: region(), signal, readEvidence, assertActive,
       invokeModel: modelClient ? (command, abortSignal) => modelClient!.send(new ConverseCommand(command), { abortSignal }) : undefined,
       onEvent: async event => {
