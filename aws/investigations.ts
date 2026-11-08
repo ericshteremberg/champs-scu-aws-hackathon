@@ -1,3 +1,4 @@
+import { withSavedEmailContext } from './resend-history.ts';
 import { createHash, randomUUID } from 'node:crypto';
 import { LambdaClient, InvokeCommand } from '@aws-sdk/client-lambda';
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
@@ -136,7 +137,7 @@ function classify(row: Evidence): EvidenceSection {
   return 'order';
 }
 export function localEvidence(item: CaseDoc, records: Evidence[], section: EvidenceSection): EvidenceEnvelope {
-  const selected = records.filter(record => classify(record) === section);
+  const selected = records.filter(record => classify(record) === section).map(record => withSavedEmailContext(record, item.orderRef));
   const limitations = [...new Set(selected.flatMap(record => record.provenance?.limitations || []))];
   for (const record of selected) if (record.fileName && !record.content) limitations.push(`The attachment ${record.fileName} requires manual review. Its contents have not been extracted.`);
   if (!selected.length) limitations.push(`No attached records are classified under ${section}. Related facts may appear in records filed under other sections; this does not establish that source records or events do not exist.`);

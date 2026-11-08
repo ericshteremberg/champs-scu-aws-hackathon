@@ -68,3 +68,17 @@ npm run build:aws
 The browser-based Resend setup and AWS backend deployment are separate from the Cloudflare UI release. The shared site uses the account in `wrangler.dev.jsonc`; do not switch it to a personal Cloudflare account to get around missing access. Deploy the frontend using the team account's authorized session with `npm run deploy:dev`. The private AWS routes are already callable through the site's existing authenticated API bridge once the backend is deployed.
 
 Rollback: remove/disable the dedicated webhook in Resend, revoke the dedicated API key, and clear the Resend environment/stack parameters if retiring the integration. Do not revoke other applications' existing Resend keys. Previously imported evidence remains part of its case until handled through the normal retention process.
+
+
+## Retained email history (November 8)
+
+The case connector discovers reviewed Supabase `public.message_log` evidence already attached to the selected case. Map that table under **delivery**, joined by `order_id`, with `channel`, `kind`, `status`, `provider_id`, and `created_at` (and optional `subject` / a small approved body field). Import the exact payment-linked order and its related records using the linked-evidence workflow. Discovery then requires no pasted UUID. No bulk mailbox scan or new database scope is introduced.
+
+- `discover` returns the case's saved order email rows, including rows with no usable provider UUID.
+- `preview_log` takes `caseId` and `evidenceId`, tries Resend if possible, and uses the retained log on a 404, 502, 503, missing ID, or missing Resend configuration.
+- `import_log` with `confirmed: true` attaches available provider metadata, or acknowledges the already-attached log without duplicating it. Prior provider evidence is never downgraded by an unavailable lookup.
+- Manual email-ID preview also finds a retained matching log before returning an unavailable error.
+
+The compiler consumes the saved log regardless of message age or provider API availability, preserves its original status and content, and labels it merchant sending evidence. `sent` and merchant `delivered` do not become provider-confirmed delivery; failed/bounced records remain counterevidence. API unavailability cannot recover an absent email body. A separately captured historical body remains usable as its own cited evidence.
+
+Deploy both frontend and AWS backend from `codex/resend-history`. This implementation has not been deployed from Eric's machine because the AWS session expired. The current manually assembled Mason case still needs structured order-log import through the reviewed mapping workflow for automatic discovery. Its manually captured Resend content already remains attached.

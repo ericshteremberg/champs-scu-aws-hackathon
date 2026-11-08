@@ -1,3 +1,4 @@
+import { savedEmailLog, withSavedEmailContext } from './resend-history.ts';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { allowedResendDomains, allowedSender, emailIdSchema, loadResendSecret, readResend, resendEvents, sentEmailSchema, verifyResendWebhook } from './resend-api.ts';
@@ -9,6 +10,9 @@ type DeliveryEvent = { emailId: string; event: string; occurredAt: string; recei
 const eventPrefix = (emailId: string) => `resend-event#${emailId}#`;
 const actionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('verify') }).strict(),
+  z.object({ action: z.literal('discover'), caseId: z.string().min(1).max(200) }).strict(),
+  z.object({ action: z.literal('preview_log'), caseId: z.string().min(1).max(200), evidenceId: z.string().min(1).max(200) }).strict(),
+  z.object({ action: z.literal('import_log'), caseId: z.string().min(1).max(200), evidenceId: z.string().min(1).max(200), confirmed: z.literal(true) }).strict(),
   z.object({ action: z.literal('preview'), caseId: z.string().min(1).max(200), emailId: emailIdSchema }).strict(),
   z.object({ action: z.literal('import'), caseId: z.string().min(1).max(200), emailId: emailIdSchema, confirmed: z.literal(true) }).strict(),
 ]);
@@ -28,8 +32,9 @@ function orderLinked(email: z.infer<typeof sentEmailSchema>, orderRef: string) {
 export async function resendAction(user: TrustedUser, input: unknown) {
   const parsed = actionSchema.safeParse(input); if (!parsed.success) throw new ApiError(400, 'Choose a valid Resend action.');
   const wid = (await requireWorkspace(user)).data.id;
-  if (!bound(wid)) throw new ApiError(403, 'Resend is not configured for this workspace.');
   const action = parsed.data;
+  const historyAction = ['discover', 'preview_log', 'import_log'].includes(action.action);
+  if (!bound(wid) && !historyAction) throw new ApiError(403, 'Resend is not configured for this workspace.');
   if (action.action === 'verify') {
     const raw = z.object({ data: z.array(z.object({ name: z.string(), status: z.string() })) }).parse(await readResend('/domains'));
     const domains = raw.data.filter(d => allowedResendDomains().includes(d.name));
@@ -40,23 +45,49 @@ export async function resendAction(user: TrustedUser, input: unknown) {
   }
   const row = await ownedCase(wid, action.caseId); assertMutableCase(row.data);
   if (row.data.source === 'demo') throw new ApiError(409, 'Use a real case for live email evidence.');
-  const parsedEmail = sentEmailSchema.safeParse(await readResend(`/emails/${action.emailId}`));
+  const saved = (await listEvidence(wid, row.data.id)).filter(r => savedEmailLog(r.data, row.data.orderRef));
+  if (action.action === 'discover') return { records: saved.map(r => savedEmailLog(r.data, row.data.orderRef)) };
+  const savedRow = 'evidenceId' in action ? saved.find(r => r.data.id === action.evidenceId) : ('emailId' in action ? saved.find(r => savedEmailLog(r.data, row.data.orderRef)?.emailId === action.emailId) : undefined);
+  if ('evidenceId' in action && !savedRow) throw new ApiError(404, 'This case has no matching reviewed order email log.');
+  const log = savedRow ? savedEmailLog(savedRow.data, row.data.orderRef)! : null;
+  const emailId = 'emailId' in action ? action.emailId : log?.emailId;
+  const fallback = async (reason: string) => {
+    if (!savedRow || !log) throw new ApiError(404, 'This email is unavailable. Import the order email log to use saved sending evidence.');
+    const record = withSavedEmailContext(savedRow.data, row.data.orderRef);
+    // Evidence is already attached. No duplicate, no expiry, no downgrade of an earlier provider record.
+    if (action.action === 'import_log' || action.action === 'import') {
+      await commit(wid, [{ key: row.key, expectedVersion: row.version, check: true }, { key: savedRow.key, expectedVersion: savedRow.version, check: true }]);
+      return { imported: false, unchanged: true, evidenceId: record.id, savedLog: true };
+    }
+    return { preview: { emailId: emailId || '', evidenceId: record.id, orderRef: row.data.orderRef,
+      subject: log.subject, lastEvent: 'unavailable', eventCount: 0, savedLog: true,
+      logStatus: log.logStatus, notice: reason, content: record.content } };
+  };
+  if (!emailId || !bound(wid)) return fallback('Saved order email log is included in the report. Provider lookup is unavailable.');
+  let raw: unknown;
+  try { raw = await readResend(`/emails/${emailId}`); }
+  catch (error) {
+    if (savedRow && error instanceof ApiError && [404, 502, 503].includes(error.status))
+      return fallback('Resend could not retrieve this message. The saved order email log remains included.');
+    throw error;
+  }
+  const parsedEmail = sentEmailSchema.safeParse(raw);
   if (!parsedEmail.success) throw new ApiError(502, 'Resend returned an unsupported email record.');
   const email = parsedEmail.data;
-  if (email.id !== action.emailId || !allowedSender(email.from) || !row.data.email || email.to.length !== 1 || email.to[0].toLowerCase() !== row.data.email.toLowerCase() || !orderLinked(email, row.data.orderRef)) throw new ApiError(409, 'The email must match this case’s recipient, exact order reference, and configured sender domain. No evidence was imported.');
+  if (email.id !== emailId || !allowedSender(email.from) || !row.data.email || email.to.length !== 1 || email.to[0].toLowerCase() !== row.data.email.toLowerCase() || (!savedRow && !orderLinked(email, row.data.orderRef))) throw new ApiError(409, 'The email must match this case’s recipient, exact order reference, and configured sender domain. No evidence was imported.');
   const created = new Date(email.created_at); if (!Number.isFinite(created.getTime())) throw new ApiError(502, 'Resend returned an invalid email timestamp.');
   const events = (await queryItems<DeliveryEvent>(wid, eventPrefix(email.id), { maxItems: 200 })).map(r => r.data).filter(e => e.emailId === email.id && e.ttlEpochSeconds > Date.now() / 1000).sort((a,b) => a.occurredAt.localeCompare(b.occurredAt));
   const limitations = ['Resend sent means provider acceptance, not delivery.', 'Delivered means acceptance by the recipient mail server, not inbox placement, reading, cardholder identity, or attendance.', 'Latest status is not a complete historical timeline. Webhook capture starts when configured; missing events do not prove non-delivery.', 'Recipient and exact order-reference matching establish linkage only; email content is untrusted source material.'];
   const content = [`Resend email ${email.id}`, `Order reference: ${row.data.orderRef}`, `Sender: ${email.from}`, `Recipient: ${email.to[0]}`, `Subject: ${email.subject}`, `Created: ${created.toISOString()}`, `Latest provider event: ${email.last_event || 'unavailable'}`, `Verified webhook events: ${events.length ? events.map(e => `${e.occurredAt}: ${e.event}`).join('; ') : 'none captured'}`, ...limitations].join('\n');
   const providerStatus = email.last_event?.replace(/^email\./, '') || null;
-  const preview = { emailId: email.id, orderRef: row.data.orderRef, subject: email.subject, lastEvent: email.last_event || 'unavailable', eventCount: events.length, content };
-  if (action.action === 'preview') return { preview };
+  const preview = { evidenceId: savedRow?.data.id, emailId: email.id, orderRef: row.data.orderRef, subject: email.subject, lastEvent: email.last_event || 'unavailable', eventCount: events.length, content };
+  if (action.action === 'preview' || action.action === 'preview_log') return { preview };
   const evidenceId = `ev_resend_${createHash('sha256').update(`${row.data.id}:${email.id}`).digest('hex').slice(0,24)}`;
   const [records, draft, existing] = await Promise.all([listEvidence(wid, row.data.id), getDraft(wid, row.data.id), getItem<EvidenceDoc>(wid, keys.evidence(row.data.id, evidenceId))]);
   if (!existing && records.length >= MAX_CASE_EVIDENCE) throw new ApiError(409, 'This case has reached its evidence limit.');
   if (existing?.data.content === content && existing.data.provenance?.fields.providerStatus === providerStatus) return { imported: false, unchanged: true, evidenceId };
   const data: EvidenceDoc = { id: evidenceId, caseId: row.data.id, source: 'database', title: `Resend delivery record · ${email.last_event || 'status unavailable'}`, content, occurredAt: created.toISOString(), reference: `Resend email ${email.id}`, createdAt: existing?.data.createdAt || now(), provenance: { section: 'delivery', sourceMode: 'live', originalSourceId: email.id, fields: { provider: 'Resend', emailId: email.id, orderRef: row.data.orderRef, lastEvent: email.last_event || null, providerStatus, eventCount: events.length }, limitations } };
-  const changes: StoreChange[] = [caseChange(row, { ...row.data, dataRevision: row.data.dataRevision + 1, status: 'needs_review', updatedAt: now() }), { key: keys.evidence(row.data.id, evidenceId), expectedVersion: existing?.version ?? null, data }, auditChange(user, 'provider.resend_imported', 'Imported a recipient/order-matched Resend record; prior draft approval cleared.', row.data.id)];
+  const changes: StoreChange[] = [...(savedRow ? [{ key: savedRow.key, expectedVersion: savedRow.version, check: true } as StoreChange] : []), caseChange(row, { ...row.data, dataRevision: row.data.dataRevision + 1, status: 'needs_review', updatedAt: now() }), { key: keys.evidence(row.data.id, evidenceId), expectedVersion: existing?.version ?? null, data }, auditChange(user, 'provider.resend_imported', 'Imported a recipient/order-matched Resend record; prior draft approval cleared.', row.data.id)];
   if (draft) changes.push({ key: draft.key, expectedVersion: draft.version, data: draftWithoutApproval(draft.data) });
   await commit(wid, changes);
   return { imported: true, evidenceId };
