@@ -125,7 +125,7 @@ export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceStat
       <GmailConnector status={status?.gmail} cases={cases} onImported={onImported} onChange={connection => setStatus(current => current ? { ...current, gmail: { configured: current.gmail?.configured || false, connection } } : current)} />
       <ImapConnector status={status?.imap} cases={cases} onImported={onImported} onChange={connection => setStatus(current => current ? { ...current, imap: { configured: current.imap?.configured || false, connection } } : current)} />
       <StripeAccountConnector status={status?.stripe} onChange={connection => setStatus(current => current ? { ...current, stripe: { ...current.stripe, connection } } : current)} />
-      <ResendConnector />
+      <ResendConnector cases={cases} onImported={onImported} />
     </div>
   </section>;
 }

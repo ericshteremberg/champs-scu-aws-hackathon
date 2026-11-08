@@ -36,7 +36,9 @@ The receiver drops events from unrelated sender domains. It stores only the prov
 
 ## Importing evidence
 
-After the frontend is deployed, open Connections → Resend → Verify Resend read access → Import email evidence. Choose a real case and enter its specific Resend email UUID. Preview before attaching.
+Open a real case → Investigation → Resend → Add email evidence. Verify access, paste the specific email UUID, preview its recipient/order match, and choose Attach to report. The case refreshes immediately; its next compilation includes the imported delivery source. Connections → Resend offers the same controls with a case selector. Linked records have a Check latest status action; refresh still requires preview and attach. No message is sent.
+
+The controls distinguish connection loading, missing deployment, missing configuration, and provider errors. Live imports are disabled on sample or closed cases and while an investigation is running. Unsaved response edits must be saved before importing from the case view. Deploy matching frontend and AWS backend versions; local-only storage cannot call the live Resend connector.
 
 The private API `/api/providers/resend` supports:
 
@@ -47,7 +49,7 @@ The private API `/api/providers/resend` supports:
 
 All actions require the authenticated, explicitly bound workspace. The case must belong to that workspace and remain editable. Sample cases cannot receive live evidence. The email UUID, approved sender domain, single recipient, and exact order reference must match the case. The order reference must occur in the source subject/text/HTML or an `order_id`, `order_ref`, or `order_number` tag. An email address match alone is insufficient. If historical messages lack a matchable order reference, the automatic importer refuses them; inspect and attach a carefully scoped original manually instead of weakening the check.
 
-Only minimal metadata and status facts enter the report. Message bodies are used transiently for order matching, not persisted. Re-importing unchanged evidence is idempotent. Updating evidence increments the case revision and clears prior draft approval. Run a new investigation afterward. Captured future webhook events are included on refresh; they never silently rewrite approved or submitted evidence.
+Only minimal metadata and status facts enter the report. Provider provenance assigns these records explicitly to the delivery section, and the source register labels them Resend. Normalized provider status is passed to the compiler so bounced/failed messages remain counterevidence. Message bodies are used transiently for order matching, not persisted. Re-importing unchanged evidence is idempotent. Updating evidence increments the case revision and clears prior draft approval. Run a new investigation afterward. Captured future webhook events are included on refresh; they never silently rewrite approved or submitted evidence.
 
 `sent` is provider acceptance; `delivered` is recipient mail-server acceptance. Neither proves inbox placement, reading, cardholder authorization, or attendance. Preserve bounced/failed/complained events as counterevidence. Missing historical events remain unknown. Do not replace purchase-time policies with current terms.
 

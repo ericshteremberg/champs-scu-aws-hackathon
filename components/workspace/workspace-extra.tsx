@@ -1061,7 +1061,7 @@ export function ReportPreview({
               <span>
                 <strong>{e.title}</strong>
                 <p>
-                  {sourceLabel(e.source)} · {e.reference || e.id}
+                  {sourceLabel(e.provenance?.fields.provider === "Resend" ? "Resend" : e.source)} · {e.reference || e.id}
                 </p>
               </span>
               <ArrowRight size={17} />

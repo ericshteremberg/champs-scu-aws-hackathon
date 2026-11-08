@@ -1,5 +1,6 @@
 "use client";
 
+import { ResendConnector } from "./resend-provider";
 import { ProviderConnectors } from "./provider-connectors";
 
 import { useDialogMotion } from "./use-dialog-motion";
@@ -184,7 +185,7 @@ function sourceName(value: string) {
   );
 }
 function sourceIcon(value: string) {
-  return value === "gmail" || value === "imap"
+  return value === "gmail" || value === "imap" || value === "resend"
     ? Mail
     : value === "database"
       ? Database
@@ -1306,6 +1307,8 @@ export default function WorkspaceApp({
                 <CaseDetail
                   key={`${current.id}:${current.draft?.revision}:${current.draft?.status}`}
                   current={current}
+                  designPreview={!!preview}
+                  onResendImported={(nextState) => setState(nextState)}
                   run={visibleRun || null}
                   investigationConfig={investigationConfig}
                   investigating={
@@ -2368,6 +2371,8 @@ function draftMethodLabel(method?: string) {
 
 function CaseDetail({
   current,
+  designPreview,
+  onResendImported,
   busy,
   mutate,
   back,
@@ -2394,6 +2399,8 @@ function CaseDetail({
   attachPolicy,
 }: {
   current: DisputeCase;
+  designPreview: boolean;
+  onResendImported: (state: WorkspaceState) => void;
   submissionEnabled: boolean;
   connected: boolean;
   busy: boolean;
@@ -2423,6 +2430,7 @@ function CaseDetail({
   ) => void;
   attachPolicy: () => void;
 }) {
+  const [resendBusy, setResendBusy] = useState(false);
   const tab = ["investigation", "report", "preview", "submission"].includes(
       initialTab,
     )
@@ -2477,7 +2485,7 @@ function CaseDetail({
     current.draft?.status === "approved" && !dirty && !stale && !investigating,
   );
   const canInvestigate =
-    !busy && !frozen && !investigating && current.evidence.length > 0;
+    !busy && !resendBusy && !frozen && !investigating && current.evidence.length > 0;
   const mode = investigationConfig?.bedrockConfigured ? "bedrock" : "sample";
   const canUseMode = mode === "bedrock" || current.source === "demo";
   const confirmReplace = () =>
@@ -2529,7 +2537,7 @@ function CaseDetail({
       "SOURCE RECORDS",
       ...current.evidence.map(
         (e) =>
-          `[${e.id}] ${e.title} · ${sourceName(e.source)} · ${e.occurredAt}\nReference: ${e.reference}\n${e.content || "Attachment requires inspection of the original file."}`,
+          `[${e.id}] ${e.title} · ${sourceName(e.provenance?.fields.provider === "Resend" ? "Resend" : e.source)} · ${e.occurredAt}\nReference: ${e.reference}\n${e.content || "Attachment requires inspection of the original file."}`,
       ),
     ].join("\n");
     const packet = {
@@ -2735,6 +2743,7 @@ function CaseDetail({
                 </details>
               </div>
             </div>
+            <ResendConnector cases={[current]} caseId={current.id} disabled={busy || investigating || frozen || dirty} designPreview={designPreview} onBusyChange={setResendBusy} onImported={onResendImported} />
             <div className="cw-evidence-split">
               <aside className="cw-timeline">
                 <div className="cw-timeline-head">
@@ -2756,7 +2765,7 @@ function CaseDetail({
                         <span>
                           <strong>{e.title}</strong>
                           <p>
-                            {sourceName(e.source)}
+                            {sourceName(e.provenance?.fields.provider === "Resend" ? "Resend" : e.source)}
                             {e.reference ? ` · ${e.reference}` : ""}
                           </p>
                         </span>
@@ -2772,10 +2781,10 @@ function CaseDetail({
                     <div className="cw-source-meta">
                       <span className="cw-pill outline">
                         {(() => {
-                          const Icon = sourceIcon(selected.source);
+                          const Icon = sourceIcon(selected.provenance?.fields.provider === "Resend" ? "resend" : selected.source);
                           return <Icon size={17} />;
                         })()}
-                        {sourceName(selected.source)}
+                        {sourceName(selected.provenance?.fields.provider === "Resend" ? "Resend" : selected.source)}
                       </span>
                       {selected.downloadUrl ? (
                         <a
@@ -3193,7 +3202,7 @@ function CaseDetail({
                       <div>
                         <strong>{e.title}</strong>
                         <p>
-                          {sourceName(e.source)} ·{" "}
+                          {sourceName(e.provenance?.fields.provider === "Resend" ? "Resend" : e.source)} ·{" "}
                           {e.reference || date(e.occurredAt)}
                         </p>
                       </div>
@@ -3542,7 +3551,7 @@ function EvidenceLibrary({
                     </td>
                     <td>
                       <span className="cw-pill outline">
-                        {sourceName(e.source)}
+                        {sourceName(e.provenance?.fields.provider === "Resend" ? "Resend" : e.source)}
                       </span>
                     </td>
                     <td>

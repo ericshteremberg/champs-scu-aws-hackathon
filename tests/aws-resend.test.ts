@@ -14,6 +14,9 @@ import { verifyResendWebhook } from '../aws/resend-api.ts';
 import { receiveResendWebhook,resendAction,resendStatus,resendWebhookHandler } from '../aws/resend.ts';
 import { executeAction,getWorkspaceState } from '../aws/workspace.ts';
 import { workspaceIdForUser } from '../aws/store.ts';
+import { localEvidence } from '../aws/investigations.ts';
+import { runInvestigation } from '../lib/investigation/engine.ts';
+import type { CaseDoc } from '../aws/types.ts';
 const user:TrustedUser={userId:'resend-owner',email:'owner@example.test',displayName:'Owner'},other={...user,userId:'someone-else'};
 const wid=workspaceIdForUser(user.userId),emailId='11111111-1111-4111-8111-111111111111';
 let caseId:string;
@@ -44,6 +47,49 @@ describe('Resend evidence boundaries',()=>{
     await resendAction(user,{action:'import',caseId,emailId,confirmed:true});
     expect(await resendAction(user,{action:'import',caseId,emailId,confirmed:true})).toMatchObject({unchanged:true});
     const record=(await getWorkspaceState(user)).cases[0].evidence[0];expect(record.provenance?.section).toBe('delivery');expect(record.content).toContain('not inbox placement');expect(record.content).not.toContain('re_synthetic');
+  });
+  it.each(['delivered', 'bounced'])('compiles imported %s email evidence with source citations and delivery limitations', async status => {
+    fixture.read.mockResolvedValue({ ...email(), last_event: status });
+    await resendAction(user, { action: 'import', caseId, emailId, confirmed: true });
+    const item = (await getWorkspaceState(user)).cases[0];
+    const record = item.evidence[0];
+    expect(record.provenance?.fields).toMatchObject({ provider: 'Resend', emailId, providerStatus: status });
+    const result = await runInvestigation({
+      case: item, mode: 'sample', region: 'us-east-1', signal: AbortSignal.timeout(10000),
+      readEvidence: async section => localEvidence({ ...item, workspaceId: wid, dataRevision: 1 } as CaseDoc, item.evidence, section),
+      assertActive: async () => {}, onEvent: async () => {},
+    });
+    expect(result.evidenceIds).toContain(record.id);
+    expect(result.content).toContain(`[${record.id}]`);
+    expect(result.content).toContain(`Latest provider event: ${status}`);
+    expect(result.gaps.join(' ')).toContain('not inbox placement');
+    expect(result.metrics.recordCount).toBe(1);
+    if (status === 'bounced') expect(result.findings.some(f => f.kind === 'conflict' && f.evidenceIds.includes(record.id))).toBe(true);
+  });
+  it('upgrades older imported records with compiler status without creating duplicates', async () => {
+    await resendAction(user, { action: 'import', caseId, emailId, confirmed: true });
+    const entry = [...fixture.rows].find(([, row]) => (row.data as { provenance?: { fields?: { provider?: string } } }).provenance?.fields?.provider === 'Resend');
+    if (!entry) throw new Error('Missing fixture record');
+    const data = entry[1].data as { provenance: { fields: Record<string, unknown> } };
+    delete data.provenance.fields.providerStatus;
+    expect(await resendAction(user, { action: 'import', caseId, emailId, confirmed: true })).toMatchObject({ imported: true });
+    const records = (await getWorkspaceState(user)).cases[0].evidence;
+    expect(records).toHaveLength(1);
+    expect(records[0].provenance?.fields.providerStatus).toBe('delivered');
+  });
+  it('refreshes changed status once and invalidates the previously approved draft', async () => {
+    await resendAction(user, { action: 'import', caseId, emailId, confirmed: true });
+    await executeAction(user, { action: 'generateDraft', caseId });
+    let item = (await getWorkspaceState(user)).cases[0];
+    await executeAction(user, { action: 'approveDraft', caseId, revision: item.draft!.revision });
+    fixture.read.mockResolvedValue({ ...email(), last_event: 'bounced' });
+    await resendAction(user, { action: 'import', caseId, emailId, confirmed: true });
+    item = (await getWorkspaceState(user)).cases[0];
+    expect(item.evidence).toHaveLength(1);
+    expect(item.evidence[0].provenance?.fields.providerStatus).toBe('bounced');
+    expect(item.draft?.status).toBe('draft');
+    expect(item.draft?.approvedAt).toBeFalsy();
+    expect(item.draft?.sourceStale).toBe(true);
   });
   it('rejects stale writes when the case changes during the provider read',async()=>{
     fixture.read.mockImplementationOnce(async()=>{await executeAction(user,{action:'updateCase',caseId,title:'Changed'});return email();});
