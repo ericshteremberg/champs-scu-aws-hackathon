@@ -1,5 +1,6 @@
 import { ArrowUpRight, ArrowRight, ArrowLeftRight } from "lucide-react";
 import { HeroVisual, ReceiptReveal } from "@/components/landing/motion";
+import { ProductDemo } from "@/components/landing/product-demo";
 import "./landing.css";
 
 const principles = [
@@ -29,8 +30,8 @@ export default function Home() {
         <section className="landing-sources" aria-label="Evidence sources"><div className="landing-container"><div className="landing-caption-row"><p>Evidence beyond the payment.</p><p className="landing-muted">Planned connections</p></div><ul className="landing-source-list"><li>Stripe</li><li>Gmail</li><li>Company records</li><li>Your policies</li></ul></div></section>
         <section className="landing-showcase landing-container" id="sample-report" aria-labelledby="showcase-title">
           <h2 id="showcase-title">The payment is one record.<br />The case is the whole story.</h2>
-          <a href="/login" className="landing-product-link" aria-label="Open Causality to explore an investigation"><img src="/causality/causality-investigation-detail.png" width="1296" height="780" loading="lazy" alt="Causality investigation: payment and shipment timeline beside the original customer email, a conflicting delivery scan, and a merchant review action." /><span className="landing-preview-action">Explore the workspace <ArrowUpRight size={18} aria-hidden="true" /></span></a>
-          <div className="landing-caption-row landing-muted"><p>Every finding stays connected to its source.</p><p>Desktop product concept · Synthetic records</p></div>
+          <ProductDemo />
+          <div className="landing-caption-row landing-muted"><p>Every finding stays connected to its source.</p><p>Scripted walkthrough · Synthetic records</p></div>
         </section>
         <section className="landing-investigation" id="investigation" aria-labelledby="investigation-title"><div className="landing-container landing-investigation-grid">
           <div className="landing-investigation-intro"><h2 id="investigation-title">Designed to investigate.<br />Without training on your data.</h2><p className="landing-muted">The intended architecture processes approved records for one case, without training on them or building a persistent cross-customer agent memory.</p><img className="landing-architecture" src="/causality/access-architecture-compact.svg" width="480" height="340" loading="lazy" alt="Planned access architecture: company records pass through a policy gate into a fresh context containing evidence and tools. Company policy and the audit log remain outside the investigator’s context." /></div>
@@ -44,7 +45,7 @@ export default function Home() {
           <div className="landing-outcome-band"><h2>Protect revenue. Reduce investigation costs.</h2><p>Prepared by Causality. Approved by you.</p></div>
         </section>
       </main>
-      <footer className="landing-footer"><div className="landing-container"><div className="landing-footer-top"><h2>Build your next case<br />on the full story.</h2><AccessButton /></div><ReceiptReveal /><div className="landing-footer-bottom"><p>© 2026 Causality</p><p>Evidence. Context. Judgment.</p><nav aria-label="Footer navigation"><a href="#sample-report">Sample report</a><a href="#access-control">Access &amp; control</a><a href="#top">Back to top ↑</a></nav></div></div></footer>
+      <div className="landing-footer-runway"><footer className="landing-footer"><div className="landing-container"><div className="landing-footer-top"><h2>Build your next case<br />on the full story.</h2><AccessButton /></div><ReceiptReveal /><div className="landing-footer-bottom"><p>© 2026 Causality</p><p>Evidence. Context. Judgment.</p><nav aria-label="Footer navigation"><a href="#sample-report">Sample report</a><a href="#access-control">Access &amp; control</a><a href="#top">Back to top ↑</a></nav></div></div></footer></div>
     </div>
   );
 }
