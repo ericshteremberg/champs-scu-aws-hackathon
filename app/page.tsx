@@ -1,6 +1,7 @@
 import { ArrowUpRight, ArrowRight, ArrowLeftRight } from "lucide-react";
 import { HeroVisual, ReceiptReveal } from "@/components/landing/motion";
 import { ProductDemo } from "@/components/landing/product-demo";
+import { IntegrationCarousel } from "@/components/landing/integration-carousel";
 import "./landing.css";
 
 const principles = [
@@ -27,7 +28,7 @@ export default function Home() {
           <div className="landing-hero-copy"><p className="landing-eyebrow">AI chargeback investigation</p><h1 id="hero-title">Stripe doesn’t<br />tell the<br /><span>whole story.</span></h1><p className="landing-hero-description">Turn payment records, customer conversations, and company data into clear, evidence-backed responses.</p><div className="landing-actions"><AccessButton /><a className="landing-text-link" href="#sample-report">See a sample report</a></div></div>
           <HeroVisual />
         </div></section>
-        <section className="landing-sources" aria-label="Evidence sources"><div className="landing-container"><div className="landing-caption-row"><p>Evidence beyond the payment.</p><p className="landing-muted">Planned connections</p></div><ul className="landing-source-list"><li>Stripe</li><li>Gmail</li><li>Company records</li><li>Your policies</li></ul></div></section>
+        <IntegrationCarousel />
         <section className="landing-showcase landing-container" id="sample-report" aria-labelledby="showcase-title">
           <h2 id="showcase-title">The payment is one record.<br />The case is the whole story.</h2>
           <ProductDemo />
