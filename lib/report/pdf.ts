@@ -26,6 +26,7 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
     const originalHash = exhibit.original ? await hashBytes(exhibit.original.bytes) : exhibit.sha256;
     if ((record.fileSha256 && record.fileSha256 !== originalHash) || (exhibit.original && originalHash !== exhibit.original.sha256)) throw new Error('An original exhibit differs from its captured fingerprint.');
     if (Boolean(record.originalEmail) !== Boolean(exhibit.renderedEmail) || (record.originalEmail && !exhibit.original)) throw new Error('An email exhibit has no retained original source.');
+    if (Boolean(record.originalRows) !== Boolean(exhibit.renderedRows) || (record.originalRows && !exhibit.original)) throw new Error('A database exhibit has no retained original query result.');
   }
   const doc = await PDFDocument.create();
   doc.registerFontkit(fontkit);
@@ -98,7 +99,7 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
     ensure(70); write(`[E${index + 1}] ${record.title}`, 11, bold, ink, 3);
     write(`${stamp(record.occurredAt)} | ${record.source}${record.provenance ? ` | ${record.provenance.sourceMode}` : ' | saved case record'}`, 9, regular, muted, 5);
     write(`Reference: ${record.reference || record.id}`, 9, regular, muted, 5);
-    write(exhibits.some(e => e.evidenceId === record.id) ? record.originalEmail ? 'Visual exhibit: rendered original provider email' : 'Visual exhibit: original uploaded file' : 'Saved text record; no original visual attached', 9, regular, muted, 12);
+    write(exhibits.some(e => e.evidenceId === record.id) ? record.originalEmail ? 'Visual exhibit: rendered original provider email' : record.originalRows ? 'Visual exhibit: original database query result' : record.originalDocument ? 'Visual exhibit: original Stripe receipt PDF' : 'Visual exhibit: original uploaded file' : 'Saved text record; no original visual attached', 9, regular, muted, 12);
   }
   if (!sources.length) write('No source records are attached. This draft cannot substantiate a dispute response.');
 
@@ -117,10 +118,10 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
       if (++visualPages > 100) throw new Error('Visual exhibits exceed 100 pages. Narrow the case files.');
       section = 'Visual exhibits'; newPage();
       heading(`[E${index + 1}] ${record.title}`);
-      write(`${exhibit.renderedEmail ? 'Rendered original Resend email' : 'Original uploaded file'} | ${part}`, 9, bold, accent, 5);
+      write(`${exhibit.renderedEmail ? 'Rendered original Resend email' : exhibit.renderedRows ? 'Original Supabase query result' : record.originalDocument ? 'Original Stripe receipt PDF' : 'Original uploaded file'} | ${part}`, 9, bold, accent, 5);
       write(`Collected: ${record.capturedAt ? stamp(record.capturedAt) : 'Not recorded'} | Retrieved for export: ${stamp(exhibit.fetchedAt)}`, 8, regular, muted, 4);
       write(`Source SHA-256: ${exhibit.original?.sha256 ?? exhibit.sha256}`, 7.5, regular, muted, 4);
-      write(exhibit.renderedEmail ? 'Captured provider body, not a provider-dashboard screenshot. Remote images, stylesheets and active content omitted.' : 'Reproduction of the attached original. Uploader-supplied content is not independently authenticated.', 8, regular, muted, 8);
+      write(exhibit.renderedEmail ? 'Captured provider body, not a provider-dashboard screenshot. Remote images, stylesheets and active content omitted.' : exhibit.renderedRows ? 'Visual export of original returned rows. The original JSON, query and parameters are embedded. This is not a database dashboard screenshot.' : record.originalDocument ? 'Original provider-generated PDF retrieved through the connected Stripe charge. The unmodified file is embedded.' : 'Reproduction of the attached original. Uploader-supplied content is not independently authenticated.', 8, regular, muted, 8);
       if (!record.fileSha256) write('No fingerprint was recorded at collection; the displayed hash was computed for this export.', 8, regular, muted, 5);
     };
     if (exhibit.mimeType === 'application/pdf') {
@@ -128,11 +129,14 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
       if (originalDoc.getPageCount() > 50 || !originalDoc.getPageCount()) throw new Error('Each original PDF must contain between 1 and 50 pages.');
       if (originalDoc.getForm().getFields().length) throw new Error('A fillable original PDF needs a flattened visual copy before it can be included. Keep its original attached.');
       const embedded = await doc.embedPdf(originalDoc, originalDoc.getPageIndices());
+      exhibitHeader(`Original PDF | ${embedded.length} page(s)`);
+      write('The original document pages follow at readable page scale. Page content is reproduced; interactive annotations are not rendered. Inspect the embedded original for annotations.', 10, regular, muted);
       for (const [number, originalPage] of embedded.entries()) {
-        exhibitHeader(`PDF page ${number + 1} of ${embedded.length}`);
-        write('Page content reproduced; interactive annotations are not rendered. Inspect the embedded original for annotations.', 8, regular, muted, 5);
-        const scale = Math.min(usable / originalPage.width, (y - 68) / originalPage.height);
-        page!.drawPage(originalPage, { x: margin + (usable - originalPage.width * scale) / 2, y: y - originalPage.height * scale, width: originalPage.width * scale, height: originalPage.height * scale });
+        if (++visualPages > 100) throw new Error('Visual exhibits exceed 100 pages. Narrow the case files.');
+        page = doc.addPage([width, height]);
+        page.drawText(`[E${index + 1}] Original document | Page ${number + 1} of ${embedded.length}`, { x: margin, y: height - 22, size: 8, font: bold, color: muted });
+        const scale = Math.min((width - 32) / originalPage.width, (height - 84) / originalPage.height);
+        page.drawPage(originalPage, { x: (width - originalPage.width * scale) / 2, y: 52, width: originalPage.width * scale, height: originalPage.height * scale });
       }
     } else {
       if (exhibit.mimeType === 'image/png') {

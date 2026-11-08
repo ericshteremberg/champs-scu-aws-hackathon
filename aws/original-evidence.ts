@@ -20,6 +20,7 @@ export async function captureOriginalEmails(user: TrustedUser, caseId: string): 
   if (!z.string().email().safeParse(row.data.email).success || row.data.orderRef.length < 4) throw new ApiError(409, 'Save the exact order reference and customer email before collecting originals.');
   const [records, draft] = await Promise.all([listEvidence(wid, caseId), getDraft(wid, caseId)]);
   const ids = linkedResendIds(records.map(record => record.data));
+  const databaseLinked = new Set(records.filter(record => record.data.originalRows && record.data.fileKey && record.data.fileSha256).flatMap(record => record.data.originalRows!.linkedEmailIds || []));
   const saved = new Set(records.filter(record => record.data.originalEmail?.provider === 'resend' && record.data.fileKey).map(record => record.data.originalEmail!.emailId));
   result.alreadySaved = ids.filter(id => saved.has(id)).length;
   const pending = ids.filter(id => !saved.has(id)); result.remaining = Math.max(0, pending.length - 3);
@@ -30,7 +31,7 @@ export async function captureOriginalEmails(user: TrustedUser, caseId: string): 
       const parsed = sentEmailSchema.safeParse(await readResend(`/emails/${emailId}`));
       if (!parsed.success) throw new ApiError(502, 'The provider returned an unsupported message.');
       const email = parsed.data;
-      if (email.id !== emailId || !allowedSender(email.from) || email.to.length !== 1 || email.to[0].toLowerCase() !== row.data.email.toLowerCase() || !orderLinked(email, row.data.orderRef)) throw new ApiError(409, 'The message did not match this case recipient, order and sender.');
+      if (email.id !== emailId || !allowedSender(email.from) || email.to.length !== 1 || email.to[0].toLowerCase() !== row.data.email.toLowerCase() || (!orderLinked(email, row.data.orderRef) && !databaseLinked.has(emailId))) throw new ApiError(409, 'The message did not match this case recipient, order and sender.');
       if (!email.html?.trim() && !email.text?.trim()) throw new ApiError(404, 'The provider has no original message body.');
       if (!Number.isFinite(new Date(email.created_at).valueOf())) throw new ApiError(502, 'The message date is invalid.');
       return { emailId, email };

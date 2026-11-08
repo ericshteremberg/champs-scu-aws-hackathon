@@ -71,6 +71,13 @@ export async function verifyStripeOAuthRead(tokens: StripeOAuthTokens): Promise<
 export const stripeDisputeId = z.string().regex(/^(?:dp|du)_[A-Za-z0-9]{1,120}$/);
 const stripeChargeId = z.string().regex(/^(?:ch|py)_[A-Za-z0-9]{1,120}$/);
 const stripePaymentId = z.string().regex(/^pi_[A-Za-z0-9]{1,120}$/);
+/** The connected account exposes its customer receipt through the existing charge-read grant. */
+export async function readStripeReceiptSource(tokens: StripeOAuthTokens, id: string) {
+  if (!stripeChargeId.safeParse(id).success) throw new ApiError(400, 'Choose a valid charge.');
+  const value = z.object({ id: stripeChargeId, object: z.literal('charge'), livemode: z.boolean(), paid: z.boolean(), amount: z.number().int().nonnegative(), currency: z.string(), created: z.number().int().positive(), payment_intent: stripePaymentId.nullable(), receipt_url: z.string().url().nullable(), metadata: z.record(z.string(), z.string()) }).safeParse(await request(`/v1/charges/${id}`, { method: 'GET', headers: { Authorization: `Bearer ${tokens.accessToken}` } }));
+  if (!value.success || value.data.id !== id || value.data.livemode !== (tokens.mode === 'live')) throw new ApiError(502, 'Stripe returned an unexpected receipt source.');
+  return value.data;
+}
 const disputeSchema = z.object({ id: stripeDisputeId, object: z.literal('dispute'), livemode: z.boolean(), amount: z.number().int().positive().max(999999999), currency: z.string().regex(/^[a-z]{3}$/), charge: stripeChargeId, payment_intent: stripePaymentId.nullable().optional(), reason: z.string().min(1).max(100), status: z.string().min(1).max(100), created: z.number().int().min(1).max(4102444800), evidence_details: z.object({ due_by: z.number().int().min(0).max(4102444800).nullable() }) });
 const allowedDispute = (d: z.infer<typeof disputeSchema>, tokens: StripeOAuthTokens) => {
   if (d.livemode !== (tokens.mode === 'live')) throw new ApiError(502, 'Stripe returned a different environment.', 'provider_invalid_response');

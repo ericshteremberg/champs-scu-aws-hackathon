@@ -5,6 +5,8 @@ export type Evidence = {
   occurredAt: string; reference: string; fileName?: string; mimeType?: string; downloadUrl?: string;
   fileSha256?: string; capturedAt?: string;
   originalEmail?: { provider: 'resend'; emailId: string };
+  originalDocument?: { provider: 'stripe'; kind: 'receipt'; sourceId: string };
+  originalRows?: { provider: 'supabase'; projectRef: string; table: string; rowCount: number; linkedEmailIds?: string[] };
   provenance?: { section: string; sourceMode: string; fields: Record<string, string | number | boolean | null>; limitations: string[]; originalSourceId?: string };
 };
 export type Finding = { kind: 'supported' | 'conflict' | 'missing'; title: string; detail: string; evidenceIds: string[] };

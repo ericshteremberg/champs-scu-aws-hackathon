@@ -1,4 +1,4 @@
-import { captureOriginalEmails } from './original-evidence.ts';
+import { captureOriginalEvidence } from './capture-originals.ts';
 import { z } from 'zod';
 import { ApiError, type TrustedUser } from './types.ts';
 import { getWorkspaceState, executeAction, requireWorkspace } from './workspace.ts';
@@ -79,7 +79,7 @@ async function route(raw:unknown) {
    return {status:200,body:{caseId:await importMerchantCase(user,action.externalCaseId),state:await getWorkspaceState(user)}};
   }
   if(path==='/api/investigations/archive' && event.method==='POST'){const input=parse(archiveSchema,event.body);return {status:200,body:await archiveApprovedCase(user,input.caseId,input.revision)};}
-  if(path==='/api/evidence/capture-originals' && event.method==='POST'){const input=parse(z.object({caseId:id}).strict(),event.body);return {status:200,body:{...await captureOriginalEmails(user,input.caseId),state:await getWorkspaceState(user)}};}
+  if(path==='/api/evidence/capture-originals' && event.method==='POST'){const input=parse(z.object({caseId:id}).strict(),event.body);return {status:200,body:{...await captureOriginalEvidence(user,input.caseId),state:await getWorkspaceState(user)}};}
   if(path==='/api/evidence/prepare-upload' && event.method==='POST')return {status:200,body:await prepareUpload(user,event.body)};
   if(path==='/api/evidence/finalize-upload' && event.method==='POST'){const input=parse(finalizeSchema,event.body);await completeUpload(user,input.uploadId);return {status:200,body:await getWorkspaceState(user)};}
   if(path.startsWith('/api/evidence/') && event.method==='GET'){const file=await getDownload(user,parse(id,decodeURIComponent(path.slice('/api/evidence/'.length))));return {status:302,redirect:file.url};}

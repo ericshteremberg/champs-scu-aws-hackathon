@@ -30,6 +30,7 @@ export function orderLinked(email: z.infer<typeof sentEmailSchema>, orderRef: st
 export function linkedResendIds(evidence: EvidenceDoc[]) {
   const ids = new Set<string>();
   for (const item of evidence) {
+    for (const value of item.originalRows?.linkedEmailIds || []) if (emailIdSchema.safeParse(value).success) ids.add(value.toLowerCase());
     const fields = item.provenance?.fields || {};
     for (const value of [fields.emailId, fields.resend_email_id, fields.resend_id, ...(item.provenance?.section === 'delivery' || /message_log/i.test(item.reference || '') ? [fields.provider_id] : [])]) {
       if (emailIdSchema.safeParse(value).success) ids.add(String(value).toLowerCase());

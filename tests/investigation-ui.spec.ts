@@ -815,3 +815,30 @@ for (const longEmail of [false, true]) test(`retained original ${longEmail ? 'lo
   expect(pdf.getPageCount()).toBeGreaterThanOrEqual(longEmail ? 5 : 3);
   await downloaded.saveAs(`.aws-build/original-email-${longEmail ? 'long' : 'short'}-synthetic.pdf`);
 });
+
+test('native provider receipts and original database rows are embedded as visual evidence', async ({ page }) => {
+  const { state } = await setup(page), item = state.cases.find(c => c.orderRef === 'ATM-1042')!;
+  const capturedAt = '2026-11-08T12:00:00Z';
+  const native = await PDFDocument.create(); native.addPage([400, 500]).drawText('SYNTHETIC PROVIDER RECEIPT', { x: 30, y: 450, size: 16 });
+  const receipt = Buffer.from(await native.save());
+  const raw = JSON.stringify({ schemaVersion: 1, provider: 'supabase', caseId: item.id, projectRef: 'syntheticproject', table: 'orders', capturedAt, query: { sql: 'SELECT id, name, email FROM orders WHERE id = $1 LIMIT 2', parameters: ['ORDER-42'] }, rows: [{ id: 'ORDER-42', name: '<img src="https://tracker.example.test/row">', email: 'customer@example.test' }] });
+  item.evidence = [
+    { id: 'native_receipt', caseId: item.id, source: 'stripe', title: 'Original receipt fixture', content: 'Original provider PDF retained.', occurredAt: capturedAt, reference: 'ch_synthetic', originalDocument: { provider: 'stripe', kind: 'receipt', sourceId: 'ch_synthetic' }, mimeType: 'application/pdf', fileName: 'receipt.pdf', capturedAt, fileSha256: createHash('sha256').update(receipt).digest('hex'), downloadUrl: '/api/evidence/native_receipt' },
+    { id: 'original_rows', caseId: item.id, source: 'database', title: 'Original database result fixture', content: 'Original query result retained.', occurredAt: capturedAt, reference: 'synthetic/orders', originalRows: { provider: 'supabase', projectRef: 'syntheticproject', table: 'orders', rowCount: 1 }, mimeType: 'application/json', fileName: 'rows.json', capturedAt, fileSha256: createHash('sha256').update(raw).digest('hex'), downloadUrl: '/api/evidence/original_rows' },
+  ];
+  item.findings = []; item.draft = { revision: 1, status: 'draft', method: 'evidence_template', generatedAt: capturedAt, content: 'Synthetic response. [native_receipt] [original_rows]' };
+  await page.route('**/api/workspace', route => route.fulfill({ json: state }));
+  await page.route('**/api/evidence/native_receipt', route => route.fulfill({ contentType: 'application/pdf', body: receipt }));
+  await page.route('**/api/evidence/original_rows', route => route.fulfill({ contentType: 'application/json', body: raw }));
+  const requests: string[] = []; await page.route('https://tracker.example.test/**', route => { requests.push(route.request().url()); return route.abort(); });
+  await page.goto(`/workspace?view=cases&case=${encodeURIComponent(item.id)}&tab=report`);
+  await expect(page.getByText('2 original files will appear as visual exhibits.', { exact: false })).toBeVisible();
+  const downloading = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download evidence PDF', exact: true }).click();
+  const file = await downloading, pdf = await PDFDocument.load(await readFile((await file.path())!));
+  const objects = pdf.context.enumerateIndirectObjects().map(([,object]) => object).filter(object => object instanceof PDFRawStream);
+  expect(objects.some(o => o.dict.get(PDFName.of('Subtype')) === PDFName.of('Image'))).toBe(true);
+  expect(objects.some(o => o.dict.get(PDFName.of('Subtype')) === PDFName.of('Form'))).toBe(true);
+  expect(objects.filter(o => o.dict.get(PDFName.of('Type')) === PDFName.of('EmbeddedFile'))).toHaveLength(2);
+  expect(requests).toEqual([]);
+  await file.saveAs('.aws-build/visual-source/native-receipt-and-rows-synthetic.pdf');
+});

@@ -35,10 +35,11 @@ async function rows(accessToken: string, ref: string, table: string, selected: s
   if (JSON.stringify(result.data).includes(accessToken)) throw new ApiError(502, 'The provider returned unsafe content.', 'provider_invalid_response');
   return result.data;
 }
-export async function fetchMappedEvidence(accessToken: string, ref: string, input: OrderEvidenceMapping, paymentRef: string) {
+async function mappedEvidence(accessToken: string, ref: string, input: OrderEvidenceMapping, paymentRef: string) {
   if (!projectRef.safeParse(ref).success || !orderMappingSchema.safeParse(input).success || !/^(?:pi|ch|py)_[A-Za-z0-9]{1,120}$/.test(paymentRef)) throw new ApiError(400, 'A verified Stripe payment and saved mapping are required.', 'mapping_invalid');
   const root = input.order;
   const orders = await rows(accessToken, ref, root.table, root.columns, root.paymentColumn, paymentRef, 2);
+  const snapshots = [{ section: 'order', table: root.table, query: { sql: evidenceQuery(root.table, root.columns, root.paymentColumn, 2), parameters: [paymentRef] }, rows: orders }];
   if (orders.length !== 1) throw new ApiError(409, orders.length ? 'Multiple orders match this payment. Fix the mapping before importing.' : 'No order matches the verified Stripe payment.', 'mapping_order_unresolved');
   const orderId = orders[0][root.idColumn];
   if ((typeof orderId !== 'string' && typeof orderId !== 'number') || !String(orderId).trim() || String(orderId).length > 200 || String(orders[0][root.paymentColumn]) !== paymentRef) throw new ApiError(409, 'The mapped order has no usable identity or payment link.', 'mapping_order_unresolved');
@@ -53,9 +54,18 @@ export async function fetchMappedEvidence(accessToken: string, ref: string, inpu
   const related = await Promise.all(input.related.map(async relation => ({ relation, values: await rows(accessToken, ref, relation.table, relation.columns, relation.orderColumn, String(orderId), 6) })));
   for (const { relation, values } of related) {
     if (values.some(row => String(row[relation.orderColumn]) !== String(orderId))) throw new ApiError(502, 'The provider returned unrelated records.', 'provider_invalid_response');
+    snapshots.push({ section: relation.section, table: relation.table, query: { sql: evidenceQuery(relation.table, relation.columns, relation.orderColumn, 6), parameters: [String(orderId)] }, rows: values });
     if (values.length > 5) limitations.push(`${relation.table}: only five related records are shown; more exist.`);
     if (!values.length) limitations.push(`${relation.table}: no matching rows returned. This does not establish that the event did not occur.`);
     for (const fields of values.slice(0, 5)) records.push(record(relation.section, relation.table, fields));
   }
-  return { records: [...new Map(records.map(r => [r.id, r])).values()], limitations };
+  return { records: [...new Map(records.map(r => [r.id, r])).values()], limitations, snapshots };
+}
+export async function fetchMappedEvidence(accessToken: string, ref: string, input: OrderEvidenceMapping, paymentRef: string) {
+  const { records, limitations } = await mappedEvidence(accessToken, ref, input, paymentRef);
+  return { records, limitations };
+}
+export async function fetchMappedOriginalRows(accessToken: string, ref: string, input: OrderEvidenceMapping, paymentRef: string) {
+  const { snapshots, limitations } = await mappedEvidence(accessToken, ref, input, paymentRef);
+  return { snapshots, limitations: limitations.map(value => value.replace('only five related records are shown; more exist.', 'six rows were returned at the query limit; additional rows may exist.')) };
 }

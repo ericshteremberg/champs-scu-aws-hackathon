@@ -204,6 +204,15 @@ describe('automatic original email collection', () => {
     expect((await getWorkspaceState(user)).cases[0]).toEqual(before);
     expect(send).not.toHaveBeenCalled(); send.mockRestore();
   });
+  it('uses retained order-linked database IDs for reminder bodies without an order number', async () => {
+    await linked();
+    const id = 'trusted_query', key = `evidence#${caseId}#${id}`;
+    fixture.rows.set(`${wid}|${key}`, { key, version: 1, data: { id, caseId, source: 'database', title: 'Original message rows', content: 'Original query', reference: 'supabase:message_log', occurredAt: '2026-11-01', fileKey: 'private/original', fileSha256: 'a'.repeat(64), originalRows: { provider: 'supabase', projectRef: 'synthetic', table: 'message_log', rowCount: 1, linkedEmailIds: [emailId] } } });
+    fixture.read.mockResolvedValue({ ...email(), subject: 'Tonight', text: 'Doors at 10 PM' });
+    const send = vi.spyOn(S3Client.prototype, 'send').mockResolvedValue({} as never);
+    expect(await captureOriginalEmails(user, caseId)).toMatchObject({ captured: 1 });
+    send.mockRestore();
+  });
   it('rejects mismatched customer and order content before preserving a provider body', async () => {
     await linked();
     const send = vi.spyOn(S3Client.prototype, 'send').mockResolvedValue({} as never);

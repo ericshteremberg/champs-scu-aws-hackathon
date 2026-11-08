@@ -20,7 +20,7 @@ export function EvidencePacket({ current, content = current.draft?.content ?? ''
       <div className="cw-banner neutral" style={{ marginBottom: 24 }}>
         <p>{originals.length
           ? `${originals.length} original file${originals.length === 1 ? '' : 's'} will appear as visual exhibits. Source text and review notes remain separate.`
-          : 'No visual originals are saved yet. AWS investigations collect linked original emails from Resend when available. Use Collect original emails to retry, or optionally attach an original image or PDF. Unavailable originals are never recreated from summaries.'}</p>
+          : 'Original evidence is missing. This export will be a text-only review draft. Use Collect original evidence to retrieve Stripe receipts, approved Supabase rows and available Resend bodies through your connected accounts. Unavailable originals are never recreated from summaries.'}</p>
       </div>
       {originals.length > 0 && <details style={{ marginBottom: 24 }}>
         <summary>Original files included in the PDF</summary>

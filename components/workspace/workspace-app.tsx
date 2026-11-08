@@ -664,10 +664,10 @@ export default function WorkspaceApp({
     setBusy(true); setError('');
     try {
       const response = await fetch('/api/evidence/capture-originals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ caseId: id }) });
-      const data = await response.json() as { state?: WorkspaceState; captured: number; alreadySaved: number; configured: boolean; remaining: number; unavailable: unknown[]; error?: string };
+      const data = await response.json() as { state?: WorkspaceState; captured: number; alreadySaved: number; configured: boolean; remaining: number; unavailable: { provider: string; reason: string }[]; error?: string };
       if (!response.ok) throw new Error(data.error || 'Original email collection could not finish.');
       if (data.state) setState(data.state);
-      setToast(!data.configured ? 'Connect Resend read access to collect original email bodies.' : data.captured ? `${data.captured} original email(s) preserved. Run a fresh investigation to include them in the PDF.${data.remaining ? ' More linked emails remain; collect again.' : ''}` : data.unavailable.length ? 'The provider could not return an original email for this case. Existing evidence was preserved; no replacement image was created.' : `${data.alreadySaved} original email(s) already saved. No additional linked messages were available.`);
+      setToast(!data.configured ? 'Connect Stripe or Resend to collect original evidence.' : `${data.captured} new original file(s) collected; ${data.alreadySaved} already saved.${data.captured ? ' Run a fresh investigation to include them in the PDF.' : ''}${data.unavailable.length ? ` Unavailable: ${[...new Set(data.unavailable.map(value => value.provider))].join(', ')}. Existing sources were preserved.` : ''}${data.remaining ? ' More linked emails remain; collect again.' : ''}`);
     } catch (error) { setError(error instanceof Error ? error.message : 'Original collection failed.'); }
     finally { setBusy(false); }
   };
@@ -2875,7 +2875,7 @@ function CaseDetail({
                   {pdfBusy ? 'Preparing PDF…' : 'Download evidence PDF'}
                 </Button>
                 <Button onClick={collectOriginals} disabled={busy || frozen || investigating || dirty || current.source === 'demo'}>
-                  Collect original emails
+                  Collect original evidence
                 </Button>
                 <Button
                   onClick={() => exportDraft("json")}

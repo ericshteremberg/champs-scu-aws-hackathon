@@ -1,7 +1,7 @@
 import type { DisputeCase, Evidence } from '../domain.ts';
 
-export type Exhibit = { evidenceId: string; bytes: Uint8Array; mimeType: 'image/png' | 'image/jpeg' | 'application/pdf'; sha256: string; fetchedAt: string; original?: { bytes: Uint8Array; sha256: string; mimeType: string }; renderedEmail?: boolean };
-export const isVisualEvidence = (record: Evidence) => Boolean(record.downloadUrl && (['image/png', 'image/jpeg', 'application/pdf'].includes(record.mimeType ?? '') || record.originalEmail?.provider === 'resend'));
+export type Exhibit = { evidenceId: string; bytes: Uint8Array; mimeType: 'image/png' | 'image/jpeg' | 'application/pdf'; sha256: string; fetchedAt: string; original?: { bytes: Uint8Array; sha256: string; mimeType: string }; renderedEmail?: boolean; renderedRows?: boolean };
+export const isVisualEvidence = (record: Evidence) => Boolean(record.downloadUrl && (['image/png', 'image/jpeg', 'application/pdf'].includes(record.mimeType ?? '') || record.originalEmail?.provider === 'resend' || record.originalRows?.provider === 'supabase'));
 export const visualEvidence = (item: DisputeCase) => item.evidence.filter(isVisualEvidence);
 export const FILE_LIMIT = 10 * 1024 * 1024;
 export const PACKET_FILE_LIMIT = 40 * 1024 * 1024;
@@ -38,11 +38,10 @@ export async function loadVisualExhibits(item: DisputeCase, request: typeof fetc
     for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
     const originalHash = await hashBytes(bytes);
     if (record.fileSha256 && record.fileSha256 !== originalHash) throw new Error(`The original file for "${record.title}" differs from its saved fingerprint. No PDF was created.`);
-    if (record.originalEmail) {
+    if (record.originalEmail || record.originalRows) {
       if (!record.fileSha256 || record.mimeType !== 'application/json') throw new Error('This email snapshot has no verified source fingerprint. Collect its original again.');
-      const { renderOriginalEmail } = await import('./email-renderer');
-      const png = await renderOriginalEmail(bytes, record);
-      exhibits.push({ evidenceId: record.id, bytes: png, mimeType: 'image/png', sha256: await hashBytes(png), fetchedAt: new Date().toISOString(), original: { bytes, sha256: originalHash, mimeType: 'application/json' }, renderedEmail: true });
+      const png = record.originalEmail ? await (await import('./email-renderer')).renderOriginalEmail(bytes, record) : await (await import('./row-renderer')).renderOriginalRows(bytes, record);
+      exhibits.push({ evidenceId: record.id, bytes: png, mimeType: 'image/png', sha256: await hashBytes(png), fetchedAt: new Date().toISOString(), original: { bytes, sha256: originalHash, mimeType: 'application/json' }, renderedEmail: !!record.originalEmail, renderedRows: !!record.originalRows });
       continue;
     }
     const mimeType = visualMime(bytes);
