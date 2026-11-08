@@ -4,7 +4,7 @@ import { loadAwsSession } from './load-aws-session.mjs';
 
 loadAwsSession();
 const region = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1';
-const modelId = process.env.BEDROCK_MODEL_ID || 'us.amazon.nova-2-lite-v1:0';
+const modelId = process.env.BEDROCK_MODEL_ID || 'us.anthropic.claude-opus-5';
 
 try {
   if (region !== 'us-east-1') throw new Error('Use us-east-1 for the SCU workshop environment.');
@@ -16,6 +16,7 @@ try {
       modelId,
       messages: [{ role: 'user', content: [{ text: 'This is a synthetic connectivity test. Call lookup_status for case_id test_case to answer whether the test case is ready. Do not answer without the tool.' }] }],
       inferenceConfig: { maxTokens: 256 },
+      ...(modelId.endsWith('anthropic.claude-opus-5') ? { additionalModelRequestFields: { thinking: { type: 'disabled' } } } : {}),
       toolConfig: { tools: [{ toolSpec: {
         name: 'lookup_status', description: 'Get the status of a synthetic test case.',
         inputSchema: { json: { type: 'object', properties: { case_id: { type: 'string' } }, required: ['case_id'], additionalProperties: false } },

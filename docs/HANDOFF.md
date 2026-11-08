@@ -1,10 +1,12 @@
 # Causality AWS handoff
 
-The final product keeps Causality's interface and review workflow, with an AWS-native backend. Wrangler hosts the frontend and authenticated bridge. Private Lambda runs the API and background investigations, DynamoDB stores business records, S3 stores files and archives, and Bedrock Nova investigates case evidence.
+The final product keeps Causality's interface and review workflow, with an AWS-native backend. Wrangler hosts the frontend and authenticated bridge. Private Lambda runs the API and background investigations, DynamoDB stores business records, S3 stores files and archives, and Bedrock Claude Opus 5 investigates case evidence.
 
 The deployment has no Cloudflare database or R2 binding. The temporary development D1 database was deleted. D1/R2 source remains for original Sites compatibility and local regression tests only.
 
 ## Current state
+
+- Claude Opus 5 upgrade, November 8, 2026: default model `us.anthropic.claude-opus-5` in CloudFormation, deployment and connectivity scripts. The investigator omits unsupported temperature, disables extended thinking to preserve forced evidence/report tool calls within the existing time budget, and retains citation validation and submission blocks. A synthetic Opus 5 tool-call probe passed before the switch. Customer investigations and broad tests are left to the team as requested. The ignored local model override was updated too. Deployment status is recorded below. This repository has no root `context.md`; this handoff documents the change.
 
 - Latest full deployment, November 8, 2026: source `cd60a59`, Worker `87fe64e0-5688-4718-b2f1-742653f3cfee`, and AWS API/investigator/webhook bundles. Bedrock now uses a more persuasive first-person merchant voice, decisive rebuttal first, explicit fact-to-claim connections and a supported reversal request. Builds and deployment commands completed; tests were skipped at the user’s request. Existing drafts require a new investigation. Demo submission buttons remain inert. Earlier entries below are deployment history.
 
@@ -15,7 +17,7 @@ The deployment has no Cloudflare database or R2 binding. The temporary developme
 
 - AWS stack: `causality-hackathon-dev`, region `us-east-1`; stack creation completed.
 - Frontend: [causality-hackathon-dev.slidah60.workers.dev](https://causality-hackathon-dev.slidah60.workers.dev).
-- Model: `us.amazon.nova-2-lite-v1:0`; a complete real investigation with validated citations was saved as a new draft requiring approval.
+- Model: `us.anthropic.claude-opus-5` (Claude Opus 5). Earlier Nova acceptance runs remain historical results. New investigations use the configured model; existing drafts are not regenerated.
 - Direct AWS acceptance passed: six DynamoDB samples and owner isolation, all three background ticket outcomes, private S3 uploads/downloads, cancellation, concurrent approval preservation, and approved archives.
 - Published browser acceptance passed with `npm run test:dev:smoke`: authenticated frontend and signed Lambda bridge, real Bedrock investigation, approval/export, S3 archive, browser S3 upload, and private original download, with no JavaScript errors.
 - Customer Stripe reads are connected and verified. Real Supabase rows and mailbox imports still need customer setup/testing. Refunds and outbound customer messaging remain disabled.
