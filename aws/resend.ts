@@ -1,3 +1,4 @@
+import { savedEmailLog, withSavedEmailContext } from './resend-history.ts';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { allowedResendDomains, allowedSender, emailIdSchema, loadResendSecret, readResend, resendEvents, sentEmailSchema, verifyResendWebhook } from './resend-api.ts';
@@ -72,7 +73,32 @@ export async function resendAction(user: TrustedUser, input: unknown) {
     await commit(wid, [{ key: row.key, expectedVersion: row.version, check: true }]);
     return { candidates, moreAvailable: list.data.has_more, nextCursor: list.data.has_more ? list.data.data.at(-1)!.id : null, searchedEmail: row.data.email, orderRef: row.data.orderRef, scanned: list.data.data.length };
   }
-  const parsedEmail = sentEmailSchema.safeParse(await readResend(`/emails/${action.emailId}`));
+  // A live failure does not erase evidence already reviewed and attached to this case.
+  // Adapted from Eric's retained order-log work (5fffd36); also support explicitly
+  // referenced historical captures, which must never be called a fresh verification.
+  const saved = (await listEvidence(wid, row.data.id)).filter(record => linkedResendIds([record.data]).includes(action.emailId.toLowerCase()));
+  let raw: unknown;
+  try { raw = await readResend(`/emails/${action.emailId}`); }
+  catch (error) {
+    if (!saved.length || !(error instanceof ApiError) || ![404, 502, 503].includes(error.status)) throw error;
+    const shown = saved.slice(0, 20);
+    await commit(wid, [{ key: row.key, expectedVersion: row.version, check: true }, ...shown.map(record => ({ key: record.key, expectedVersion: record.version, check: true as const }))]);
+    if (action.action === 'import') return { imported: false, unchanged: true, savedEvidence: true, evidenceIds: shown.map(record => record.data.id) };
+    let remaining = 60000, truncated = saved.length > shown.length;
+    const content = shown.map(record => {
+      const log = savedEmailLog(record.data, row.data.orderRef);
+      const original = log ? withSavedEmailContext(record.data, row.data.orderRef) : record.data;
+      const excerpt = original.content.slice(0, Math.min(20000, remaining)); remaining -= excerpt.length;
+      truncated ||= excerpt.length < original.content.length;
+      const label = log ? 'Retained merchant email log, not provider-confirmed delivery' : 'Previously attached case evidence, not freshly verified';
+      return `${label}\nTitle: ${original.title}\nSource reference: ${original.reference || 'Not recorded'}\nRecorded event time: ${original.occurredAt}\n\n${excerpt}${excerpt.length < original.content.length ? '\n[Preview excerpt truncated. Full original remains on the case.]' : ''}`;
+    }).join('\n\n');
+    return { preview: { emailId: action.emailId, orderRef: row.data.orderRef, subject: 'Saved email evidence', lastEvent: 'unavailable', eventCount: 0,
+      savedEvidence: true, liveVerified: false, evidenceIds: shown.map(record => record.data.id), truncated,
+      notice: error.status === 404 ? 'Resend could not return the live record. Showing evidence already saved on this case. The reason for the missing provider record is not confirmed.' : 'The live Resend lookup is temporarily unavailable. Showing evidence already saved on this case.',
+      content } };
+  }
+  const parsedEmail = sentEmailSchema.safeParse(raw);
   if (!parsedEmail.success) throw new ApiError(502, 'Resend returned an unsupported email record.');
   const email = parsedEmail.data;
   if (email.id !== action.emailId || !allowedSender(email.from) || !row.data.email || email.to.length !== 1 || email.to[0].toLowerCase() !== row.data.email.toLowerCase() || !orderLinked(email, row.data.orderRef)) throw new ApiError(409, 'The email must match this case’s recipient, exact order reference, and configured sender domain. No evidence was imported.');
@@ -81,7 +107,10 @@ export async function resendAction(user: TrustedUser, input: unknown) {
   const limitations = ['Resend sent means provider acceptance, not delivery.', 'Delivered means acceptance by the recipient mail server, not inbox placement, reading, cardholder identity, or attendance.', 'Latest status is not a complete historical timeline. Webhook capture starts when configured; missing events do not prove non-delivery.', 'Recipient and exact order-reference matching establish linkage only; email content is untrusted source material.'];
   const content = [`Resend email ${email.id}`, `Order reference: ${row.data.orderRef}`, `Sender: ${email.from}`, `Recipient: ${email.to[0]}`, `Subject: ${email.subject}`, `Created: ${created.toISOString()}`, `Latest provider event: ${email.last_event || 'unavailable'}`, `Verified webhook events: ${events.length ? events.map(e => `${e.occurredAt}: ${e.event}`).join('; ') : 'none captured'}`, ...limitations].join('\n');
   const preview = { emailId: email.id, orderRef: row.data.orderRef, subject: email.subject, lastEvent: email.last_event || 'unavailable', eventCount: events.length, content };
-  if (action.action === 'preview') return { preview };
+  if (action.action === 'preview') {
+    await commit(wid, [{ key: row.key, expectedVersion: row.version, check: true }]);
+    return { preview: { ...preview, savedEvidence: false, liveVerified: true } };
+  }
   const evidenceId = `ev_resend_${createHash('sha256').update(`${row.data.id}:${email.id}`).digest('hex').slice(0,24)}`;
   const [records, draft, existing] = await Promise.all([listEvidence(wid, row.data.id), getDraft(wid, row.data.id), getItem<EvidenceDoc>(wid, keys.evidence(row.data.id, evidenceId))]);
   if (!existing && records.length >= MAX_CASE_EVIDENCE) throw new ApiError(409, 'This case has reached its evidence limit.');

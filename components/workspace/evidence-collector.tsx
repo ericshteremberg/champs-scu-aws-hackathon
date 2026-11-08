@@ -40,8 +40,8 @@ export function EvidenceCollector({ cases }: { cases: WorkspaceState['cases'] })
       if (provider === 'Resend') {
         const result = await api<{ candidates: { emailId: string; subject: string; source: string }[]; moreAvailable: boolean }>('/api/providers/resend', { action: 'find', caseId });
         if (result.candidates.length === 1 && result.candidates[0].source === 'case_reference') {
-          const verified = await api<{ preview: { content: string; subject: string } }>('/api/providers/resend', { action: 'preview', caseId, emailId: result.candidates[0].emailId });
-          return { state: 'ready', summary: 'Found and verified the email already linked to this case.', details: [{ label: verified.preview.subject || 'Resend record', value: verified.preview.content }] };
+          const verified = await api<{ preview: { content: string; subject: string; savedEvidence?: boolean; notice?: string } }>('/api/providers/resend', { action: 'preview', caseId, emailId: result.candidates[0].emailId });
+          return { state: 'ready', summary: verified.preview.savedEvidence ? 'Saved case evidence is available. The live Resend record could not be reverified.' : 'Found and verified the email already linked to this case.', details: [{ label: verified.preview.savedEvidence ? 'Already attached evidence, not live verification' : verified.preview.subject || 'Resend record', value: [verified.preview.notice, verified.preview.content].filter(Boolean).join('\n\n') }] };
         }
         return { state: result.candidates.length ? 'ready' : 'attention', summary: `${result.candidates.length} candidate emails found. ${result.moreAvailable ? 'Older pages remain available in the Resend tool below.' : 'No more pages were reported.'} Recipient matches still require order verification.`, items: result.candidates.map(m => ({ id: m.emailId, title: m.subject || '(No subject)', subtitle: 'Preview to check the exact order and recipient.' })) };
       }
@@ -60,7 +60,7 @@ export function EvidenceCollector({ cases }: { cases: WorkspaceState['cases'] })
     setBusy(true); setError(''); setPreview(null);
     try {
       if (provider === 'IMAP') { const result = await api<{ preview: { subject: string; text: string } }>('/api/providers/imap', { action: 'preview', caseId, messageId: id }); setPreview({ title: result.preview.subject, text: result.preview.text }); }
-      else { const result = await api<{ preview: { subject: string; content: string } }>('/api/providers/resend', { action: 'preview', caseId, emailId: id }); setPreview({ title: result.preview.subject, text: result.preview.content }); }
+      else { const result = await api<{ preview: { subject: string; content: string; savedEvidence?: boolean; notice?: string } }>('/api/providers/resend', { action: 'preview', caseId, emailId: id }); setPreview({ title: result.preview.savedEvidence ? 'Saved case evidence, not reverified' : result.preview.subject, text: [result.preview.notice, result.preview.content].filter(Boolean).join('\n\n') }); }
     } catch (e) { setError(e instanceof Error ? e.message : 'Preview unavailable.'); }
     finally { setBusy(false); }
   };

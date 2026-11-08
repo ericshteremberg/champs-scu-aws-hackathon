@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 type Status = { configured: boolean; verifiedAt: string | null; domains: string[] };
 type Case = { id: string; customerName: string; orderRef: string; source: string; status: string; email: string };
-type Preview = { content: string; emailId: string; orderRef: string };
+type Preview = { content: string; emailId: string; orderRef: string; savedEvidence?: boolean; liveVerified?: boolean; notice?: string; truncated?: boolean };
 type Candidate = { emailId: string; subject: string; createdAt?: string; source: string };
 type Search = { candidates: Candidate[]; moreAvailable: boolean; nextCursor?: string; searchedEmail: string; orderRef: string; linkedTruncated?: boolean };
 async function api<T>(path: string, body?: unknown): Promise<T> {
@@ -15,7 +15,7 @@ export function ResendConnector() {
   const [busy,setBusy] = useState(false), [error,setError] = useState(''), [notice,setNotice] = useState('');
   useEffect(() => { let alive=true; api<Status>('/api/providers/resend').then(s=>{if(alive)setStatus(s);}).catch(e=>{if(alive)setError(e.message);}); return ()=>{alive=false;}; },[]);
   const run = async (action: ()=>Promise<void>) => {setBusy(true);setError('');setNotice('');try{await action();}catch(e){setError(e instanceof Error?e.message:'Request failed.');}finally{setBusy(false);}};
-  const showPreview = async (id: string, selectedCase = caseId) => { setPreview(null); const r=await api<{preview:Preview}>('/api/providers/resend',{action:'preview',caseId:selectedCase,emailId:id});setEmailId(id);setPreview(r.preview); };
+  const showPreview = async (id: string, selectedCase = caseId) => { setPreview(null); const r=await api<{preview:Preview}>('/api/providers/resend',{action:'preview',caseId:selectedCase,emailId:id});setEmailId(id);setPreview(r.preview);if(r.preview.savedEvidence)setNotice(r.preview.notice || 'Showing saved case evidence. Live Resend verification is unavailable.'); };
   const find = async (selectedCase: string, recent = false, after?: string) => {
     setPreview(null); setSearch(null); setEmailId('');
     const result = await api<Search>('/api/providers/resend', { action: 'find', caseId: selectedCase, ...(recent ? { recent: true } : {}), ...(after ? { after } : {}) });
@@ -46,7 +46,12 @@ export function ResendConnector() {
         </details>
       </div>}
       {busy && <p role="status">Finding and checking email records…</p>}
-      {preview && <div><pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',font:'inherit',lineHeight:1.6}}>{preview.content}</pre><button className="cw-button primary" disabled={busy} onClick={()=>void run(async()=>{await api('/api/providers/resend',{action:'import',caseId,emailId:preview.emailId,confirmed:true});setPreview(null);setNotice('Evidence saved to the case. Run the investigation again to include it.');})}>Attach to case</button></div>}
+      {preview && <section aria-label="Resend evidence preview"><h4>{preview.savedEvidence ? 'Saved case evidence, not reverified' : 'Live Resend record'}</h4>
+        {preview.savedEvidence && <p>This evidence is already attached to the case and remains available to the investigation. It does not establish fresh provider verification or confirmed delivery.</p>}
+        {preview.truncated && <p>Only part of the saved evidence is shown here. Review the full original on the case.</p>}
+        <pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',font:'inherit',lineHeight:1.6}}>{preview.content}</pre>
+        {preview.savedEvidence ? <p>Already attached. The original evidence and report were not changed.</p> : <button className="cw-button primary" disabled={busy} onClick={()=>void run(async()=>{await api('/api/providers/resend',{action:'import',caseId,emailId:preview.emailId,confirmed:true});setPreview(null);setNotice('Evidence saved to the case. Run the investigation again to include it.');})}>Attach to case</button>}
+      </section>}
     </>}
   </article>;
 }

@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { chromium, expect } from '@playwright/test';
 
 const base = 'https://causality-hackathon-dev.slidah60.workers.dev';
+let stage = 'load case';
 async function main() {
   const caseId = process.env.CAUSALITY_SMOKE_CASE_ID;
   assert.ok(caseId, 'Set CAUSALITY_SMOKE_CASE_ID to an authorized existing case.');
@@ -18,8 +19,10 @@ async function main() {
     const page = await context.newPage(), errors = [], actions = [];
     page.on('pageerror', e => errors.push(e.name));
     page.on('request', r => { if (r.method() === 'POST' && r.url().includes('/api/providers/')) { try { actions.push(r.postDataJSON().action); } catch { /* No request body logged. */ } } });
+    stage = 'open connections';
     await page.goto(`${base}/workspace?view=integrations`);
     const collector = page.getByRole('article', { name: 'Get evidence from all providers' });
+    stage = 'collect provider results';
     await collector.getByLabel('Case to collect evidence for').selectOption(caseId);
     await collector.getByRole('button', { name: 'Get evidence', exact: true }).click();
     await expect(collector.getByRole('button', { name: 'Get evidence', exact: true })).toBeEnabled({ timeout: 60000 });
@@ -34,18 +37,35 @@ async function main() {
     await page.setViewportSize({ width: 390, height: 844 });
     assert.equal(await collector.evaluate(el => el.scrollWidth <= el.clientWidth), true);
     await collector.screenshot({ path: '.aws-build/customer-evidence-mobile.png' });
+    stage = 'customer lookup';
     const imap = page.getByRole('article', { name: 'Other email IMAP connection' });
+    await imap.getByLabel('Case for IMAP evidence').scrollIntoViewIfNeeded();
     await imap.getByLabel('Case for IMAP evidence').selectOption(caseId);
     await imap.getByRole('button', { name: 'Find customer account in Supabase' }).click();
     await expect(imap.getByRole('button', { name: 'Look up customer', exact: true })).toBeEnabled();
     await imap.getByRole('button', { name: 'Look up customer', exact: true }).click();
     await expect(imap.getByRole('button', { name: /Use this email and search/ }).first()).toBeVisible();
     const accountMatches = await imap.getByRole('button', { name: /Use this email and search/ }).count();
+    let savedResendVerified = false;
+    if (process.env.CAUSALITY_EXPECT_SAVED_RESEND === '1') {
+      stage = 'saved Resend preview';
+      const resend = page.getByRole('article', { name: 'Resend email evidence' });
+      await resend.getByRole('button', { name: 'Import email evidence' }).click();
+      await resend.getByLabel('Resend evidence case').selectOption(caseId);
+      await expect(resend.getByRole('heading', { name: 'Saved case evidence, not reverified' })).toBeVisible({ timeout: 30000 });
+      await expect(resend.getByRole('alert')).toHaveCount(0);
+      await expect(resend.getByRole('button', { name: 'Attach to case' })).toHaveCount(0);
+      await expect(resend).toContainText('Already attached.');
+      await expect(collector).toContainText('The live Resend record could not be reverified.');
+      await resend.screenshot({ path: '.aws-build/resend-retained-mobile.png' });
+      savedResendVerified = true;
+    }
+    stage = 'case unchanged';
     assert.equal(digest(await readCase()), digest(before));
     assert.equal(actions.some(a => /^(?:import|import_records|customer_select|customer_save_mapping|send)$/.test(a)), false);
     assert.deepEqual(errors, []);
-    const report = { verifiedAt: new Date().toISOString(), outcomes, accountMatches, desktopMobilePassed: true, caseUnchanged: true, evidenceAttached: false, emailsSent: false };
+    const report = { verifiedAt: new Date().toISOString(), outcomes, accountMatches, savedResendVerified, desktopMobilePassed: true, caseUnchanged: true, evidenceAttached: false, emailsSent: false };
     writeFileSync('.aws-build/customer-evidence-browser-live.json', JSON.stringify(report, null, 2)); console.log(JSON.stringify(report));
   } finally { await browser.close(); }
 }
-main().catch(e => { console.error(JSON.stringify({ passed: false, errorType: e?.name || 'Error' })); process.exitCode = 1; });
+main().catch(e => { console.error(JSON.stringify({ passed: false, stage, errorType: e?.name || 'Error', assertion: String(e?.message || '').split('\n')[0] })); process.exitCode = 1; });
