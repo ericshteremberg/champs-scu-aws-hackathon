@@ -36,6 +36,17 @@ function wire(section: EvidenceSection = 'summary') {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('portable investigation engine', () => {
+  it('loads attached policy evidence into the first model context before drafting', async () => {
+    const invoke = vi.fn<NonNullable<InvestigationInput['invokeModel']>>()
+      .mockResolvedValueOnce(modelResponse(['order', 'tickets', 'delivery', 'support'].map(section => ({ name: 'get_evidence', input: { section } }))))
+      .mockResolvedValueOnce(modelResponse([{ name: 'finish_report', input: report() }]));
+    const options = input({ mode: 'bedrock', modelId: 'test-model', requirePolicy: true, invokeModel: invoke, readEvidence: async section => section === 'policy' ? { ...envelope(section), status: 'partial', records: [{ id: 'policy_saved', source: 'policy', sourceId: 'policy_version', occurredAt: timestamp, title: 'Retained terms', detail: 'Refund requests within 14 days. Historical applicability is unverified.', fields: {} }] } : envelope(section) });
+    await runInvestigation(options);
+    const context = JSON.parse(invoke.mock.calls[0][0].messages![0].content![0].text!);
+    expect(context.initialPolicy.records[0]).toMatchObject({ sourceId: 'policy_version', detail: expect.stringContaining('Historical applicability is unverified') });
+    expect(options.events.filter(e => e.type === 'tool_completed' && e.section === 'policy')).toHaveLength(1);
+  });
+
   it('retrieves scoped records, preserves IDs, and labels sample output honestly', async () => {
     const options = input();
     const result = await runInvestigation(options);

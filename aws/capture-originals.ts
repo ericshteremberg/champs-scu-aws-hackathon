@@ -1,3 +1,4 @@
+import { collectPolicyEvidence } from './policy-collection.ts';
 import { captureOriginalEmails } from './original-evidence.ts';
 import { captureOriginalStripeReceipt } from './stripe-originals.ts';
 import { captureOriginalDatabaseRows } from './supabase-originals.ts';
@@ -22,5 +23,13 @@ export async function captureOriginalEvidence(user: TrustedUser, caseId: string)
   const email = await captureOriginalEmails(user, caseId);
   result.configured ||= email.configured; result.captured += email.captured; result.alreadySaved += email.alreadySaved; result.remaining = email.remaining;
   result.unavailable.push(...email.unavailable.map(value => ({ ...value, provider: 'Resend' })));
+  try {
+    const policy = await collectPolicyEvidence(user, caseId);
+    result.configured ||= policy.policies.length > 0;
+    result.captured += policy.captured; result.alreadySaved += policy.alreadySaved;
+  } catch (error) {
+    if (error instanceof ApiError && ['conflict','run_active'].includes(error.code)) throw error;
+    result.unavailable.push({ provider: 'Policies', reason: 'Policy matching could not complete. Existing evidence was preserved.' });
+  }
   return result;
 }

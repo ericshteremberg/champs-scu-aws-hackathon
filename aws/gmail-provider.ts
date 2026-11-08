@@ -18,7 +18,7 @@ const bindingSchema = z.string().regex(/^[a-f0-9]{64}$/);
 const caseId = z.string().min(1).max(200);
 const actions = z.discriminatedUnion('action', [
   z.object({ action: z.literal('disconnect') }).strict(),
-  z.object({ action: z.literal('search'), caseId }).strict(),
+  z.object({ action: z.literal('search'), caseId, topic: z.literal('policy').optional() }).strict(),
   z.object({ action: z.literal('preview'), caseId, messageId }).strict(),
   z.object({ action: z.literal('import'), caseId, messageId, confirmed: z.literal(true) }).strict(),
 ]);
@@ -108,7 +108,7 @@ export async function gmailProviderAction(user: TrustedUser, input: unknown) {
   const selectionKey = `gmail-selection#${row.data.id}`, previewKey = `gmail-preview#${row.data.id}`;
   try {
     if (action.action === 'search') {
-      const results = await searchGmail(token.data.accessToken, row.data.email);
+      const results = await (action.topic ? searchGmail(token.data.accessToken, row.data.email, action.topic) : searchGmail(token.data.accessToken, row.data.email));
       const prior = await getItem<Selection>(wid, selectionKey);
       await commit(wid, [...guard, { key: row.key, expectedVersion: row.version, check: true }, { key: selectionKey, expectedVersion: prior?.version ?? null, data: { caseVersion: row.version, connectionVersion: connection.version, ids: results.messages.map(m => m.id), ttlEpochSeconds: Math.floor(Date.now() / 1000) + 600 } satisfies Selection }, auditChange(user, 'provider.gmail_searched', 'Searched up to ten messages involving the case customer email. Message bodies were not saved.', row.data.id)]);
       return results;

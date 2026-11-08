@@ -237,7 +237,7 @@ export function PolicyLibrary({
     <>
       <Heading
         title="Policies"
-        text="Save dated versions, then attach the applicable policy to a case."
+        text="Save dated versions from a URL, document or text. Get evidence matches them to purchase records."
       >
         <Action primary onClick={addPolicy}>
           <Plus size={18} />
@@ -261,9 +261,13 @@ export function PolicyLibrary({
                 </span>
                 <div className="cw-policy-body">
                   <h3>{p.name}</h3>
-                  <p>Effective {day(p.effectiveDate)}</p>
+                  <p>{p.kind || 'Policy'} · Version {p.versionLabel || p.version || 'legacy'} · Declared effective {day(p.effectiveDate)}{p.endsAt ? ` until ${day(p.endsAt)} (exclusive)` : ''}</p>
+                  <p>Captured {day(p.capturedAt || p.createdAt)} · {p.sourceType || 'text'}{p.sourceUrl ? ` · ${p.sourceUrl}` : ''}</p>
+                  <p className="cw-caption">A declared effective date is not proof of historical disclosure or customer acceptance.</p>
+                  {p.downloadUrl && <a href={p.downloadUrl} target="_blank" rel="noreferrer">Download retained original</a>}
+                  {p.extractionNotice && <p>{p.extractionNotice}</p>}
                   <details className="cw-policy-text">
-                    <summary>Read original policy</summary>
+                    <summary>Read extracted policy text</summary>
                     <p>{p.content}</p>
                   </details>
                 </div>

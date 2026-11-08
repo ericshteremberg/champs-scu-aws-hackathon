@@ -842,3 +842,51 @@ test('native provider receipts and original database rows are embedded as visual
   expect(requests).toEqual([]);
   await file.saveAs('.aws-build/visual-source/native-receipt-and-rows-synthetic.pdf');
 });
+
+test('policy library accepts dated sources and PDF exports retain policy originals with factual arguments', async ({ page }) => {
+  const { state } = await setup(page), item = state.cases.find(c => c.orderRef === 'ATM-1042')!;
+  const requests: Record<string, unknown>[] = [], capturedAt = '2026-11-08T12:00:00Z';
+  await page.route('**/api/workspace', route => route.fulfill({ json: state }));
+  await page.route('**/api/policies', async route => {
+    const body = route.request().postDataJSON(); requests.push(body);
+    if (body.action === 'prepare-upload') return route.fulfill({ json: { uploadId: 'policy_upload_fixture', uploadUrl: `${base}/synthetic-policy-upload`, fields: { key: 'fixture' } } });
+    if (body.action === 'finalize-upload') return route.fulfill({ json: { policy: state.policies[0] } });
+    state.policies.push({ id: 'policy_fixture', ...body.metadata, content: body.text || 'Refunds within 14 days.', createdAt: capturedAt, capturedAt, sourceType: body.sourceType, version: 1 });
+    return route.fulfill({ json: { policy: state.policies.at(-1) } });
+  });
+  await page.route('**/synthetic-policy-upload', route => route.fulfill({ status: 204 }));
+  await page.goto('/workspace?view=policies');
+  for (const source of ['text', 'url', 'file']) {
+    await page.getByRole('button', { name: 'Add policy version' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByLabel('Policy name', { exact: true }).fill('Synthetic refund policy');
+    await dialog.getByRole('combobox', { name: 'Policy type', exact: true }).selectOption('refund');
+    await dialog.getByLabel('Declared effective date', { exact: true }).fill('2026-01-01');
+    await dialog.getByRole('combobox', { name: 'Policy source', exact: true }).selectOption(source);
+    if (source === 'text') await dialog.getByLabel('Policy text', { exact: true }).fill('Refund requests must be received within 14 days.');
+    if (source === 'url') await dialog.getByLabel('Public HTTPS URL', { exact: true }).fill('https://merchant.com/refunds');
+    if (source === 'file') await dialog.locator('input[type=file]').setInputFiles({ name: 'refunds.txt', mimeType: 'text/plain', buffer: Buffer.from('Refund requests within 14 days.') });
+    await dialog.getByRole('button', { name: 'Save policy version' }).click(); await expect(dialog).not.toBeVisible();
+  }
+  expect(requests.map(r => r.action)).toEqual(['save', 'save', 'prepare-upload', 'finalize-upload']);
+  const raw = JSON.stringify({ schemaVersion: 1, provider: 'policy-library', policyId: 'policy_fixture', capturedAt, effectiveDate: '2026-01-01', text: 'Refund requests must be received within 14 days.\nCancellation requests are considered individually.', original: '<p>Refund requests must be received within 14 days.</p><script>window.__policyExecuted=true</script>' });
+  const native = await PDFDocument.create(); native.addPage([400,500]).drawText('SYNTHETIC ORIGINAL TERMS', { x: 25, y: 450 });
+  const pdfBytes = Buffer.from(await native.save());
+  item.evidence = [
+    { id: 'policy_visual', caseId: item.id, source: 'policy', title: 'Refund policy (historical applicability unverified)', content: 'Declared effective date only. No acceptance evidence.', occurredAt: capturedAt, reference: 'https://merchant.com/refunds', capturedAt, originalPolicy: { policyId: 'policy_fixture', sourceType: 'url', version: 1, effectiveDate: '2026-01-01' }, fileName: 'policy-capture.json', mimeType: 'application/json', fileSha256: createHash('sha256').update(raw).digest('hex'), downloadUrl: '/api/evidence/policy_visual' },
+    { id: 'policy_pdf', caseId: item.id, source: 'policy', title: 'Original terms document', content: 'Declared effective date only.', occurredAt: capturedAt, reference: 'terms.pdf', capturedAt, originalPolicy: { policyId: 'policy_pdf', sourceType: 'file', version: 1, effectiveDate: '2026-01-01' }, fileName: 'terms.pdf', mimeType: 'application/pdf', fileSha256: createHash('sha256').update(pdfBytes).digest('hex'), downloadUrl: '/api/evidence/policy_pdf' },
+  ];
+  item.findings = []; item.draft = { revision: 1, status: 'draft', method: 'bedrock', generatedAt: capturedAt, content: 'The retained refund policy sets a request deadline. Its historical applicability and customer acceptance remain unverified. [policy_visual]\n\n1. The retained policy specifies a refund window\nRequest window | Within 14 days [policy_visual]\nCollected | November 8, 2026 [policy_visual]\nThe document states “Refund requests must be received within 14 days.” This is a current capture, not proof of checkout disclosure. [policy_visual]\n\n2. The original terms document is retained\nSource | Merchant-uploaded PDF [policy_pdf]\nThe original file supports inspection of the retained terms, but does not establish acceptance. [policy_pdf]' };
+  await page.route('**/api/evidence/policy_visual', route => route.fulfill({ contentType: 'application/json', body: raw }));
+  await page.route('**/api/evidence/policy_pdf', route => route.fulfill({ contentType: 'application/pdf', body: pdfBytes }));
+  await page.goto(`/workspace?view=cases&case=${encodeURIComponent(item.id)}&tab=report`);
+  await expect(page.getByRole('heading', { name: '1. The retained policy specifies a refund window' })).toBeVisible();
+  const downloading = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download evidence PDF', exact: true }).click();
+  const file = await downloading, pdf = await PDFDocument.load(await readFile((await file.path())!));
+  const objects = pdf.context.enumerateIndirectObjects().map(([,o]) => o).filter(o => o instanceof PDFRawStream);
+  expect(objects.filter(o => o.dict.get(PDFName.of('Type')) === PDFName.of('EmbeddedFile'))).toHaveLength(2);
+  expect(objects.some(o => o.dict.get(PDFName.of('Subtype')) === PDFName.of('Image'))).toBe(true);
+  expect(objects.some(o => o.dict.get(PDFName.of('Subtype')) === PDFName.of('Form'))).toBe(true);
+  expect(await page.evaluate(() => '__policyExecuted' in window)).toBe(false);
+  await file.saveAs('.aws-build/policies/policy-evidence-synthetic.pdf');
+});

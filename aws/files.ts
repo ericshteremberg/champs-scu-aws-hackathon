@@ -18,7 +18,7 @@ const uploadSchema = z.object({
 }).strict();
 type PendingUpload = z.infer<typeof uploadSchema> & { id: string; ownerId: string; workspaceId: string; tempKey: string; createdAt: string; expiresAt: string; ttlEpochSeconds: number; evidenceId?: string };
 
-function storage() {
+export function storage() {
   const bucket = process.env.EVIDENCE_BUCKET;
   if (!bucket || (process.env.AWS_REGION || 'us-east-1') !== 'us-east-1') throw new ApiError(503, 'Private AWS file storage is not configured.', 'storage_unavailable');
   return { bucket, client: new S3Client({ region: 'us-east-1', maxAttempts: 2 }) };
@@ -46,7 +46,7 @@ export async function prepareUpload(user: TrustedUser, input: unknown): Promise<
   } finally { client.destroy(); }
 }
 
-async function readUploadedBytes(client: S3Client, bucket: string, upload: PendingUpload) {
+export async function readUploadedBytes(client: S3Client, bucket: string, upload: Pick<PendingUpload, 'tempKey' | 'size'>) {
   const signal = AbortSignal.timeout(20_000);
   const object = await client.send(new GetObjectCommand({ Bucket: bucket, Key: upload.tempKey }), { abortSignal: signal });
   if (!object.Body) throw new ApiError(409, 'The uploaded file is not available yet. Retry after the upload finishes.', 'upload_missing');

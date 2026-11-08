@@ -6,6 +6,8 @@ The deployment has no Cloudflare database or R2 binding. The temporary developme
 
 ## Current state
 
+- Feature branch `codex/policy-evidence-workflow` adds dated policy intake (URL, PDF/text upload and paste), purchase-period matching, scoped policy correspondence collection, original policy exhibits, and numbered response arguments. See [POLICY_COLLECTION.md](POLICY_COLLECTION.md). This feature is branch-only, not deployed or merged to main. Existing hosted-state notes below describe prior deployments.
+
 - AWS stack: `causality-hackathon-dev`, region `us-east-1`; stack creation completed.
 - Frontend: [causality-hackathon-dev.slidah60.workers.dev](https://causality-hackathon-dev.slidah60.workers.dev).
 - Model: `us.amazon.nova-2-lite-v1:0`; a complete real investigation with validated citations was saved as a new draft requiring approval.

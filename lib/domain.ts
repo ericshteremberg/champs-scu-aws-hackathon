@@ -4,6 +4,7 @@ export type Evidence = {
   id: string; caseId: string; source: EvidenceSource; title: string; content: string;
   occurredAt: string; reference: string; fileName?: string; mimeType?: string; downloadUrl?: string;
   fileSha256?: string; capturedAt?: string;
+  originalPolicy?: { policyId: string; sourceType: 'text' | 'url' | 'file'; effectiveDate: string; version: number };
   originalEmail?: { provider: 'resend'; emailId: string };
   originalDocument?: { provider: 'stripe'; kind: 'receipt'; sourceId: string };
   originalRows?: { provider: 'supabase'; projectRef: string; table: string; rowCount: number; linkedEmailIds?: string[] };
@@ -24,7 +25,7 @@ export type Workspace = { id: string; name: string; industry: string; website: s
 export type Integration = { id: string; provider: 'stripe' | 'gmail' | 'imap' | 'database' | 'bedrock'; name: string; status: 'connected' | 'not_connected' | 'configuration_required'; mode?: 'test' | 'live'; accountName?: string; lastSyncAt?: string; description: string };
 export type Activity = { id: string; action: string; detail: string; actor: string; caseId?: string; createdAt: string };
 export type AccessRequest = { id: string; caseId?: string; scope: string; reason: string; status: 'pending' | 'approved' | 'denied'; requestedBy: string; createdAt: string; reviewedBy?: string; canReview: boolean };
-export type Policy = { id: string; name: string; content: string; effectiveDate: string; createdAt: string };
+export type Policy = { id: string; name: string; content: string; effectiveDate: string; createdAt: string; kind?: 'terms' | 'refund' | 'cancellation'; familyId?: string; version?: number; versionLabel?: string; endsAt?: string; sourceType?: 'text' | 'url' | 'file'; sourceUrl?: string; capturedAt?: string; fileName?: string; mimeType?: string; fileSha256?: string; downloadUrl?: string; extractionNotice?: string };
 export type WorkspaceState = {
   user: { id: string; email: string; name: string }; workspace: Workspace | null; cases: DisputeCase[];
   integrations: Integration[]; activity: Activity[]; accessRequests: AccessRequest[]; policies: Policy[];

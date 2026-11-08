@@ -4,7 +4,7 @@ import type { DisputeCase } from '@/lib/domain';
 import { visualEvidence } from '@/lib/report/exhibits';
 import styles from './evidence-packet.module.css';
 import { formatMoney } from '@/lib/money';
-import { packetNotes, packetResponse, packetSources, packetIncludedSources, citationText } from '@/lib/report/packet';
+import { packetNotes, packetResponse, packetSources, packetIncludedSources, citationText, responseBlocks, packetClaim } from '@/lib/report/packet';
 
 export function EvidencePacket({ current, content = current.draft?.content ?? '' }: { current: DisputeCase; content?: string }) {
   const sources = packetSources(current);
@@ -28,11 +28,12 @@ export function EvidencePacket({ current, content = current.draft?.content ?? ''
         <summary>Original files included in the PDF</summary>
         <ul>{originals.map(record => <li key={record.id}><a style={{ color: '#111', textDecoration: 'underline' }} href={record.downloadUrl} target="_blank" rel="noreferrer">{record.fileName || record.title}</a> {record.capturedAt ? `Collected ${new Date(record.capturedAt).toLocaleDateString()}` : 'Collection time not recorded'}</li>)}</ul>
       </details>}
-      <h3 className={styles.section}><span>1</span>Merchant response</h3>
+      <p style={{ padding: 12, background: "#f5f5f5", marginBottom: 20 }}>The claim (recorded case reason, not a verbatim statement): {packetClaim(current)}</p>
+      <h3 className={styles.section}>Our response</h3>
       <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.75, marginTop: 16 }}>
-        {packetResponse(current, content) || 'Prepare a response from the attached evidence to create your PDF.'}
+        {responseBlocks(packetResponse(current, content) || 'Prepare a response from the attached evidence to create your PDF.').map((block, i) => block.kind === 'heading' ? <h4 key={i} style={{ margin: '20px 0 8px', fontWeight: 700 }}>{block.text}</h4> : block.kind === 'fact' ? <dl key={i} style={{ display: 'grid', gridTemplateColumns: 'minmax(100px, 30%) 1fr', gap: 16, background: '#f5f5f5', padding: '6px 10px', margin: '2px 0' }}><dt style={{ fontWeight: 700 }}>{block.label}</dt><dd style={{ margin: 0 }}>{block.value}</dd></dl> : <p key={i} style={{ marginBottom: 12 }}>{block.text}</p>)}
       </div>
-      <h3 className={styles.section} style={{ marginTop: 32 }}><span>2</span>Included evidence</h3>
+      <h3 className={styles.section} style={{ marginTop: 32 }}>Included evidence</h3>
       <ol style={{ paddingLeft: 24, marginTop: 12 }}>
         {included.map((record) => <li key={record.id} style={{ marginBottom: 10, overflowWrap: 'anywhere' }}><strong>[E{sources.findIndex(source => source.id === record.id) + 1}]</strong> {record.title}</li>)}
       </ol>

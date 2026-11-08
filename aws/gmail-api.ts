@@ -61,9 +61,9 @@ function summary(raw: unknown): GmailMessage {
   if (!Number.isFinite(date.getTime())) throw new ApiError(502, 'Gmail returned an invalid message date.', 'provider_invalid_response');
   return { id: data.id, threadId: data.threadId, subject: field('subject').slice(0, 500), from: field('from'), to: field('to'), occurredAt: date.toISOString() };
 }
-export async function searchGmail(token: string, email: string) {
+export async function searchGmail(token: string, email: string, topic?: 'policy') {
   if (!searchEmail.safeParse(email).success) throw new ApiError(400, 'This case needs a supported customer email address.', 'invalid_case_email');
-  const query = `{from:${email} to:${email}}`;
+  const query = `{from:${email} to:${email}}${topic === 'policy' ? ' {refund cancel cancellation terms policy consent checkout accepted acceptance agreed disclosure}' : ''}`;
   const result = z.object({ messages: z.array(z.object({ id: messageId })).max(10).optional(), nextPageToken: z.string().optional() }).safeParse(await read(token, `messages?${new URLSearchParams({ q: query, maxResults: '10', includeSpamTrash: 'false' })}`));
   if (!result.success) throw new ApiError(502, 'Gmail returned an invalid search response.', 'provider_invalid_response');
   const messages = await Promise.all((result.data.messages || []).map(async m => {

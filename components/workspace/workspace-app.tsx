@@ -1,5 +1,6 @@
 "use client";
 
+import { PolicyEditor } from "./policy-editor";
 import { ProviderConnectors } from "./provider-connectors";
 
 import { useDialogMotion } from "./use-dialog-motion";
@@ -1371,9 +1372,9 @@ export default function WorkspaceApp({
                   stripeAction={stripeAction}
                   requestAccess={() => setModal("access")}
                   navigate={navigate}
-                  onConnectorImported={(nextState, caseId) => {
+                  onConnectorImported={(nextState, caseId, stayOnPage) => {
                     setState(nextState);
-                    navigate("cases", caseId, { tab: "investigation" });
+                    if (!stayOnPage) navigate("cases", caseId, { tab: "investigation" });
                   }}
                   isDesignPreview={!!preview}
                 />
@@ -1723,50 +1724,7 @@ export default function WorkspaceApp({
       )}
       {modal === "policy" && (
         <Modal title="Add a company policy" onClose={closeModal} error={error}>
-          <form
-            className="cw-form"
-            onSubmit={(e) =>
-              void act(
-                e,
-                (f) => ({
-                  action: "addPolicy",
-                  name: formText(f, "name"),
-                  content: formText(f, "content"),
-                  effectiveDate: formText(f, "effectiveDate"),
-                }),
-                "Policy saved.",
-              )
-            }
-          >
-            <Field label="Policy name">
-              <input
-                name="name"
-                required
-                minLength={2}
-                maxLength={160}
-                placeholder="Returns and refunds"
-              />
-            </Field>
-            <Field label="Effective date">
-              <input name="effectiveDate" type="date" required />
-            </Field>
-            <Field label="Policy text">
-              <textarea
-                name="content"
-                required
-                minLength={10}
-                maxLength={24000}
-                style={{ minHeight: 230 }}
-                placeholder="Paste the policy that applied when the customer placed their order."
-              />
-            </Field>
-            <p className="cw-caption">
-              Policies do not grant data access.
-            </p>
-            <Button primary type="submit" disabled={busy}>
-              {busy ? "Saving…" : "Save policy"}
-            </Button>
-          </form>
+          <PolicyEditor policies={state?.policies || []} onSaved={async () => { await load(); closeModal(); }} />
         </Modal>
       )}
       {modal === "attach-policy" && current && state && (
@@ -3467,7 +3425,7 @@ function Integrations({
     body?: object,
   ) => Promise<void>;
   requestAccess: () => void;
-  onConnectorImported: (state: WorkspaceState, caseId: string) => void;
+  onConnectorImported: (state: WorkspaceState, caseId: string, stayOnPage?: boolean) => void;
   isDesignPreview?: boolean;
   navigate: (
     view: string,

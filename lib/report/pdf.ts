@@ -3,7 +3,7 @@ import { PDFDocument, rgb, pushGraphicsState, popGraphicsState, rectangle, clip,
 import fontkit from '@pdf-lib/fontkit';
 import type { DisputeCase } from '../domain.ts';
 import { formatMoney } from '../money.ts';
-import { assertPacketReady, packetClaim, packetIncludedSources, packetResponse, packetSources } from './packet.ts';
+import { assertPacketReady, packetClaim, packetIncludedSources, packetResponse, packetSources, responseBlocks } from './packet.ts';
 
 type Fonts = { regular: Uint8Array; bold: Uint8Array };
 const ink = rgb(0.07, 0.07, 0.07), muted = rgb(0.35, 0.35, 0.35), rule = rgb(0.82, 0.82, 0.82), panel = rgb(0.96, 0.96, 0.96);
@@ -26,6 +26,7 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
     const originalHash = exhibit.original ? await hashBytes(exhibit.original.bytes) : exhibit.sha256;
     if ((record.fileSha256 && record.fileSha256 !== originalHash) || (exhibit.original && originalHash !== exhibit.original.sha256)) throw new Error('An original exhibit differs from its captured fingerprint.');
     if (Boolean(record.originalEmail) !== Boolean(exhibit.renderedEmail) || (record.originalEmail && !exhibit.original)) throw new Error('An email exhibit has no retained original source.');
+    if (Boolean(record.originalPolicy && record.mimeType !== 'application/pdf') !== Boolean(exhibit.renderedPolicy) || (exhibit.renderedPolicy && !exhibit.original)) throw new Error('A policy exhibit has no retained original source.');
     if (Boolean(record.originalRows) !== Boolean(exhibit.renderedRows) || (record.originalRows && !exhibit.original)) throw new Error('A database exhibit has no retained original query result.');
   }
   const doc = await PDFDocument.create();
@@ -97,7 +98,7 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
   write(`Prepared ${stamp(generatedAt.toISOString())}`, 8.5, regular, muted, 12);
   page.drawLine({ start: { x: margin, y: y + 5 }, end: { x: width - margin, y: y + 5 }, color: ink, thickness: 1.6 });
   y -= 14;
-  for (const line of lines(`The claim: ${packetClaim(item)}`, regular, 10, usable - 24)) {
+  for (const line of lines(`The claim (recorded case reason, not a verbatim statement): ${packetClaim(item)}`, regular, 10, usable - 24)) {
     ensure(20);
     page.drawRectangle({ x: margin, y: y - 7, width: usable, height: 20, color: panel });
     page.drawRectangle({ x: margin, y: y - 7, width: 2, height: 20, color: muted });
@@ -105,17 +106,31 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
     y -= 20;
   }
   y -= 16;
-  heading('Merchant response', 1);
+  heading('Our response');
   // Do not truncate or strip adverse statements from the saved factual narrative.
-  write(packetResponse(item), 10.5);
+  for (const block of responseBlocks(packetResponse(item))) {
+    if (block.kind === 'heading') { ensure(70); write(block.text, 11, bold, ink, 9); }
+    else if (block.kind === 'paragraph') write(block.text, 10.5);
+    else {
+      const label = lines(block.label, bold, 9, 135), values = lines(block.value, regular, 9, usable - 160);
+      for (let i = 0; i < Math.max(label.length, values.length); i++) {
+        ensure(17); page.drawRectangle({ x: margin, y: y - 5, width: usable, height: 17, color: panel });
+        if (label[i]) page.drawText(label[i], { x: margin + 6, y, size: 9, font: bold, color: ink });
+        if (values[i]) page.drawText(values[i], { x: margin + 150, y, size: 9, font: regular, color: ink });
+        y -= 17;
+      }
+      y -= 4;
+    }
+  }
 
   const included = packetIncludedSources(item);
-  section = 'Evidence index'; ensure(65); heading('Supporting records', 2);
+  section = 'Evidence index'; ensure(65); heading('Supporting records');
   for (const record of included) {
     const index = sources.findIndex(source => source.id === record.id);
     ensure(44);
     write(`[E${index + 1}] ${record.title}`, 9, bold, ink, 2);
     write(`${stamp(record.occurredAt)} | ${record.reference || record.id}`, 8, regular, muted, 2);
+    if (record.originalPolicy) write(`Policy version ${record.originalPolicy.version}. Declared effective: ${record.originalPolicy.effectiveDate}. Captured: ${record.capturedAt || 'Not recorded'}. Historical applicability, checkout disclosure and acceptance are unverified.`, 8, regular, muted, 4);
     write(exhibits.some(e => e.evidenceId === record.id) ? 'Original exhibit attached.' : 'Saved source record.', 8, regular, muted, 6);
   }
   if (!included.length) write('No supporting records are cited in this response.', 9);
@@ -128,10 +143,10 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
       if (++visualPages > 100) throw new Error('Visual exhibits exceed 100 pages. Narrow the case files.');
       section = 'Visual exhibits'; newPage();
       heading(`[E${index + 1}] ${record.title}`);
-      write(`${exhibit.renderedEmail ? 'Rendered original Resend email' : exhibit.renderedRows ? 'Original Supabase query result' : record.originalDocument ? 'Original Stripe receipt PDF' : 'Original uploaded file'} | ${part}`, 9, bold, ink, 5);
+      write(`${exhibit.renderedEmail ? 'Rendered original Resend email' : exhibit.renderedPolicy ? 'Retained policy capture' : exhibit.renderedRows ? 'Original Supabase query result' : record.originalDocument ? 'Original Stripe receipt PDF' : 'Original uploaded file'} | ${part}`, 9, bold, ink, 5);
       write(`Collected: ${record.capturedAt ? stamp(record.capturedAt) : 'Not recorded'} | Retrieved for export: ${stamp(exhibit.fetchedAt)}`, 8, regular, muted, 4);
       write(`Source SHA-256: ${exhibit.original?.sha256 ?? exhibit.sha256}`, 7.5, regular, muted, 4);
-      write(exhibit.renderedEmail ? 'Captured provider body, not a provider-dashboard screenshot. Remote images, stylesheets and active content omitted.' : exhibit.renderedRows ? 'Visual export of original returned rows. The original JSON, query and parameters are embedded. This is not a database dashboard screenshot.' : record.originalDocument ? 'Original provider-generated PDF retrieved through the connected Stripe charge. The unmodified file is embedded.' : 'Reproduction of the attached original. Uploader-supplied content is not independently authenticated.', 8, regular, muted, 8);
+      write(exhibit.renderedEmail ? 'Captured provider body, not a provider-dashboard screenshot. Remote images, stylesheets and active content omitted.' : exhibit.renderedPolicy ? 'Text export of the retained policy. This is not a historical checkout screenshot or proof of customer acceptance. The complete original file is embedded.' : exhibit.renderedRows ? 'Visual export of original returned rows. The original JSON, query and parameters are embedded. This is not a database dashboard screenshot.' : record.originalDocument ? 'Original provider-generated PDF retrieved through the connected Stripe charge. The unmodified file is embedded.' : 'Reproduction of the attached original. Uploader-supplied content is not independently authenticated.', 8, regular, muted, 8);
       if (!record.fileSha256) write('No fingerprint was recorded at collection; the displayed hash was computed for this export.', 8, regular, muted, 5);
     };
     if (exhibit.mimeType === 'application/pdf') {

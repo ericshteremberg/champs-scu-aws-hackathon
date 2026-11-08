@@ -198,10 +198,14 @@ export async function processInvestigation(input: { workspaceId: string; caseId:
       const mapped = normalizeMerchantRecords(wid, item.data, fetched.evidence);
       for (const record of mapped) pending.set(record.id, record);
       if (new Set([...records.map(record => record.data.id), ...pending.keys()]).size > MAX_CASE_EVIDENCE) throw new ApiError(409, 'The merchant returned more than 90 records. Narrow the case grant.');
-      return { ...fetched.evidence, caseId, records: fetched.evidence.records.map((record, index) => ({ ...record, id: mapped[index].id })) };
+      const remoteRecords = fetched.evidence.records.map((record, index) => ({ ...record, id: mapped[index].id }));
+      // Library originals and mailbox requests are case-owned supplements to the merchant API.
+      const local = localEvidence(item.data, records.map(r => r.data).filter(r => ['policy_library','gmail_policy_search','imap_policy_search','supabase_oauth'].includes(r.provenance?.sourceMode || '')), section);
+      const supplements = local.records.filter(r => !remoteRecords.some(remote => remote.id === r.id));
+      return { ...fetched.evidence, caseId, status: supplements.length ? 'partial' : fetched.evidence.status, records: [...remoteRecords, ...supplements], limitations: [...fetched.evidence.limitations, ...(supplements.length ? local.limitations : [])] };
     };
     if (running.mode === 'bedrock') modelClient = new BedrockRuntimeClient({ region: region(), maxAttempts: 1, requestHandler: new FetchHttpHandler({ requestTimeout: 45_000 }) });
-    const result = await runInvestigation({ case: item.data, mode: running.mode, modelId: running.modelId, region: region(), signal, readEvidence, assertActive,
+    const result = await runInvestigation({ case: item.data, requirePolicy: records.some(r => r.data.source === 'policy' || r.data.provenance?.section === 'policy'), mode: running.mode, modelId: running.modelId, region: region(), signal, readEvidence, assertActive,
       invokeModel: modelClient ? (command, abortSignal) => modelClient!.send(new ConverseCommand(command), { abortSignal }) : undefined,
       onEvent: async event => {
         if (++sequence > 100) throw new InvestigationError('event_limit', 'The investigation reached its event limit.');

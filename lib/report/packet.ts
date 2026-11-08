@@ -50,3 +50,19 @@ export function assertPacketReady(item: DisputeCase) {
   }
 }
 export const packetFilename = (item: DisputeCase) => `causality-${(item.orderRef || item.id).replace(/[^a-zA-Z0-9-]/g, '') || 'case'}-evidence.pdf`;
+
+export type ResponseBlock = { kind: 'heading'; text: string } | { kind: 'paragraph'; text: string } | { kind: 'fact'; label: string; value: string };
+/** Formatting only. Never infer facts or discard unmatched source prose. */
+export function responseBlocks(text: string): ResponseBlock[] {
+  const blocks: ResponseBlock[] = [];
+  for (const line of text.split('\n')) {
+    const value = line.trim(); if (!value) continue;
+    if (/^\d{1,2}\.\s+\S/.test(value) || /^(Our response|Conclusion):?$/i.test(value)) blocks.push({ kind: 'heading', text: value });
+    else {
+      const cells = value.split(' | ');
+      if (cells.length === 2 && cells[0].length <= 80 && cells.every(Boolean)) blocks.push({ kind: 'fact', label: cells[0], value: cells[1] });
+      else blocks.push({ kind: 'paragraph', text: value });
+    }
+  }
+  return blocks;
+}

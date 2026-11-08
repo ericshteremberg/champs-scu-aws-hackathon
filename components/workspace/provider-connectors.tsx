@@ -34,7 +34,7 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
   return value as T;
 }
 
-export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceState['cases']; onImported: (state: WorkspaceState, caseId: string) => void }) {
+export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceState['cases']; onImported: (state: WorkspaceState, caseId: string, stayOnPage?: boolean) => void }) {
   const [status, setStatus] = useState<ProviderStatus | null>(null);
   const [busy, setBusy] = useState('loading');
   const [error, setError] = useState('');
@@ -109,7 +109,7 @@ export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceStat
     {error && <p className="cw-banner error" role="alert">{error}</p>}
     {notice && <p className="cw-banner neutral" role="status">{notice}</p>}
     <div className="cw-provider-grid">
-      <EvidenceCollector cases={cases} />
+      <EvidenceCollector cases={cases} onImported={onImported} />
       <article className="cw-provider-card" aria-label="Supabase account">
         <h3><Database size={20} />Supabase <span className={`cw-pill${authorized ? ' green' : ''}`}>{authorized ? 'Authorized' : connection?.status === 'reconnect_required' ? 'Reconnect required' : 'Not connected'}</span></h3>
         <p>Choose a project and review its tables.</p>

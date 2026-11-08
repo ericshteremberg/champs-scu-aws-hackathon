@@ -52,6 +52,8 @@ export interface InvestigationResult {
 export interface InvestigationCredentials { accessKeyId: string; secretAccessKey: string; sessionToken?: string }
 
 export interface InvestigationInput {
+  /** Server-derived: load attached policies before the model starts. */
+  requirePolicy?: boolean;
   case: Pick<DisputeCase, 'id' | 'title' | 'reason' | 'orderRef' | 'amount' | 'currency' | 'source'>;
   mode: InvestigationMode;
   modelId?: string;

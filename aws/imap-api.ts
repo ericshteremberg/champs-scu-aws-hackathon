@@ -96,7 +96,7 @@ export async function verifyImap(settings: ImapSettings, detectSent = false): Pr
     return folders;
   });
 }
-export async function searchImap(settings: ImapSettings, email: string, scope: 'recent' | 'all' = 'recent') {
+export async function searchImap(settings: ImapSettings, email: string, scope: 'recent' | 'all' = 'recent', topic?: 'policy') {
   if (!z.string().email().max(254).safeParse(email).success) throw new ApiError(400, 'This case needs a valid customer email before searching.', 'imap_email_required');
   return withMailbox(settings, async client => {
     const messages: ImapMessage[] = []; let moreAvailable = false; let scanLimited = false;
@@ -104,7 +104,7 @@ export async function searchImap(settings: ImapSettings, email: string, scope: '
       const box = await openReadOnly(client, path);
       if (!box.exists) continue;
       scanLimited ||= scope === 'recent' && box.exists > MAX_SCAN;
-      const found = await client.search({ ...(scope === 'recent' ? { seq: `${Math.max(1, box.exists - MAX_SCAN + 1)}:${box.exists}` } : {}), deleted: false, or: [{ from: email }, { to: email }] }, { uid: true });
+      const found = await client.search({ ...(scope === 'recent' ? { seq: `${Math.max(1, box.exists - MAX_SCAN + 1)}:${box.exists}` } : {}), deleted: false, or: [{ from: email }, { to: email }], ...(topic === 'policy' ? { or: [{ from: email, or: ['refund','cancel','terms','policy','consent','checkout','accept','agree','disclos'].flatMap(term => [{ body: term }, { subject: term }]) }, { to: email, or: ['refund','cancel','terms','policy','consent','checkout','accept','agree','disclos'].flatMap(term => [{ body: term }, { subject: term }]) }] } : {}) }, { uid: true });
       if (!found || !found.length) continue;
       const ids = found.sort((a, b) => b - a).slice(0, 10);
       moreAvailable ||= found.length > 10;

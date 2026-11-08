@@ -8,7 +8,7 @@ const identifier = z.string().regex(/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/);
 const columns = z.array(identifier).min(1).max(8).refine(values => new Set(values).size === values.length);
 export const orderMappingSchema = z.object({
   order: z.object({ table: identifier, idColumn: identifier, paymentColumn: identifier, paymentKind: z.enum(['payment_intent', 'charge']), customerEmailColumn: identifier.optional(), columns }).strict(),
-  related: z.array(z.object({ section: z.enum(['tickets', 'delivery', 'history', 'attendance', 'support']), table: identifier, orderColumn: identifier, columns }).strict()).max(3),
+  related: z.array(z.object({ section: z.enum(['tickets', 'delivery', 'history', 'attendance', 'support', 'policy']), table: identifier, orderColumn: identifier, columns }).strict()).max(3),
 }).strict();
 const sensitive = /password|passwd|secret|token|qr.?code|qr.?payload|barcode|private.?key|api.?key|cvv|cvc|card.?number/i;
 export function validateOrderMapping(input: unknown, approved: SchemaTable[], schema: SchemaTable[]): OrderEvidenceMapping {

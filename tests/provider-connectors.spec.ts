@@ -333,6 +333,8 @@ test('Get evidence starts all sources and preserves successes when one provider 
     actions.push(route.request().postDataJSON().action); return route.fulfill({ json: { candidates: [], moreAvailable: true } });
   });
   await page.route('**/api/providers/imap', async route => { actions.push(route.request().postDataJSON().action); return route.fulfill({ json: { searchedEmail: 'old@example.com', folders: ['INBOX'], messages: [{ id: 'm1', subject: 'Ticket confirmation', from: 'support@example.com', to: 'old@example.com', folder: 'INBOX' }], moreAvailable: false } }); });
+  const stages: string[] = [];
+  await page.route('**/api/policies/collect', async route => { const body = route.request().postDataJSON(); stages.push(body.stage); return route.fulfill({ json: { captured: body.stage === 'records' ? 1 : 0, notices: [], related: [] } }); });
   await page.goto('/workspace?view=integrations');
   const card = page.getByRole('article', { name: 'Get evidence from all providers' });
   await card.getByLabel('Case to collect evidence for').selectOption(caseId);
@@ -341,6 +343,8 @@ test('Get evidence starts all sources and preserves successes when one provider 
   await expect(card.getByRole('heading', { name: 'IMAP: Ready to review' })).toBeVisible();
   await expect(card).toContainText('Set up the customer lookup first.');
   await expect(card.getByRole('button', { name: 'Get evidence', exact: true })).toBeEnabled();
+  expect(stages).toEqual(['records', 'gmail', 'imap', 'match']);
+  await expect(card.getByRole('heading', { name: 'Policies: Ready to review' })).toBeVisible();
   expect(actions.sort()).toEqual(['customer_lookup','find','preview_case_payment','search']);
   expect(actions.some(a => /import|send|select$/.test(a))).toBe(false);
 });

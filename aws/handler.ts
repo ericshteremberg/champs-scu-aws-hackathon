@@ -1,3 +1,5 @@
+import { policyAction, policyDownload } from './policies.ts';
+import { collectPolicyEvidence, collectPolicyMail } from './policy-collection.ts';
 import { captureOriginalEvidence } from './capture-originals.ts';
 import { z } from 'zod';
 import { ApiError, type TrustedUser } from './types.ts';
@@ -41,6 +43,13 @@ async function route(raw:unknown) {
   if(path==='/api/stripe/webhook' && event.method==='POST')return {status:200,body:await handleStripeWebhook(event.rawBody||'',event.stripeSignature||'')};
   if(!event.user)throw new ApiError(401,'Sign in to continue.','unauthenticated');
   const user=event.user as TrustedUser;
+  if(path==='/api/policies' && event.method==='POST') return {status:200,body:await policyAction(user,event.body)};
+  if(path==='/api/policies/collect' && event.method==='POST') {
+   const input=parse(z.object({caseId:id,stage:z.enum(['records','match','gmail','imap']).default('match')}).strict(),event.body);
+   if(input.stage==='gmail'||input.stage==='imap') return {status:200,body:await collectPolicyMail(user,input.caseId,input.stage)};
+   return {status:200,body:{...await collectPolicyEvidence(user,input.caseId,input.stage==='records'),state:await getWorkspaceState(user)}};
+  }
+  if(path.startsWith('/api/policies/') && event.method==='GET') return {status:302,redirect:await policyDownload(user,parse(id,decodeURIComponent(path.slice('/api/policies/'.length))))};
   if(path==='/api/providers/evidence')return {status:200,body:event.method==='GET'?await providerEvidenceStatus(user):await providerEvidenceAction(user,event.body)};
   if(path==='/api/providers/resend')return {status:200,body:event.method==='GET'?await resendStatus(user):await resendAction(user,event.body)};
   if(path==='/api/providers' && event.method==='GET')return {status:200,body:await providerStatus(user)};

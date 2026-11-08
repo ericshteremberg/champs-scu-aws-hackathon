@@ -103,7 +103,7 @@ export async function getWorkspaceState(user: TrustedUser): Promise<WorkspaceSta
     { id: 'imap', provider: 'imap', name: 'Other email (IMAP)', status: imap?.data.status === 'authorized' ? 'connected' : 'not_connected', accountName: imap?.data.email, description: 'Connect a mailbox over TLS, then review selected customer emails before importing.' },
     { id: 'database', provider: 'database', name: 'Company records', status: merchantConfigured(workspaceId) ? 'connected' : 'configuration_required', description: merchantConfigured(workspaceId) ? 'A merchant-owned evidence API is configured for this workspace. Only records linked to an approved case are retrieved.' : 'Connect a merchant-owned evidence API with a workspace binding. No database credentials are required.' },
   ];
-  base.policies = policyRows.map(record => record.data).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  base.policies = policyRows.map(record => { const { fileKey, ...policy } = record.data as Policy & { fileKey?: string }; return { ...policy, ...(fileKey ? { downloadUrl: `/api/policies/${encodeURIComponent(policy.id)}` } : {}) }; }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   base.activity = auditRows.map(record => record.data).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 100);
   base.accessRequests = accessRows.map(({ data }) => ({ ...data, canReview: data.status === 'pending' && canReviewAccess(data.requestedBy, user.userId) })).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 100);
   if (Buffer.byteLength(JSON.stringify(base)) > 4 * 1024 * 1024) throw new ApiError(413, 'This workspace exceeds the prototype response limit. Reduce the attached records before loading all cases.', 'workspace_too_large');
