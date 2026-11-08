@@ -1,4 +1,8 @@
-import { createHmac } from 'node:crypto';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { LambdaClient } from '@aws-sdk/client-lambda';
+import { captureOriginalEmails } from '../aws/original-evidence.ts';
+import { startInvestigation } from '../aws/investigations.ts';
+import { createHmac, createHash } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Stored, StoreChange, TrustedUser } from '../aws/types.ts';
 const fixture=vi.hoisted(()=>({rows:new Map<string,Stored<unknown>>(),read:vi.fn()}));
@@ -154,5 +158,70 @@ describe('saved evidence when a live Resend record is unavailable', () => {
     expect(withSavedEmailContext(record, 'ORDER-42').provenance?.fields).toMatchObject({ providerStatus: null, merchantEmailStatus: 'delivered', statusSource: 'merchant_email_log' });
     expect(withSavedEmailContext({ ...record, provenance: { ...record.provenance, fields: { ...record.provenance.fields, status: 'failed' } } }, 'ORDER-42').provenance?.fields.providerStatus).toBe('failed');
     expect(withSavedEmailContext(record, 'OTHER-ORDER')).toEqual(record);
+  });
+});
+
+
+describe('automatic original email collection', () => {
+  async function linked() {
+    process.env.EVIDENCE_BUCKET = 'synthetic-private-bucket';
+    await executeAction(user, { action: 'addEvidence', caseId, source: 'database', title: 'Order email reference', content: 'Order ORDER-42 email reference', occurredAt: '2026-11-01T12:00:00Z', reference: `Resend email ${emailId}` });
+  }
+  it('preserves exact provider HTML in S3 with a server-recorded fingerprint before investigating', async () => {
+    await linked();
+    const html = '<h1>Original ticket ORDER-42</h1><p>Purchased ticket</p>';
+    fixture.read.mockResolvedValue({ ...email(), html });
+    const send = vi.spyOn(S3Client.prototype, 'send').mockResolvedValue({} as never);
+    expect(await captureOriginalEmails(user, caseId)).toMatchObject({ captured: 1, unavailable: [] });
+    const put = send.mock.calls.find(([command]) => command instanceof PutObjectCommand)![0] as PutObjectCommand;
+    const snapshot = JSON.parse(Buffer.from(put.input.Body as Uint8Array).toString());
+    expect(snapshot.message.html).toBe(html);
+    const record = (await getWorkspaceState(user)).cases[0].evidence.find(e => e.originalEmail)!;
+    expect(record.originalEmail?.emailId).toBe(emailId);
+    expect(record.fileSha256).toBe(createHash('sha256').update(put.input.Body as Uint8Array).digest('hex'));
+    expect(record.downloadUrl).toContain(record.id);
+    fixture.read.mockClear();
+    expect(await captureOriginalEmails(user, caseId)).toMatchObject({ captured: 0, alreadySaved: 1 });
+    expect(fixture.read).not.toHaveBeenCalled();
+    send.mockRestore();
+  });
+  it('automatically captures linked originals before taking the investigation source snapshot', async () => {
+    await linked();
+    process.env.AWS_REGION = 'us-east-1'; process.env.BEDROCK_MODEL_ID = 'test-model'; process.env.FUNCTION_NAME = 'test-worker';
+    const s3 = vi.spyOn(S3Client.prototype, 'send').mockResolvedValue({} as never);
+    const lambda = vi.spyOn(LambdaClient.prototype, 'send').mockResolvedValue({ StatusCode: 202 } as never);
+    const run = await startInvestigation(user, caseId, 'bedrock');
+    expect(run.status).toBe('running');
+    expect((await getWorkspaceState(user)).cases[0].evidence.some(e => e.originalEmail)).toBe(true);
+    expect(lambda).toHaveBeenCalledOnce();
+    s3.mockRestore(); lambda.mockRestore();
+  });
+  it('does not manufacture original files when the provider has no message', async () => {
+    await linked(); fixture.read.mockRejectedValue(new Error('Unavailable'));
+    const before = (await getWorkspaceState(user)).cases[0];
+    const send = vi.spyOn(S3Client.prototype, 'send').mockResolvedValue({} as never);
+    expect(await captureOriginalEmails(user, caseId)).toMatchObject({ captured: 0, unavailable: [{ emailId, reason: expect.any(String) }] });
+    expect((await getWorkspaceState(user)).cases[0]).toEqual(before);
+    expect(send).not.toHaveBeenCalled(); send.mockRestore();
+  });
+  it('rejects mismatched customer and order content before preserving a provider body', async () => {
+    await linked();
+    const send = vi.spyOn(S3Client.prototype, 'send').mockResolvedValue({} as never);
+    for (const change of [{ to: ['unrelated@example.test'] }, { subject: 'ORDER-420', text: 'ORDER-420' }, { from: 'other@unrelated.test' }]) {
+      fixture.read.mockResolvedValue({ ...email(), ...change });
+      expect(await captureOriginalEmails(user, caseId)).toMatchObject({ captured: 0 });
+    }
+    expect(send).not.toHaveBeenCalled(); send.mockRestore();
+    await expect(captureOriginalEmails(other, caseId)).rejects.toMatchObject({ status: 404 });
+  });
+  it('does not attach captured content to a case that changed during collection', async () => {
+    await linked();
+    fixture.read.mockImplementationOnce(async () => { await executeAction(user, { action: 'updateCase', caseId, title: 'Concurrent edit' }); return email(); });
+    const send = vi.spyOn(S3Client.prototype, 'send').mockResolvedValue({} as never);
+    await expect(captureOriginalEmails(user, caseId)).rejects.toMatchObject({ status: 409 });
+    const item = (await getWorkspaceState(user)).cases[0];
+    expect(item.title).toBe('Concurrent edit');
+    expect(item.evidence.some(record => record.originalEmail)).toBe(false);
+    send.mockRestore();
   });
 });

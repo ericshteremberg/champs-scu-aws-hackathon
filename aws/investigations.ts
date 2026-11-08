@@ -1,3 +1,4 @@
+import { captureOriginalEmails } from './original-evidence.ts';
 import { evidenceSections } from '../lib/investigation/sections.ts';
 import { withSavedEmailContext } from './resend-history.ts';
 import { createHash, randomUUID } from 'node:crypto';
@@ -106,6 +107,13 @@ export async function startInvestigation(user: TrustedUser, caseId: string, mode
   if (item.data.activeRunId) throw new ApiError(409, 'An investigation is already running for this case.', 'run_active');
   if (mode === 'sample' && item.data.source !== 'demo') throw new ApiError(409, 'Sample investigation is available only for clearly labeled sample cases.', 'sample_only');
   if (mode === 'bedrock' && !getInvestigationConfig(wid).bedrockConfigured) throw new ApiError(409, 'Configure a tool-capable Bedrock model in us-east-1.', 'bedrock_not_configured');
+  // Collect provider originals before taking the immutable model/source snapshot.
+  if (mode === 'bedrock' && item.data.source !== 'demo') {
+    await captureOriginalEmails(user, caseId);
+    item = await ownedCase(wid, caseId);
+    assertMutableCase(item.data);
+    if (item.data.activeRunId) throw new ApiError(409, 'An investigation is already running for this case.', 'run_active');
+  }
   const managed = await caseConnection(wid, item.data);
   if (item.data.source === 'merchant' && !managed) requireMerchant(wid);
   const functionName = process.env.FUNCTION_NAME || process.env.AWS_LAMBDA_FUNCTION_NAME;

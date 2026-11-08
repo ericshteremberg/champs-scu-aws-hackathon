@@ -1,12 +1,14 @@
 "use client";
 
 import type { DisputeCase } from '@/lib/domain';
+import { visualEvidence } from '@/lib/report/exhibits';
 import { formatMoney } from '@/lib/money';
 import { packetNotes, packetResponse, packetSources, citationText } from '@/lib/report/packet';
 
 export function EvidencePacket({ current, content = current.draft?.content ?? '' }: { current: DisputeCase; content?: string }) {
   const sources = packetSources(current);
   const notes = packetNotes(current);
+  const originals = visualEvidence(current);
   return (
     <article aria-label="Evidence packet preview" className="cw-report-document" style={{ padding: 'clamp(20px, 4vw, 48px)', borderTop: '4px solid #f58220', whiteSpace: 'normal' }}>
       <p className="cw-eyebrow">CAUSALITY / DISPUTE EVIDENCE</p>
@@ -15,6 +17,15 @@ export function EvidencePacket({ current, content = current.draft?.content ?? ''
       <p className="cw-caption" style={{ margin: '12px 0 28px' }}>
         {current.source === 'demo' ? 'Synthetic sample' : current.draft?.status === 'approved' ? 'Reviewed copy' : 'Draft for review'} · {sources.length} saved source records · Not submitted
       </p>
+      <div className="cw-banner neutral" style={{ marginBottom: 24 }}>
+        <p>{originals.length
+          ? `${originals.length} original file${originals.length === 1 ? '' : 's'} will appear as visual exhibits. Source text and review notes remain separate.`
+          : 'No visual originals are saved yet. AWS investigations collect linked original emails from Resend when available. Use Collect original emails to retry, or optionally attach an original image or PDF. Unavailable originals are never recreated from summaries.'}</p>
+      </div>
+      {originals.length > 0 && <details style={{ marginBottom: 24 }}>
+        <summary>Original files included in the PDF</summary>
+        <ul>{originals.map(record => <li key={record.id}><a href={record.downloadUrl} target="_blank" rel="noreferrer">{record.fileName || record.title}</a> {record.capturedAt ? `Collected ${new Date(record.capturedAt).toLocaleDateString()}` : 'Collection time not recorded'}</li>)}</ul>
+      </details>}
       <h3>Merchant response</h3>
       <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.75, marginTop: 16 }}>
         {packetResponse(current, content) || 'Prepare a response from the attached evidence to create your PDF.'}
@@ -28,7 +39,7 @@ export function EvidencePacket({ current, content = current.draft?.content ?? ''
         <p className="cw-caption">These qualifications are included in the PDF.</p>
         <ul style={{ paddingLeft: 24 }}>{notes.map((note, i) => <li key={i} style={{ marginTop: 12 }}>{citationText(note, sources)}</li>)}</ul>
       </details>}
-      <p className="cw-caption" style={{ marginTop: 28 }}>The PDF contains the response, source register, review notes and full saved source text. Original file attachments remain available in the case. Submissions are disabled.</p>
+      <p className="cw-caption" style={{ marginTop: 28 }}>The PDF includes original image and PDF exhibits where attached, with file fingerprints and source labels. Other file formats remain available in the case. A fingerprint detects byte changes; it does not authenticate what an image depicts. Submissions are disabled.</p>
     </article>
   );
 }

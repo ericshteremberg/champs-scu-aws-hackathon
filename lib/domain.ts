@@ -3,6 +3,8 @@ export type EvidenceSource = 'stripe' | 'gmail' | 'imap' | 'database' | 'policy'
 export type Evidence = {
   id: string; caseId: string; source: EvidenceSource; title: string; content: string;
   occurredAt: string; reference: string; fileName?: string; mimeType?: string; downloadUrl?: string;
+  fileSha256?: string; capturedAt?: string;
+  originalEmail?: { provider: 'resend'; emailId: string };
   provenance?: { section: string; sourceMode: string; fields: Record<string, string | number | boolean | null>; limitations: string[]; originalSourceId?: string };
 };
 export type Finding = { kind: 'supported' | 'conflict' | 'missing'; title: string; detail: string; evidenceIds: string[] };

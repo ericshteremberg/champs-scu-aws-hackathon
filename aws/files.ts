@@ -91,7 +91,7 @@ export async function completeUpload(user: TrustedUser, uploadId: string): Promi
     catch (error) { if (error instanceof UploadValidationError) throw new ApiError(400, error.message, 'invalid_upload'); throw error; }
     await client.send(new PutObjectCommand({ Bucket: bucket, Key: finalKey, Body: bytes, ContentType: validated.mimeType, ServerSideEncryption: 'AES256', IfNoneMatch: '*', Metadata: { sha256: createHash('sha256').update(bytes).digest('hex') } }), { abortSignal: AbortSignal.timeout(20_000) });
     const content = validated.textContent.length > 24000 ? `${validated.textContent.slice(0, 23800)}\n[Text preview truncated. Review the attached original.]` : validated.textContent;
-    const evidence: EvidenceDoc = { id: evidenceId, caseId: item.data.id, source: upload.data.source, title: upload.data.title, content, occurredAt: now(), reference: validated.fileName, fileName: validated.fileName, mimeType: validated.mimeType, fileKey: finalKey, createdAt: now() };
+    const evidence: EvidenceDoc = { id: evidenceId, caseId: item.data.id, source: upload.data.source, title: upload.data.title, content, occurredAt: now(), reference: validated.fileName, fileName: validated.fileName, mimeType: validated.mimeType, fileKey: finalKey, fileSha256: createHash('sha256').update(bytes).digest('hex'), capturedAt: now(), createdAt: now() };
     const changes: StoreChange[] = [
       { key: item.key, expectedVersion: item.version, data: { ...item.data, dataRevision: item.data.dataRevision + 1, status: 'needs_review', updatedAt: now() } satisfies CaseDoc },
       { key: keys.evidence(item.data.id, evidenceId), expectedVersion: null, data: evidence },

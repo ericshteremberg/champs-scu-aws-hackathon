@@ -271,6 +271,8 @@ describe('private S3 evidence', () => {
     const stateAfter = await getWorkspaceState(user); const saved = stateAfter.cases.find(item => item.id === caseId)!;
     const file = saved.evidence.find(record => record.fileName === 'receipt.txt')!;
     expect(file.content).toBe('hello'); expect(file.downloadUrl).toContain(file.id);
+    expect(file.fileSha256).toBe('2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824');
+    expect(file.capturedAt).toBeTruthy();
     expect(saved.draft?.status).toBe('draft'); expect(saved.draft?.sourceStale).toBe(true);
     const put = send.mock.calls.find(([command]) => command instanceof PutObjectCommand)![0] as PutObjectCommand;
     expect(put.input.Key).toContain(`evidence/${wid}/${caseId}/`); expect(put.input.IfNoneMatch).toBe('*'); expect(put.input.Body?.toString()).toBe('hello');

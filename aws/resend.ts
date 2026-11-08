@@ -21,7 +21,7 @@ export async function resendStatus(user: TrustedUser) {
   const state = await getItem<{ verifiedAt: string }>(wid, 'provider#resend');
   return { configured: true, verifiedAt: state?.data.verifiedAt || null, domains: allowedResendDomains() };
 }
-function orderLinked(email: z.infer<typeof sentEmailSchema>, orderRef: string) {
+export function orderLinked(email: z.infer<typeof sentEmailSchema>, orderRef: string) {
   if (!orderRef || orderRef.length < 4) return false;
   const escaped = orderRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(`(^|[^A-Za-z0-9_-])${escaped}($|[^A-Za-z0-9_-])`, 'i');

@@ -68,6 +68,7 @@ import {
   SubmissionOutcome,
 } from "./workspace-extra";
 import { EvidencePacket } from './evidence-packet';
+import { loadVisualExhibits } from '@/lib/report/exhibits';
 import { packetFilename, packetNotes, categoryDiagnostics, citationText, packetSources } from '@/lib/report/packet';
 import type { ScreenPreview } from "@/lib/design/fixtures";
 import { EvidenceConnectors } from "./connector-setup";
@@ -658,6 +659,18 @@ export default function WorkspaceApp({
 
   useEffect(() => () => investigationController.current?.abort(), []);
 
+  const collectOriginals = async (id: string) => {
+    if (preview || busy || pendingInvestigation || dirtyReport) return;
+    setBusy(true); setError('');
+    try {
+      const response = await fetch('/api/evidence/capture-originals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ caseId: id }) });
+      const data = await response.json() as { state?: WorkspaceState; captured: number; alreadySaved: number; configured: boolean; remaining: number; unavailable: unknown[]; error?: string };
+      if (!response.ok) throw new Error(data.error || 'Original email collection could not finish.');
+      if (data.state) setState(data.state);
+      setToast(!data.configured ? 'Connect Resend read access to collect original email bodies.' : data.captured ? `${data.captured} original email(s) preserved. Run a fresh investigation to include them in the PDF.${data.remaining ? ' More linked emails remain; collect again.' : ''}` : data.unavailable.length ? 'The provider could not return an original email for this case. Existing evidence was preserved; no replacement image was created.' : `${data.alreadySaved} original email(s) already saved. No additional linked messages were available.`);
+    } catch (error) { setError(error instanceof Error ? error.message : 'Original collection failed.'); }
+    finally { setBusy(false); }
+  };
   const startInvestigation = async (id: string, mode: "sample" | "bedrock") => {
     if (preview) {
       setToast(
@@ -1322,6 +1335,7 @@ export default function WorkspaceApp({
                       void archiveCase(current.id, current.draft.revision);
                   }}
                   openConnections={() => navigate("integrations")}
+                  collectOriginals={() => void collectOriginals(current.id)}
                   initialTab={detail.tab}
                   initialEvidence={detail.evidence}
                   onTab={(v) => updateDetail("tab", v)}
@@ -2311,6 +2325,7 @@ function draftMethodLabel(method?: string) {
 
 function CaseDetail({
   current,
+  collectOriginals,
   busy,
   mutate,
   back,
@@ -2334,6 +2349,7 @@ function CaseDetail({
   attachPolicy,
 }: {
   current: DisputeCase;
+  collectOriginals: () => void;
   busy: boolean;
   mutate: (a: WorkspaceAction, message?: string) => Promise<boolean>;
   back: () => void;
@@ -2426,7 +2442,8 @@ function CaseDetail({
           return new Uint8Array(await response.arrayBuffer());
         }),
       ]);
-      const bytes = await module.createEvidencePdf(current, { regular: fonts[0], bold: fonts[1] });
+      const exhibits = await loadVisualExhibits(current);
+      const bytes = await module.createEvidencePdf(current, { regular: fonts[0], bold: fonts[1] }, new Date(), exhibits);
       const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }));
       const link = document.createElement('a'); link.href = url; link.download = packetFilename(current);
       document.body.appendChild(link); link.click(); link.remove();
@@ -2856,6 +2873,9 @@ function CaseDetail({
                 <Button primary onClick={() => void downloadPdf()} disabled={!canDownloadPdf}>
                   <ArrowDownToLine size={18} />
                   {pdfBusy ? 'Preparing PDF…' : 'Download evidence PDF'}
+                </Button>
+                <Button onClick={collectOriginals} disabled={busy || frozen || investigating || dirty || current.source === 'demo'}>
+                  Collect original emails
                 </Button>
                 <Button
                   onClick={() => exportDraft("json")}

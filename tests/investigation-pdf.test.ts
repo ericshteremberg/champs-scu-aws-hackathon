@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
 import { createEvidencePdf } from '../lib/report/pdf.ts';
 import { assertPacketReady, categoryDiagnostics, citationText, packetNotes, packetResponse, packetSources } from '../lib/report/packet.ts';
 import { evidenceSections } from '../lib/investigation/sections.ts';
+import { loadVisualExhibits, hashBytes, type Exhibit } from '../lib/report/exhibits.ts';
 import { responseStyleFeedback } from '../lib/investigation/report.ts';
 import { runInvestigation } from '../lib/investigation/engine.ts';
 import type { DisputeCase, Evidence } from '../lib/domain.ts';
@@ -70,5 +71,41 @@ describe('combined attached evidence routing', () => {
   });
   it('rejects reuse of an ID for different content', async () => {
     await expect(runInvestigation({ case: fixture(), mode: 'sample', region: 'us-east-1', signal: new AbortController().signal, assertActive: async () => {}, onEvent: async () => {}, readEvidence: async section => envelope(section, section === 'order') })).rejects.toMatchObject({ code: 'duplicate_evidence' });
+  });
+});
+
+
+describe('original visual exhibits', () => {
+  const image = new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l1sAAAAASUVORK5CYII=', 'base64'));
+  async function visualCase() {
+    const item = fixture(), sha256 = await hashBytes(image);
+    item.evidence[0] = { ...item.evidence[0], fileName: 'original.png', mimeType: 'image/png', downloadUrl: '/api/evidence/ev_order', fileSha256: sha256, capturedAt: record.occurredAt };
+    return { item, exhibit: { evidenceId: record.id, bytes: image, mimeType: 'image/png', sha256, fetchedAt: record.occurredAt } as Exhibit };
+  }
+  it('embeds the actual image and original file bytes, and never substitutes descriptive text', async () => {
+    const { item, exhibit } = await visualCase();
+    const pdf = await PDFDocument.load(await createEvidencePdf(item, fonts, new Date(), [exhibit]));
+    expect(pdf.context.enumerateIndirectObjects().some(([,object]) => object instanceof PDFRawStream && object.dict.get(PDFName.of('Subtype')) === PDFName.of('Image'))).toBe(true);
+    expect(pdf.catalog.has(PDFName.of('Names'))).toBe(true);
+    await expect(createEvidencePdf(item, fonts)).rejects.toThrow('Original exhibits are missing');
+    await expect(createEvidencePdf(item, fonts, new Date(), [{ ...exhibit, evidenceId: 'unrelated' }])).rejects.toThrow('do not belong');
+    await expect(createEvidencePdf(item, fonts, new Date(), [{ ...exhibit, sha256: '0'.repeat(64) }])).rejects.toThrow('changed');
+  });
+  it('reproduces every page of an original PDF', async () => {
+    const original = await PDFDocument.create(); original.addPage([300,400]).drawText('Synthetic original page one'); original.addPage([300,400]).drawText('Synthetic original page two');
+    const bytes = await original.save(), sha256 = await hashBytes(bytes), item = fixture();
+    item.evidence[0] = { ...item.evidence[0], fileName: 'receipt.pdf', mimeType: 'application/pdf', downloadUrl: '/api/evidence/ev_order', fileSha256: sha256 };
+    const pdf = await PDFDocument.load(await createEvidencePdf(item, fonts, new Date(), [{ evidenceId: record.id, bytes, mimeType: 'application/pdf', sha256, fetchedAt: record.occurredAt }]));
+    expect(pdf.getPageCount()).toBeGreaterThanOrEqual(5);
+  });
+  it('loads only authorized originals and fails on retrieval, format or fingerprint mismatch', async () => {
+    const { item } = await visualCase();
+    const request = async () => new Response(image, { status: 200 });
+    expect(await loadVisualExhibits(item, request as typeof fetch)).toHaveLength(1);
+    await expect(loadVisualExhibits(item, (async () => new Response('', {status:404})) as typeof fetch)).rejects.toThrow('could not be retrieved');
+    item.evidence[0].fileSha256 = '0'.repeat(64);
+    await expect(loadVisualExhibits(item, request as typeof fetch)).rejects.toThrow('fingerprint');
+    item.evidence[0].downloadUrl = 'https://unrelated.example.test/file';
+    await expect(loadVisualExhibits(item, request as typeof fetch)).rejects.toThrow('invalid case download link');
   });
 });
