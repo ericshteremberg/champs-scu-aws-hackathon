@@ -75,7 +75,7 @@ export async function submitStripe(workspaceId:string,actor:string,input:{caseId
  const db=getDb(),{connection,stripe}=await verifiedConnection(workspaceId);
  const row=await db.select().from(cases).where(and(eq(cases.id,input.caseId),eq(cases.workspaceId,workspaceId))).get();if(!row)throw new ApiError(404,'Case not found.');
  const draft=await db.select().from(drafts).where(and(eq(drafts.caseId,row.id),eq(drafts.workspaceId,workspaceId))).get();
- const invalid=submissionEligibility({source:row.source,status:row.status,draftStatus:draft?.status,revision:draft?.revision,requestedRevision:input.draftRevision,confirmed:input.confirmed});if(invalid)throw new ApiError(409,invalid);
+ const invalid=submissionEligibility({source:row.source,status:row.status,draftStatus:draft?.status,revision:draft?.revision,requestedRevision:input.draftRevision,confirmed:input.confirmed,sourceRevision:draft?.sourceRevision,dataRevision:row.dataRevision});if(invalid)throw new ApiError(409,invalid);
  if(!row.stripeDisputeId||row.stripeAccountId!==connection.accountId)throw new ApiError(409,'The case belongs to a different Stripe account.');
  if(draft!.content.length>20000)throw new ApiError(409,'Stripe accepts at most 20,000 characters in this text response. Shorten and review the draft again.');
  const attachment=await db.select({id:evidence.id}).from(evidence).where(and(eq(evidence.workspaceId,workspaceId),eq(evidence.caseId,row.id),sql`${evidence.fileKey} IS NOT NULL`)).limit(1);
@@ -87,7 +87,7 @@ export async function submitStripe(workspaceId:string,actor:string,input:{caseId
  try{
   const result=await performClaimedSubmission({
    claim:async()=>{
-    const claimed=await db.update(cases).set({status:'submitting',updatedAt:new Date().toISOString()}).where(and(eq(cases.id,row.id),eq(cases.workspaceId,workspaceId),eq(cases.status,'ready'),sql`EXISTS (SELECT 1 FROM drafts WHERE case_id = ${row.id} AND workspace_id = ${workspaceId} AND status = 'approved' AND revision = ${input.draftRevision})`)).returning({id:cases.id});return claimed.length===1;
+    const claimed=await db.update(cases).set({status:'submitting',updatedAt:new Date().toISOString()}).where(and(eq(cases.id,row.id),eq(cases.workspaceId,workspaceId),eq(cases.status,'ready'),sql`EXISTS (SELECT 1 FROM drafts WHERE case_id = ${row.id} AND workspace_id = ${workspaceId} AND status = 'approved' AND revision = ${input.draftRevision} AND (source_revision IS NULL OR source_revision = ${cases.dataRevision}))`)).returning({id:cases.id});return claimed.length===1;
    },
    send:()=>stripe.disputes.update(disputeId,{evidence:{uncategorized_text:draft!.content},submit:true},{idempotencyKey:`causality:${workspaceId}:${row.id}:revision:${input.draftRevision}`}),
    settle:async(updated)=>{await db.batch(disputeWrites(updated,workspaceId,connection.accountId));await audit(workspaceId,actor,'stripe.submitted',`Submitted approved response revision ${input.draftRevision}.`,row.id);},

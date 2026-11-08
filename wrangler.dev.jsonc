@@ -1,0 +1,38 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "causality-hackathon-dev",
+  "account_id": "fad42c44a85c38e6c342158dd55020e8",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2026-11-07",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "no_bundle": true,
+  "find_additional_modules": true,
+  "rules": [
+    {
+      "type": "ESModule",
+      "globs": [
+        "**/*.js",
+        "**/*.mjs"
+      ]
+    }
+  ],
+  "assets": {
+    "directory": "dist/client",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "vars": {
+    "DEPLOYMENT_MODE": "standalone-dev",
+    "DATA_BACKEND": "aws",
+    "AWS_REGION": "us-east-1",
+    "AWS_BACKEND_FUNCTION": "causality-hackathon-backend",
+    "EVIDENCE_BUCKET_ORIGIN": "https://causality-hackathon-dev-evidencebucket-evmipvnuxndt.s3.us-east-1.amazonaws.com"
+  },
+  "observability": {
+    "enabled": true
+  }
+}

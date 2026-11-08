@@ -1,110 +1,144 @@
 # Causality
 
-A desktop chargeback investigation workspace, built from the Causality Paper design. The landing page pairs the Enterprise product story with rounded surfaces, an original animated evidence illustration, and a receipt-filled wordmark footer.
+Causality investigates payment disputes using the records behind a transaction: tickets, delivery attempts, support messages, payment history, and relevant policies. The operator reviews sourced findings, edits a response, approves its exact revision, and exports or archives the packet.
 
-## What works
+The hackathon deployment uses an **AWS backend and database**. Cloudflare Workers serves the existing Causality interface and an authenticated bridge. Private AWS Lambda runs the application, DynamoDB stores its records, S3 stores attachments and approved archives, and Amazon Bedrock performs the investigation.
 
-- Managed ChatGPT sign-in and sign-out, protected server routes, and one persistent workspace per signed-in owner.
-- Business onboarding, an overview dashboard, searchable dispute queue, case details, evidence library, connections, access/activity, and settings.
-- Manual cases and explicitly loaded synthetic sample cases; samples cannot be submitted to Stripe.
-- Source records and private PDF, image, text, CSV, JSON, and email-file uploads. D1 stores records; R2 stores original attachments.
-- Source-linked timelines, basic rule-based contradiction flags, editable evidence-template drafts, revision-bound approval, and export.
-- Evidence changes clear approval. Submitted cases are locked. An audit trail records workspace actions.
-- Versioned company policies, retention preferences, and access-request recording. Policy uploads do not grant permissions.
-- Stripe server integration code for account validation, paginated dispute imports, signed webhooks, disconnect, and separately enabled merchant-approved text submission.
+## Architecture
 
-## Current boundaries
+```mermaid
+flowchart LR
+  Browser[Merchant browser] --> Frontend[Wrangler frontend and authentication]
+  Frontend -->|IAM-signed invocation| Lambda[Private AWS Lambda API]
+  Lambda --> DynamoDB[(DynamoDB records and revisions)]
+  Lambda -->|Asynchronous invocation| Investigator[Lambda investigation job]
+  Investigator --> Bedrock[Amazon Bedrock Nova]
+  Investigator --> Merchant[Merchant case evidence API]
+  Investigator --> DynamoDB
+  Lambda --> S3[(Private S3 attachments and archives)]
+  Browser -->|Short-lived signed upload| S3
+```
 
-Stripe is deliberately **disconnected**. No credentials, account connection, real dispute imports, payments, or submissions were made. Black Label Creators LLC is reserved for a later connection decision.
+The development stack is `causality-hackathon-dev` in `us-east-1`. Its frontend is [causality-hackathon-dev.slidah60.workers.dev](https://causality-hackathon-dev.slidah60.workers.dev).
 
-This is a functional first application, with explicit integration boundaries:
+**Verification status:** Direct AWS acceptance passed with `npm run test:aws:smoke`: DynamoDB persistence and owner isolation, all three asynchronous ticket investigations, private S3 upload/validation/download, cancellation, concurrent approval preservation, approved S3 archival, and a complete real Nova investigation with validated citations and a newly unapproved draft. The model is `us.amazon.nova-2-lite-v1:0`. The public frontend is published, but its HTTPS-to-Lambda bridge remains under final verification. ATMSPHR production data and Stripe submission remain unconnected.
 
-- Drafts use an evidence template and limited pattern matching. No LLM is connected. PDF and image contents are not extracted automatically; originals remain available for merchant review.
-- Gmail OAuth and automated company-database retrieval are not implemented. Selected emails and approved records can be imported manually. The separate database-access backend is not replaced by this application.
-- Each workspace currently has one owner. Requests cannot be self-approved; independent reviewer membership and the external policy-enforcement service must be integrated before broader access can be granted.
-- Retention is a saved preference; there is no scheduled deletion process yet.
-- The initial Stripe connector uses a server-held restricted key tied to one workspace. It is not multi-merchant OAuth or a Stripe Marketplace App.
-- Stripe submission currently sends the approved response as `uncategorized_text`. It blocks submission when supporting files are attached, rather than silently omitting them. It does not upload or map attached files into Stripe evidence categories. Complete and validate that mapping before using this for production dispute packages.
-- The published Site is owner-private. Stripe cannot deliver unauthenticated webhooks through its sign-in gate. Before enabling webhooks, provide a supported service ingress or a separately hosted signature-verifying relay. Do not make workspace data public to work around this.
-- Landing-page screenshots show synthetic product concepts; the access architecture is labeled as planned. The application does not claim that a bank will uphold a merchant’s dispute response.
+There are no D1 or R2 bindings in the development deployment. The temporary development D1 database was deleted. Legacy D1/R2 modules and migrations remain only for the original Sites compatibility path and local regression tests; they do not store the AWS deployment's data.
 
-## Run locally
+## Product behavior
 
-Use Node 22.13 or newer.
+- The existing Causality landing page, onboarding, queue, evidence library, connections, activity, settings, and review interface are preserved.
+- Six explicitly loaded synthetic cases include three ATMSPHR-style ticket disputes. Sample loading is idempotent and preserves edits to existing samples.
+- **Sample investigation** is deterministic, is labeled as such, and runs only on sample cases. **AWS investigation** uses Bedrock Converse tool calls. An AWS failure never becomes a sample result under an AWS label.
+- A merchant-owned API returns only selected records linked to an approved case. The model cannot choose another case, database query, or arbitrary endpoint.
+- Investigations run asynchronously in Lambda. The browser polls persisted progress, and cancellation prevents later tool/model steps and draft publication.
+- DynamoDB conditional transactions protect case data, active runs, draft revisions, approval state, and Stripe submission claims. A stale result cannot replace newer source records or a reviewer's edits.
+- PDFs, images, UTF-8 text, CSV, JSON, and email files upload directly to private S3 using a short-lived signed form. Finalization validates the stored bytes before attaching them to a case. File downloads require case ownership.
+- Approved packets can be explicitly archived to private S3. The JSON packet contains the response, findings, and evidence metadata; original attachments remain separate private S3 objects.
+- The Stripe connector retains account/environment validation, paginated sync, webhook verification, and separately enabled exact-revision submission. Refunds and customer messaging are not implemented.
+
+## Development access
+
+The deployed preview requires username `dev` and its development password. The password is saved locally in Git-ignored `.dev-worker-access.txt` with owner-only file permissions. Share it separately from the repository; never commit it or paste it into a public demo.
+
+This is a shared team development workspace. The Worker strips caller-supplied platform identity headers and inserts a fixed reviewer identity only after password verification. The original Sites-managed identity path remains available in its own deployment mode. The development password gate is not production multi-user authentication.
+
+## Setup and deployment
+
+Use Node 22.13 or newer. Install dependencies and run checks:
 
 ```sh
 npm ci
-npm run build
+npm run check
 ```
 
-Apply the initial migration **once** to a fresh local database:
+Use the organizer's [AWS workshop access guide](https://github.com/SCUACM/aws-access-26). In a terminal containing the current Workshop Studio credential exports, save the temporary session without printing it:
 
 ```sh
-node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_fluffy_hardball.sql
+node scripts/save-aws-session.mjs
+npm run aws:check -- --invoke
+npm run sync:dev-secrets
 ```
 
-Then launch the desktop preview:
+The save helper writes the three temporary credential variables to Git-ignored `.dev.vars`, preserving other settings. `sync:dev-secrets` sends those credentials and the existing private development password to the Wrangler secret store without committing them. Use `AWS_REGION=us-east-1` and `BEDROCK_MODEL_ID=us.amazon.nova-2-lite-v1:0`. The model check sends a small synthetic tool-use request.
+
+Deploy the AWS backend, then the Wrangler frontend:
 
 ```sh
-npm run dev -- --port 5173
+npm run deploy:aws
+npm run deploy:dev
 ```
 
-Open the printed loopback URL. Local development supplies the Sites test identity through the normal **Continue with ChatGPT** link. It does not use the production account. The dev proxy strips caller-supplied identity headers. Hosted authentication is provided by Sites; it owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, and `/callback`.
+`deploy:aws` builds the Lambda archive, updates the CloudFormation stack in `infra/aws-backend.json`, and uploads the backend code. Set `CAUSALITY_FRONTEND_ORIGIN` to the deployed frontend origin when provisioning or changing its S3 CORS configuration. Generated resource outputs are saved in ignored `.aws-build/deployment.json`.
 
-The build uses Vinext, React 19, TypeScript, Cloudflare Workers, Drizzle, D1, and R2. Preserve the `sites()` integration in `vite.config.ts`. Publishing through Sites applies production migrations separately from the local database.
+`deploy:dev` publishes the frontend configured by `wrangler.dev.jsonc`. It does not replace the original Sites application. Set the preview password and temporary AWS bridge credentials through the Worker secret store, never through public variables. Use `npm run sync:dev-secrets` after refreshing `.dev.vars`; deployment alone does not copy local secrets.
 
-## Verification
+The bridge's temporary workshop credentials expire. Refresh them before the demo and run `npm run sync:dev-secrets` to update the deployed Worker secrets. Lambda uses its own execution role for DynamoDB, S3, Bedrock, and background invocation; it does not depend on copied workshop credentials internally. An expired bridge session can interrupt the UI while stored data and an already-running Lambda job remain in AWS.
 
-```sh
-npm run typecheck
-npm test
-npm run build
-```
+## Runtime configuration
 
-For API integration tests, start the **built Worker** in a second terminal:
-
-```sh
-npm start -- --port 8788
-```
-
-Then run:
-
-```sh
-CAUSALITY_API_TEST_BASEURL=http://127.0.0.1:8788 npm run test:api
-```
-
-These tests create synthetic records in local D1/R2. They exercise anonymous denial, ownership isolation, persistence, stale approvals, independent-review requirements, cross-origin rejection, upload validation, private downloads, and disconnected Stripe behavior. They only accept a localhost URL. The built preview simulates trusted platform identity with test headers; it must remain bound to loopback and must not be exposed as a public authentication service.
-
-## Stripe configuration for later
-
-All values remain empty or disabled in `.env.example`. Do not put a key in browser code, source control, or the hosting manifest. Set hosted runtime secrets through Sites environment settings. For local work, use an ignored `.dev.vars` file recognized by Wrangler.
-
-| Variable | Purpose |
+| Location | Values |
 | --- | --- |
-| `STRIPE_RESTRICTED_KEY` | Server-only `rk_test_…` restricted key; use a sandbox first. |
-| `STRIPE_WORKSPACE_ID` | Exact workspace ID shown in Connections. Binds the key to one owner’s workspace. |
-| `STRIPE_WEBHOOK_SECRET` | Endpoint signing secret, once webhook ingress is configured. |
-| `STRIPE_ALLOW_LIVE` | Defaults to `false`; live keys are refused unless explicitly enabled. |
-| `STRIPE_ENABLE_SUBMISSION` | Defaults to `false`; approval and export work without submission. |
+| Frontend Worker public configuration | `DATA_BACKEND=aws`, `DEPLOYMENT_MODE=standalone-dev`, `AWS_REGION`, `AWS_BACKEND_FUNCTION`, `EVIDENCE_BUCKET_ORIGIN` |
+| Frontend Worker secrets | `DEV_ACCESS_PASSWORD`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` |
+| Lambda, provisioned by CloudFormation | `CAUSALITY_TABLE`, `EVIDENCE_BUCKET`, `BEDROCK_MODEL_ID`, `FUNCTION_NAME` |
+| Lambda, optional merchant connection | `MERCHANT_EVIDENCE_URL`, `MERCHANT_EVIDENCE_TOKEN`, `MERCHANT_WORKSPACE_ID` |
+| Lambda, optional Stripe connection | `STRIPE_RESTRICTED_KEY`, `STRIPE_WORKSPACE_ID`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_ALLOW_LIVE`, `STRIPE_ENABLE_SUBMISSION` |
 
-The restricted key must permit reading the current account and disputes. Write access to disputes is only needed for a separately enabled submission path. The connection validates the account and environment; later requests must match that binding. Do not enable submission until test-mode evidence packaging and the entire review flow are verified.
+Configure merchant and Stripe credentials on Lambda, preserving the infrastructure-provided environment values. Bind each connection to the exact workspace ID shown in the interface. They are not browser credentials. The Connections screen indicates configuration; only a successful operation verifies current access.
 
-Webhook processing verifies the raw body signature and timestamp, checks account/environment binding, records event IDs, and retrieves current dispute state. Submission requires a real imported Stripe case, an exact approved revision, and explicit confirmation. The same revision uses a stable idempotency key. An ambiguous submission failure remains locked for reconciliation rather than inviting a duplicate submission.
+## Limits and current boundaries
 
-Primary references: [Stripe disputes](https://docs.stripe.com/api/disputes), [updating dispute evidence](https://docs.stripe.com/api/disputes/update), [webhooks](https://docs.stripe.com/webhooks), [restricted keys](https://docs.stripe.com/keys/restricted-api-keys), [currency units](https://docs.stripe.com/currencies).
+The AWS implementation supports 90 evidence records per case, 300 KB per DynamoDB item, 3 MB per database transaction, 1 MB of normalized investigator context, and 10 MB per uploaded file. Reads are paginated and fail explicitly at their configured bounds instead of silently returning incomplete evidence. Run time and tool/model rounds are bounded.
+
+PDF and image contents are not extracted automatically. The operator can inspect the originals; the model is told when relevant content is unavailable. Gmail OAuth, independent reviewer membership, automatic retention deletion, refunds, and outbound customer messages are not implemented. Saved policies and access requests do not grant broader permissions.
+
+All bundled records are fictional. A real Bedrock run over them is a synthetic-data demonstration. No improvement in win rate, revenue recovery, or operator time has been established. The first pilot is ticket-dispute preparation with ATMSPHR; Rentul is a later adapter to validate.
+
+Stripe is disconnected and submission is disabled by default. Real submission requires the correct connected account, a Stripe-imported case, current evidence, an approved exact draft revision, and explicit confirmation. Cases with file attachments are blocked from text-only submission. Ambiguous results stay locked for reconciliation. The password-protected development endpoint is not automatic public Stripe webhook ingress; a separately reviewed ingress path is required. Black Label Creators LLC remains reserved for a later connection decision.
+
+## Verification and compatibility
+
+```sh
+npm run check
+```
+
+The checks cover type safety, existing backend/Stripe/currency behavior, legacy migrations, development authentication, investigation reasoning, native AWS behavior, and both application and Lambda builds.
+
+The deployed AWS acceptance test is separate:
+
+```sh
+npm run test:aws:smoke
+```
+
+It targets the named hackathon development backend, creates isolated synthetic workspaces and S3 objects, and makes real Bedrock requests. It has passed the AWS persistence, investigation, file, cancellation, approval-race, and archive scenarios described above. Results are written to ignored `.aws-build/smoke-result.json`. It directly invokes Lambda, so it does not verify the public frontend bridge or browser CORS. Complete that deployed browser rehearsal before recording the final demo.
+
+For the retained local Sites compatibility test path only:
+
+```sh
+npm run build
+npm run db:migrate:local
+npm start -- --port 8788
+CAUSALITY_API_TEST_BASEURL=http://127.0.0.1:8788 npm run test:api
+CAUSALITY_API_TEST_BASEURL=http://127.0.0.1:8788 npm run test:api:investigation
+```
+
+Those local regression tests use D1/R2 emulation and trusted test headers bound to loopback. They do not exercise the deployed AWS database. Keep `sites()` in `vite.config.ts`, managed identity code, and `.openai/hosting.json` intact for that compatibility path.
 
 ## Source map
 
 | Path | Responsibility |
 | --- | --- |
-| `app/page.tsx`, `app/landing.css`, `components/landing/` | Landing page and motion |
-| `app/login/`, `app/workspace/`, `components/workspace/` | Authentication entry and application screens |
-| `app/chatgpt-auth.ts`, `lib/server/auth.ts` | Managed identity, ownership checks, origin checks, bounded request bodies |
-| `lib/server/workspace.ts`, `lib/server/report.ts` | Workspace operations, evidence workflow, draft assembly |
-| `app/api/evidence/`, `lib/server/uploads.ts` | Validated private file storage and downloads |
-| `lib/stripe/`, `app/api/stripe/` | Disconnected-by-default Stripe integration |
-| `db/schema.ts`, `drizzle/` | Persistent schema and immutable migrations |
-| `tests/` | Unit and local API integration checks |
-| `public/causality/` | Paper exports and licensed shader runtime |
+| `components/workspace/`, `app/` | Causality interface and original Sites routes |
+| `worker/index.ts`, `lib/server/dev-auth.ts`, `lib/server/aws-bridge.ts` | Protected frontend and private Lambda bridge |
+| `aws/handler.ts`, `aws/workspace.ts`, `aws/store.ts` | AWS API, business actions, DynamoDB conditional persistence |
+| `aws/investigations.ts` | Background jobs, trace persistence, scoped evidence, cancellation and final publication |
+| `aws/files.ts` | Signed S3 uploads, validation, private downloads and approved archives |
+| `aws/stripe.ts`, `lib/stripe/model.ts` | AWS-backed Stripe integration and submission state machine |
+| `lib/investigation/` | Portable Bedrock/sample engine, merchant wire contract and citation checks |
+| `lib/demo.ts`, `lib/ticket-demo.ts` | Six synthetic evaluation cases |
+| `infra/aws-backend.json`, `scripts/build-aws.mjs`, `scripts/deploy-aws.mjs` | Reproducible AWS infrastructure and deployment |
+| `lib/server/`, `db/`, `drizzle/` | Retained legacy Sites implementation and local regression path |
+| `tests/` | Unit, API and browser verification |
 
-The Sites project ID is preserved in `.openai/hosting.json`. Runtime secrets and local test records are excluded from publication source.
+See [handoff](docs/HANDOFF.md), [merchant API](docs/EVIDENCE_API.md), [demo](docs/DEMO.md), [business validation](docs/BUSINESS.md), and [branch comparison](docs/BRANCH_COMPARISON.md). The retained `docs/demo/` video shows the older standalone Casework interface. Record a fresh Causality demonstration for submission.

@@ -19,6 +19,8 @@ next-env.d.ts
 
 # Test output
 /coverage/
+/test-results/
+/playwright-report/
 
 # Package-manager logs
 npm-debug.log*
@@ -44,3 +46,7 @@ yarn-error.log*
 
 # OS metadata
 .DS_Store
+
+/.dev-worker-access.txt
+/.dev-worker-secrets.json
+/.aws-build/

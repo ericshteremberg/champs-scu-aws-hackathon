@@ -30,3 +30,9 @@ test('account and environment changes are rejected before using stored disputes'
  const {accountBindingError}=await import('../lib/stripe/model.ts');const stored={accountId:'acct_fixture',mode:'test'};
  assert.equal(accountBindingError(stored,'acct_fixture','test'),null);assert.ok(accountBindingError(stored,'acct_other','test'));assert.ok(accountBindingError(stored,'acct_fixture','live'));
 });
+
+test('approved investigation responses cannot submit after evidence changes',()=>{
+ const approved={source:'stripe',status:'ready',draftStatus:'approved',revision:3,requestedRevision:3,confirmed:true,sourceRevision:7,dataRevision:7};
+ assert.equal(submissionEligibility(approved),null);
+ assert.match(submissionEligibility({...approved,dataRevision:8})!,/evidence changed/);
+});

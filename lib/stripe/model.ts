@@ -18,9 +18,10 @@ export function normalizeDispute(dispute: Stripe.Dispute, workspaceId: string, a
   createdAt:new Date(dispute.created*1000).toISOString(),updatedAt:timestamp,
  };
 }
-export function submissionEligibility(input:{source:string;status:string;draftStatus?:string;revision?:number;requestedRevision:number;confirmed:boolean}) {
+export function submissionEligibility(input:{source:string;status:string;draftStatus?:string;revision?:number;requestedRevision:number;confirmed:boolean;sourceRevision?:number|null;dataRevision?:number}) {
  if(input.source!=='stripe') return 'Only imported Stripe disputes can be submitted.';
  if(!input.confirmed) return 'Confirm the exact response before submission.';
+ if(input.sourceRevision!=null && input.sourceRevision!==input.dataRevision) return 'The evidence changed. Run the investigation again and review the current response.';
  if(input.draftStatus!=='approved') return 'Approve the response before submission.';
  if(input.revision!==input.requestedRevision) return 'The response changed. Review and approve the current revision.';
  if(input.status==='submitting') return 'A submission is being verified. Check its Stripe status before taking further action.';

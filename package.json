@@ -13,13 +13,38 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --test tests/backend.test.mjs tests/stripe.test.mts tests/money.test.mts",
-    "test:api": "node tests/api-isolation.mjs"
+    "test": "node --experimental-strip-types --test tests/backend.test.mjs tests/stripe.test.mts tests/money.test.mts tests/migrations.test.mts tests/dev-auth.test.mts",
+    "test:api": "node tests/api-isolation.mjs",
+    "test:investigation": "vitest run --config vitest.config.ts",
+    "test:e2e": "playwright test --config playwright.config.ts",
+    "aws:check": "node --experimental-strip-types scripts/aws-check.ts",
+    "check": "npm run typecheck && npm test && npm run test:investigation && npm run build && npm run build:aws",
+    "db:migrate:local": "node scripts/migrate-local.mjs",
+    "test:api:investigation": "node tests/investigation-api.mjs",
+    "deploy:dev": "npm run build && node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js deploy --config wrangler.dev.jsonc",
+    "build:aws": "node scripts/build-aws.mjs",
+    "deploy:aws": "npm run build:aws && node scripts/deploy-aws.mjs",
+    "sync:dev-secrets": "node scripts/sync-dev-secrets.mjs",
+    "test:aws:smoke": "node scripts/smoke-aws.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock": "^3.1164.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1164.0",
+    "@aws-sdk/client-cloudformation": "^3.1164.0",
+    "@aws-sdk/client-dynamodb": "^3.1164.0",
+    "@aws-sdk/client-iam": "^3.1164.0",
+    "@aws-sdk/client-lambda": "^3.1164.0",
+    "@aws-sdk/client-s3": "^3.1164.0",
+    "@aws-sdk/client-sts": "^3.1164.0",
+    "@aws-sdk/credential-provider-node": "^3.972.94",
+    "@aws-sdk/lib-dynamodb": "^3.1164.0",
+    "@aws-sdk/s3-presigned-post": "^3.1164.0",
+    "@aws-sdk/s3-request-presigner": "^3.1164.0",
     "@base-ui/react": "^1.7.0",
     "@hookform/resolvers": "^5.7.1",
     "@shadcn/react": "^0.3.0",
+    "@smithy/fetch-http-handler": "^5.8.1",
+    "aws4fetch": "^1.0.20",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "cmdk": "^1.1.1",
@@ -28,7 +53,7 @@
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^1.31.0",
-    "next": "16.3.4",
+    "next": "^16.4.5",
     "next-themes": "^0.4.6",
     "radix-ui": "^1.6.7",
     "react": "19.2.6",
@@ -38,14 +63,16 @@
     "react-resizable-panels": "^4.12.2",
     "recharts": "^3.8.0",
     "sonner": "^2.0.8",
+    "stripe": "23.0.0",
     "tailwind-merge": "3.6.0",
     "vaul": "^1.1.2",
-    "zod": "^3.25.76",
-    "stripe": "23.0.0"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.1164.0",
     "@cloudflare/vite-plugin": "1.37.1",
     "@cloudflare/workers-types": "4.20260515.1",
+    "@playwright/test": "^1.65.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
@@ -53,6 +80,7 @@
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",
+    "esbuild": "^0.28.2",
     "eslint": "9.39.4",
     "eslint-config-next": "16.3.4",
     "json-rpc-2.0": "1.7.1",
@@ -63,12 +91,13 @@
     "typescript": "5.9.3",
     "vinext": "1.0.0-beta.5",
     "vite": "8.0.13",
+    "vitest": "^5.1.0",
     "wrangler": "4.92.0"
   },
   "type": "module",
   "overrides": {
     "miniflare": {
-      "sharp": "0.35.4"
+      "sharp": "0.35.5"
     }
   }
 }

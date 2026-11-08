@@ -1,4 +1,5 @@
 import type { DisputeCase } from './domain';
+import { TICKET_DEMO_CASES } from './ticket-demo';
 export const DEMO_CASES: DisputeCase[] = [
  {id:'demo-1048',title:'Product not received',customerName:'Alex Morgan',email:'alex@example.com',amount:24800,currency:'usd',status:'needs_review',reason:'product_not_received',orderRef:'#1048',dueAt:'2026-11-18T23:59:00.000Z',source:'demo',createdAt:'2026-10-17T10:14:00.000Z',updatedAt:'2026-10-17T10:14:00.000Z',findings:[],evidence:[
  {id:'demo-e1',caseId:'demo-1048',source:'stripe',title:'Payment captured',content:'A payment of $248.00 was captured for order #1048 on 12 October 2026. Synthetic Stripe payment record.',occurredAt:'2026-10-12T15:20:00.000Z',reference:'Synthetic · pi_demo_1048'},
@@ -8,4 +9,5 @@ export const DEMO_CASES: DisputeCase[] = [
  ]},
  {id:'demo-1052',title:'Duplicate charge reported',customerName:'Jordan Lee',email:'jordan@example.com',amount:12900,currency:'usd',status:'investigating',reason:'duplicate',orderRef:'#1052',dueAt:'2026-11-21T23:59:00.000Z',source:'demo',createdAt:'2026-11-02T09:00:00.000Z',updatedAt:'2026-11-02T09:00:00.000Z',findings:[],evidence:[{id:'demo-e5',caseId:'demo-1052',source:'stripe',title:'Payment recorded',content:'A $129.00 payment is recorded. A second payment has not yet been attached for comparison. Synthetic sample.',occurredAt:'2026-10-30T11:00:00.000Z',reference:'Synthetic · pi_demo_1052'}]},
  {id:'demo-1061',title:'Subscription cancellation dispute',customerName:'Sam Rivera',email:'sam@example.com',amount:7900,currency:'usd',status:'needs_review',reason:'subscription_canceled',orderRef:'#1061',dueAt:'2026-11-24T23:59:00.000Z',source:'demo',createdAt:'2026-11-03T10:00:00.000Z',updatedAt:'2026-11-03T10:00:00.000Z',findings:[],evidence:[]},
+ ...TICKET_DEMO_CASES,
 ];

@@ -1,0 +1,39 @@
+name: Verify Causality
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run db:migrate:local
+      - run: npx playwright install --with-deps chromium
+      - name: Start local Worker and test APIs
+        run: |
+          npm start -- --port 8788 > /tmp/causality-worker.log 2>&1 &
+          echo $! > /tmp/causality-worker.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8788/ > /dev/null; then break; fi
+            sleep 1
+          done
+          CAUSALITY_API_TEST_BASEURL=http://127.0.0.1:8788 npm run test:api
+          CAUSALITY_API_TEST_BASEURL=http://127.0.0.1:8788 npm run test:api:investigation
+      - run: CAUSALITY_UI_TEST_BASEURL=http://127.0.0.1:8788 npm run test:e2e
+      - name: Stop local Worker
+        if: always()
+        run: if test -f /tmp/causality-worker.pid; then kill "$(cat /tmp/causality-worker.pid)" || true; fi
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-test-results
+          path: test-results/
+          retention-days: 7

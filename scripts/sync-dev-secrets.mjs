@@ -1,0 +1,11 @@
+import {existsSync,readFileSync} from 'node:fs';
+import {spawnSync} from 'node:child_process';
+if(existsSync('.dev.vars'))process.loadEnvFile('.dev.vars');
+const password=readFileSync('.dev-worker-access.txt','utf8').match(/^Password: (.+)$/m)?.[1];
+if(!password || password.length<32)throw new Error('Create the private development access file before syncing secrets.');
+const names=['AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','AWS_SESSION_TOKEN'];
+for(const name of names)if(!process.env[name])throw new Error(`Missing ${name}. Save a current Workshop Studio session first.`);
+const secrets=Object.fromEntries(names.map(name=>[name,process.env[name]]));secrets.DEV_ACCESS_PASSWORD=password;
+const result=spawnSync(process.execPath,['--import','./scripts/sites-env.mjs','./node_modules/wrangler/bin/wrangler.js','secret','bulk','--config','wrangler.dev.jsonc'],{input:JSON.stringify(secrets),encoding:'utf8'});
+process.stdout.write(result.stdout);process.stderr.write(result.stderr);
+if(result.status!==0)process.exit(result.status||1);
