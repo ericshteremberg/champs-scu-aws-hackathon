@@ -29,6 +29,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run install:connectors
       - run: npm run check
       - run: npm run db:migrate:local
       - run: npx playwright install --with-deps chromium

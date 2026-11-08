@@ -5,6 +5,7 @@ export type WorkspaceDoc = Workspace & { ownerId: string; updatedAt: string };
 export type CaseDoc = Omit<DisputeCase, 'evidence' | 'findings' | 'draft' | 'investigation'> & {
   workspaceId: string; dataRevision: number; stripeAccountId?: string | null;
   merchantCaseId?: string | null; merchantId?: string | null; paymentRef?: string | null;
+  merchantConnectionId?: string | null;
   activeRunId?: string; activeRunExpiresAt?: string; latestRunId?: string;
 };
 export type EvidenceDoc = Omit<Evidence, 'downloadUrl'> & { fileKey?: string; createdAt: string };

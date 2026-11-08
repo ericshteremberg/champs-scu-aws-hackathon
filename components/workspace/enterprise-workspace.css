@@ -353,17 +353,24 @@
 .cw.cw-shell .cw-modal-actions { gap: 8px; margin-top: 24px; padding-top: 20px; }
 .cw.cw-shell .cw-toast { border-radius: 8px; backdrop-filter: none; box-shadow: 0 4px 16px #00000014; }
 
-/* Preserve the workspace's responsive geometry beneath the desktop refinements. */
+/* Match the base workspace breakpoints at the refinement's specificity. */
 @media (max-width: 1100px) {
-  .cw.cw-shell .cw-sidebar { width: 200px; }
+  .cw.cw-shell .cw-sidebar { width: 200px; padding-inline: 14px; }
   .cw.cw-shell .cw-main { margin-left: 200px; width: calc(100% - 200px); }
   .cw.cw-shell .cw-content { padding: 28px; }
+  .cw.cw-shell .cw-topbar { padding-inline: 28px; }
+  .cw.cw-shell .cw-integration-grid > .cw-integration { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .cw.cw-shell .cw-integration > * { grid-column: 1; }
+  .cw.cw-shell .cw-integration > :is(.cw-integration-head, .cw-button, .cw-actions) { grid-column: 1; grid-row: auto; }
 }
 @media (max-width: 760px) {
   .cw.cw-shell .cw-sidebar { width: 78px; padding: 22px 12px; }
   .cw.cw-shell .cw-main { margin-left: 78px; width: calc(100% - 78px); }
+  .cw.cw-shell .cw-topbar { height: 68px; padding-inline: 18px; }
+  .cw.cw-shell .cw-top-actions > .cw-caption { display: none; }
   .cw.cw-shell .cw-content { padding: 24px 18px; }
-  .cw.cw-shell .cw-integration-grid > .cw-integration { display: block; }
+  .cw.cw-shell .cw-page-head { align-items: flex-start; }
+  .cw.cw-shell .cw-nav :is(button, a) { justify-content: center; }
 }
 
 @media (prefers-contrast: more) {

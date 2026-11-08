@@ -5,6 +5,8 @@ import { FetchHttpHandler } from '@smithy/fetch-http-handler';
 import type { Evidence, EvidenceSource, InvestigationConfig, InvestigationRun } from '../lib/domain.ts';
 import { runInvestigation } from '../lib/investigation/engine.ts';
 import { fetchMerchantSection } from '../lib/investigation/merchant.ts';
+import { fetchPublicMerchantSection } from './merchant-network.ts';
+import { loadManagedConnection } from './managed-connectors.ts';
 import { EVIDENCE_SECTIONS, InvestigationError, type EvidenceEnvelope, type EvidenceSection, type InvestigationEvent, type InvestigationMode } from '../lib/investigation/types.ts';
 import { commit, getItem, keys, queryItems } from './store.ts';
 import { ApiError, ConflictError, mutableStatuses, type CaseDoc, type DraftDoc, type EvidenceDoc, type Stored, type StoreChange, type TrustedUser } from './types.ts';
@@ -20,7 +22,24 @@ export type RunDoc = Omit<InvestigationRun, 'events' | 'status'> & {
   status: InvestigationRun['status'] | 'queued'; workspaceId: string; actor: string;
   expiresAt: string; sourceRevision: number; baseDraftRevision: number;
   baseDraftStatus: string; baseDraftApprovedAt: string; workerToken?: string;
+  merchantConnectionVersion?: number; merchantCredentialVersion?: number;
 };
+
+type ManagedContext = Awaited<ReturnType<typeof loadManagedConnection>>;
+function connectionChecks(context?: ManagedContext): StoreChange[] {
+  return context ? [
+    { key: context.connection.key, expectedVersion: context.connection.version, check: true },
+    { key: context.credential.key, expectedVersion: context.credential.version, check: true },
+  ] : [];
+}
+async function caseConnection(wid: string, item: CaseDoc, run?: RunDoc): Promise<ManagedContext | undefined> {
+  if (!item.merchantConnectionId) return undefined;
+  const context = await loadManagedConnection(wid, item.merchantConnectionId);
+  const connection = context.connection.data;
+  if (connection.externalCaseId !== item.merchantCaseId || connection.merchantId !== item.merchantId || connection.orderRef !== item.orderRef || connection.paymentRef !== item.paymentRef) throw new ApiError(409, 'The case no longer matches its approved connection.', 'merchant_mapping_changed');
+  if (run && (context.connection.version !== run.merchantConnectionVersion || context.credential.version !== run.merchantCredentialVersion)) throw new InvestigationError('stale', 'The connection changed during investigation. Start a new investigation after reviewing the connection.');
+  return context;
+}
 
 function merchantConfigured(workspaceId: string) {
   if (!process.env.MERCHANT_EVIDENCE_TOKEN || process.env.MERCHANT_WORKSPACE_ID !== workspaceId) return false;
@@ -85,13 +104,15 @@ export async function startInvestigation(user: TrustedUser, caseId: string, mode
   if (item.data.activeRunId) throw new ApiError(409, 'An investigation is already running for this case.', 'run_active');
   if (mode === 'sample' && item.data.source !== 'demo') throw new ApiError(409, 'Sample investigation is available only for clearly labeled sample cases.', 'sample_only');
   if (mode === 'bedrock' && !getInvestigationConfig(wid).bedrockConfigured) throw new ApiError(409, 'Configure a tool-capable Bedrock model in us-east-1.', 'bedrock_not_configured');
-  if (item.data.source === 'merchant') requireMerchant(wid);
+  const managed = await caseConnection(wid, item.data);
+  if (item.data.source === 'merchant' && !managed) requireMerchant(wid);
   const functionName = process.env.FUNCTION_NAME || process.env.AWS_LAMBDA_FUNCTION_NAME;
   if (!functionName) throw new ApiError(503, 'The background investigation worker is not configured.', 'worker_not_configured');
   const [draft] = await Promise.all([getDraft(wid, caseId), listEvidence(wid, caseId)]);
   const id = newId('run'); const startedAt = now();
   const run: RunDoc = { id, workspaceId: wid, caseId, actor: user.email, status: 'queued', mode, modelId: mode === 'bedrock' ? process.env.BEDROCK_MODEL_ID : undefined, startedAt, expiresAt: new Date(Date.now() + 300_000).toISOString(), sourceRevision: item.data.dataRevision, baseDraftRevision: draft?.data.revision ?? 0, baseDraftStatus: draft?.data.status ?? 'none', baseDraftApprovedAt: draft?.data.approvedAt ?? '' };
-  await commit(wid, [{ key: keys.run(id), expectedVersion: null, data: run }, { key: item.key, expectedVersion: item.version, data: { ...item.data, activeRunId: id, activeRunExpiresAt: run.expiresAt, latestRunId: id } }, auditChange(user, 'investigation.started', mode === 'sample' ? 'Queued a deterministic investigation of synthetic sample evidence.' : 'Queued an Amazon Bedrock investigation.', caseId)]);
+  if (managed) { run.merchantConnectionVersion = managed.connection.version; run.merchantCredentialVersion = managed.credential.version; }
+  await commit(wid, [{ key: keys.run(id), expectedVersion: null, data: run }, { key: item.key, expectedVersion: item.version, data: { ...item.data, activeRunId: id, activeRunExpiresAt: run.expiresAt, latestRunId: id } }, ...connectionChecks(managed), auditChange(user, 'investigation.started', mode === 'sample' ? 'Queued a deterministic investigation of synthetic sample evidence.' : 'Queued an Amazon Bedrock investigation.', caseId)]);
   try {
     const result = await new LambdaClient({ region: region(), maxAttempts: 2 }).send(new InvokeCommand({ FunctionName: functionName, InvocationType: 'Event', Payload: Buffer.from(JSON.stringify({ kind: 'investigation', workspaceId: wid, caseId, runId: id })) }));
     if (result.StatusCode !== 202) throw new Error('Worker rejected invocation.');
@@ -158,15 +179,18 @@ export async function processInvestigation(input: { workspaceId: string; caseId:
       if (!run || run.data.status !== 'running' || run.data.workerToken !== workerToken) throw new InvestigationError('cancelled', 'The investigation is no longer active.');
       if (run.data.expiresAt <= now()) throw new InvestigationError('time_limit', 'The investigation reached its two-minute limit.');
       assertSnapshot(run.data, current.data, draft?.data);
-      return { run, current, draft };
+      const managed = await caseConnection(wid, current.data, run.data);
+      return { run, current, draft, managed };
     };
     const assertActive = async () => { await snapshot(); };
     const readEvidence = async (section: EvidenceSection, sectionSignal: AbortSignal): Promise<EvidenceEnvelope> => {
-      await assertActive();
+      const { managed } = await snapshot();
       if (item.data.source !== 'merchant') return localEvidence(item.data, records.map(record => record.data), section);
       if (!item.data.merchantCaseId || !item.data.merchantId || !item.data.paymentRef) throw new ApiError(409, 'This case lacks a verified merchant mapping.');
       if (section !== 'summary' && !summaryVerified) throw new ApiError(409, 'Verify the merchant summary before reading other sections.');
-      const fetched = await fetchMerchantSection(requireMerchant(wid), item.data.merchantCaseId, section, sectionSignal);
+      const fetched = managed
+        ? await fetchPublicMerchantSection(managed.configuration, item.data.merchantCaseId, section, sectionSignal)
+        : await fetchMerchantSection(requireMerchant(wid), item.data.merchantCaseId, section, sectionSignal);
       await assertActive();
       if (section === 'summary') {
         const metadata = fetched.case;
@@ -183,11 +207,11 @@ export async function processInvestigation(input: { workspaceId: string; caseId:
       invokeModel: modelClient ? (command, abortSignal) => modelClient!.send(new ConverseCommand(command), { abortSignal }) : undefined,
       onEvent: async event => {
         if (++sequence > 100) throw new InvestigationError('event_limit', 'The investigation reached its event limit.');
-        const { run, current } = await snapshot();
-        await commit(wid, [{ key: run.key, expectedVersion: run.version, check: true }, { key: current.key, expectedVersion: current.version, check: true }, { key: keys.event(runId, sequence), expectedVersion: null, data: event }]);
+        const { run, current, managed } = await snapshot();
+        await commit(wid, [{ key: run.key, expectedVersion: run.version, check: true }, { key: current.key, expectedVersion: current.version, check: true }, ...connectionChecks(managed), { key: keys.event(runId, sequence), expectedVersion: null, data: event }]);
       },
     });
-    const { run, current, draft } = await snapshot(); const timestamp = now();
+    const { run, current, draft, managed } = await snapshot(); const timestamp = now();
     const sourceRevision = current.data.dataRevision + pending.size;
     const { content, findings, ...analysis } = result;
     const nextDraft: DraftDoc = { caseId, content, revision: (draft?.data.revision ?? 0) + 1, generatedAt: timestamp, status: 'draft', method: running.mode === 'bedrock' ? 'bedrock' : 'sample_investigator', sourceRevision, analysis: { ...analysis, findings } };
@@ -195,6 +219,7 @@ export async function processInvestigation(input: { workspaceId: string; caseId:
       { key: run.key, expectedVersion: run.version, data: { ...run.data, status: 'completed', finishedAt: timestamp } satisfies RunDoc },
       { key: current.key, expectedVersion: current.version, data: { ...current.data, dataRevision: sourceRevision, status: 'needs_review', updatedAt: timestamp, activeRunId: undefined, activeRunExpiresAt: undefined } satisfies CaseDoc },
       { key: keys.draft(caseId), expectedVersion: draft?.version ?? null, data: nextDraft },
+      ...connectionChecks(managed),
     ];
     for (const record of pending.values()) changes.push({ key: keys.evidence(caseId, record.id), expectedVersion: records.find(existing => existing.data.id === record.id)?.version ?? null, data: record });
     await commit(wid, changes);
@@ -222,5 +247,44 @@ export async function importMerchantCase(user: TrustedUser, externalCaseId: stri
   const records = normalizeMerchantRecords(wid, item, fetched.evidence);
   if (records.length > MAX_CASE_EVIDENCE) throw new ApiError(409, 'The merchant returned more than 90 records. Narrow the case grant.');
   await commit(wid, [{ key: keys.case(id), expectedVersion: null, data: { ...item, dataRevision: records.length } }, { key: keys.externalCase(externalCaseId), expectedVersion: null, data: { caseId: id, merchantId: metadata.merchantId } }, ...records.map(record => ({ key: keys.evidence(id, record.id), expectedVersion: null, data: record })), auditChange(user, 'merchant.imported', 'Imported a case through its verified payment-to-order mapping.', id)]);
+  return id;
+}
+
+/** Imports only the approved case stored on the connection, never an arbitrary caller-supplied case. */
+export async function importManagedMerchantCase(user: TrustedUser, connectionId: string): Promise<string> {
+  const workspace = await requireWorkspace(user); const wid = workspace.data.id;
+  const context = await loadManagedConnection(wid, connectionId);
+  const connection = context.connection.data;
+  const indexKey = keys.externalCase(`live:${connectionId}:${connection.externalCaseId}`);
+  const existing = await getItem<{ caseId: string }>(wid, indexKey);
+  if (existing) {
+    await ownedCase(wid, existing.data.caseId);
+    await commit(wid, [...connectionChecks(context), { key: existing.key, expectedVersion: existing.version, check: true }]);
+    return existing.data.caseId;
+  }
+  const fetched = await fetchPublicMerchantSection(context.configuration, connection.externalCaseId, 'summary', AbortSignal.timeout(15_000));
+  const metadata = fetched.case;
+  if (!fetched.mappingVerified || !metadata || metadata.id !== connection.externalCaseId || metadata.merchantId !== connection.merchantId || metadata.orderRef !== connection.orderRef || metadata.paymentRef !== connection.paymentRef) throw new ApiError(409, 'The endpoint no longer matches this connection’s approved merchant, order, and payment.', 'merchant_mapping_changed');
+  const id = newId('case'); const timestamp = now();
+  const item: CaseDoc = { id, workspaceId: wid, title: metadata.reason, customerName: metadata.customerLabel, email: '', amount: metadata.amount, currency: metadata.currency.toLowerCase(), status: 'needs_review', reason: metadata.claim, orderRef: metadata.orderRef, dueAt: metadata.dueAt, source: 'merchant', createdAt: timestamp, updatedAt: timestamp, dataRevision: 0, merchantCaseId: metadata.id, merchantId: metadata.merchantId, paymentRef: metadata.paymentRef, merchantConnectionId: connectionId };
+  const records = normalizeMerchantRecords(wid, item, fetched.evidence);
+  if (records.length > MAX_CASE_EVIDENCE) throw new ApiError(409, 'The merchant returned more than 90 records. Narrow the case grant.');
+  try {
+    await commit(wid, [
+      ...connectionChecks(context),
+      { key: keys.case(id), expectedVersion: null, data: { ...item, dataRevision: records.length } },
+      { key: indexKey, expectedVersion: null, data: { caseId: id, merchantId: metadata.merchantId } },
+      ...records.map(record => ({ key: keys.evidence(id, record.id), expectedVersion: null, data: record })),
+      auditChange(user, 'merchant.imported', 'Imported the approved case from its saved live connection.', id),
+    ]);
+  } catch (error) {
+    if (!(error instanceof ConflictError)) throw error;
+    const current = await loadManagedConnection(wid, connectionId);
+    const concurrent = await getItem<{ caseId: string }>(wid, indexKey);
+    if (!concurrent) throw error;
+    await ownedCase(wid, concurrent.data.caseId);
+    await commit(wid, [...connectionChecks(current), { key: concurrent.key, expectedVersion: concurrent.version, check: true }]);
+    return concurrent.data.caseId;
+  }
   return id;
 }

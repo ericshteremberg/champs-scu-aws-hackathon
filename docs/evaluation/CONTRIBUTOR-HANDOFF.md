@@ -1,6 +1,6 @@
 # Contributor checkout: codex/demo-evaluation
 
-This development checkpoint adds a [code-controlled fact inventory and offline CLI packets](../FACT_INVENTORY.md). It includes `origin/main` through `9e8e473`, including the latest frontend refinements. It does not update the shared deployment or merge this branch into `main`.
+This development checkpoint adds a [code-controlled fact inventory and offline CLI packets](../FACT_INVENTORY.md). It includes `origin/main` through `9e8e473` and Aiden's `codex/aiden-aws-harness` through `44ec7e9`, including guided connector setup and workspace-managed case-scoped connections. It does not update the shared deployment or merge this branch into `main`.
 
 For a fresh checkout:
 
@@ -8,6 +8,7 @@ For a fresh checkout:
 git clone --branch codex/demo-evaluation https://github.com/ericshteremberg/champs-scu-aws-hackathon.git
 cd champs-scu-aws-hackathon
 npm ci
+npm run install:connectors
 npm run check
 ```
 
@@ -34,11 +35,12 @@ The root lock retains the optional WASI repair and the frontend dependencies mer
 
 ## Final combined-branch verification
 
-- `npm run check`: 56 Node tests, 124 investigation/AWS unit tests, type checking, frontend build and Lambda build passed after merging main through `9e8e473`.
-- Adapter typecheck and all 90 tests passed. The local HTTP test requires loopback access; the first sandboxed attempt failed only because binding was denied.
-- All 13 Chrome browser tests passed on the final combined branch, including the new human-edit label assertion. The tests exposed dropped inventory metadata in the legacy serializer and two mobile overflow regressions from the mainline desktop styles; both causes were fixed. The frontend was rebuilt after the responsive CSS fix.
+- The merged branch passed type checking, 56 Node tests, 291 investigation/AWS/connector unit tests, frontend build and Lambda build. The final three integration regressions were added after the full check and verified with another type check and unit suite run.
+- Both standalone connector packages passed type checking: 90 ATMSPHR tests and 22 generic connector tests. Install their pinned dependencies with `npm run install:connectors` before checking a fresh checkout.
+- All 21 Chrome browser tests passed, covering the 13 demo-evaluation flows plus guided ticket/rental setup and managed connection import, secret clearing, disconnect, endpoint validation and mobile layouts.
 - Both CI API suites passed: workspace/file isolation and investigation scope/cancellation/races. The first workspace API attempt was interrupted by a preview-worker restart; a full rerun passed without changing application code.
-- Local migrations are current. The engine/source files used for live inference retain their recorded fingerprints after the merge.
+- The merge preserves the fact-only report engine. Harness mocks now return fact-ID plans, and regression tests reject extra model prose, verify eight-section retrieval, and exercise both connector templates through the inventory. Existing disconnect/publication race and credential isolation checks remain active.
+- Local migrations are current. The six saved live model runs still reproduce exactly in the offline inventory audit. Those runs predate this harness merge; the AWS worker has changed, so their full source fingerprint is historical. No new live merchant or paid model evaluation ran for this merge.
 
 ## Remaining product limits
 
