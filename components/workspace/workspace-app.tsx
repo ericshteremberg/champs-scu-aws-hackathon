@@ -1,5 +1,7 @@
 "use client";
 
+import { StripeDraftWriter } from "./stripe-draft-writer";
+
 import { ResendConnector } from "./resend-provider";
 import { ProviderConnectors } from "./provider-connectors";
 
@@ -3185,6 +3187,7 @@ function CaseDetail({
                 connected={connected}
               />
             )}
+            {!frozen && <StripeDraftWriter current={current} disabled={busy || dirty || designPreview} />}
             <div className="cw-two-col">
               <div>
                 <h3>{frozen ? "Preserved response" : "Response"}</h3>

@@ -38,7 +38,7 @@ function fixture(overrides: Partial<Stripe.Dispute> = {}): Stripe.Dispute {
 }
 const caseId = `stripe_${workspace}_dp_ticket_1042`;
 
-function harness() {
+function harness(sdk?: Stripe) {
   const records = new Map<string, Stored<unknown>>();
   const mapKey = (wid: string, key: string) => `${wid}/${key}`;
   let beforeCommit: ((changes: StoreChange[]) => void) | undefined;
@@ -84,6 +84,7 @@ function harness() {
     STRIPE_WORKSPACE_ID: workspace,
     STRIPE_WEBHOOK_SECRET: "whsec_synthetic",
     STRIPE_ENABLE_SUBMISSION: "true",
+    STRIPE_ENABLE_DRAFT_WRITES: "true",
     STRIPE_ALLOW_LIVE: "false",
   };
   const current = fixture();
@@ -116,7 +117,7 @@ function harness() {
     queryItems,
     commit,
     settings: () => env,
-    client,
+    client: sdk ? () => sdk : client,
   });
   const connection: StripeConnection = {
     accountId: account.id,
@@ -473,5 +474,94 @@ describe("AWS Stripe webhook verification and replay protection", () => {
     );
     expect(h.retrieve).not.toHaveBeenCalled();
     expect(h.commit).not.toHaveBeenCalled();
+  });
+});
+
+const saveDraft = (h: ReturnType<typeof harness>, overrides = {}) =>
+  h.service.saveStripeDraft(workspace, 'Reviewer', { caseId, confirmed: true, draftRevision: 3, autoSubmitAcknowledged: true, ...overrides });
+
+describe('Stripe draft writes', () => {
+  it('requires a separate enable flag and auto-response acknowledgement', async () => {
+    const h = harness(); await h.ready();
+    await expect(saveDraft(h, { autoSubmitAcknowledged: false })).rejects.toMatchObject({ code: 'auto_submit_ack_required' });
+    h.env.STRIPE_ENABLE_DRAFT_WRITES = 'false';
+    await expect(saveDraft(h)).rejects.toMatchObject({ code: 'submission_disabled' });
+    expect(h.update).not.toHaveBeenCalled();
+  });
+  it.each(['unapproved', 'stale', 'unconfirmed', 'existing text'])('blocks %s drafts before writing', async kind => {
+    const h = harness(); await h.ready();
+    const row = h.read<DraftDoc>(keys.draft(caseId))!;
+    if (kind === 'unapproved') h.put(row.key, { ...row.data, status: 'draft' });
+    if (kind === 'stale') h.put(row.key, { ...row.data, sourceRevision: -1 });
+    if (kind === 'existing text') h.current.evidence.uncategorized_text = 'Someone else’s saved response';
+    await expect(saveDraft(h, { confirmed: kind !== 'unconfirmed' })).rejects.toMatchObject({ status: 409 });
+    expect(h.update).not.toHaveBeenCalled();
+  });
+  it('keeps an uncertain draft write locked for reconciliation', async () => {
+    const h = harness(); await h.ready();
+    h.update.mockRejectedValueOnce(new Error('connection lost'));
+    await expect(saveDraft(h)).rejects.toMatchObject({ status: 502 });
+    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe('submitting');
+    await expect(saveDraft(h)).rejects.toMatchObject({ status: 409 });
+    expect(h.update).toHaveBeenCalledTimes(1);
+  });
+  it('does not report a draft save when Stripe returns a submitted response', async () => {
+    const h = harness(); await h.ready();
+    await expect(saveDraft(h)).rejects.toMatchObject({ code: 'submission_verification_required' });
+    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe('submitting');
+  });
+  it('rehearses both write modes with the actual Stripe SDK and zero network requests', async () => {
+    // Every SDK HTTP operation terminates here; there is no fetch/network fallback.
+    const intercepted: { method: string; path: string; body: string; idempotencyKey: string | null }[] = [];
+    let remote = fixture();
+    const transport = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
+      const url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url);
+      const method = init?.method || 'GET';
+      const body = String(init?.body || '');
+      const headers = new Headers(init?.headers);
+      intercepted.push({ method, path: url.pathname, body, idempotencyKey: headers.get('idempotency-key') });
+      let result: unknown;
+      if (method === 'GET' && url.pathname === '/v1/account') result = { id: 'acct_test', object: 'account', business_profile: { name: 'Synthetic organizer' } };
+      else if (method === 'GET' && url.pathname === '/v1/disputes') result = { object: 'list', data: [remote], has_more: false, url: '/v1/disputes' };
+      else if (method === 'GET' && url.pathname === `/v1/disputes/${remote.id}`) result = remote;
+      else if (method === 'POST' && url.pathname === `/v1/disputes/${remote.id}`) {
+        const params = new URLSearchParams(body);
+        const submitted = params.get('submit') === 'true';
+        remote = fixture({
+          evidence: { ...remote.evidence, uncategorized_text: params.get('evidence[uncategorized_text]') || '' },
+          status: submitted ? 'under_review' : 'needs_response',
+          evidence_details: { ...remote.evidence_details, has_evidence: true, submission_count: submitted ? 1 : 0 },
+        }); result = remote;
+      } else throw new Error(`Unexpected SDK request ${method} ${url.pathname}`);
+      return new Response(JSON.stringify(result), { status: 200, headers: { 'content-type': 'application/json', 'request-id': 'req_local_rehearsal' } });
+    };
+    const sdk = new Stripe('rk_test_synthetic_rehearsal', { httpClient: Stripe.createFetchHttpClient(transport as typeof fetch), maxNetworkRetries: 0, telemetry: false });
+    const h = harness(sdk); await h.ready();
+    const { readFile, writeFile } = await import('node:fs/promises');
+    const { createHash } = await import('node:crypto');
+    const report = process.env.STRIPE_REHEARSAL_REPORT ? await readFile(process.env.STRIPE_REHEARSAL_REPORT, 'utf8') : 'Reviewed synthetic report.\nStripe payment + Supabase order + Resend email.\nDelivery ≠ reading. Symbols: & + %.';
+    const draft = h.read<DraftDoc>(keys.draft(caseId))!;
+    h.put(draft.key, { ...draft.data, content: report });
+    h.env.STRIPE_ENABLE_SUBMISSION = 'false';
+    await expect(saveDraft(h)).resolves.toMatchObject({ saved: true, submitted: false });
+    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe('ready');
+    await expect(submit(h)).rejects.toMatchObject({ code: 'submission_disabled' });
+    h.env.STRIPE_ENABLE_SUBMISSION = 'true';
+    const attempts = await Promise.allSettled([submit(h), submit(h)]);
+    expect(attempts.filter(a => a.status === 'fulfilled')).toHaveLength(1);
+    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe('submitted');
+    const writes = intercepted.filter(r => r.method === 'POST');
+    expect(writes).toHaveLength(2);
+    expect(writes.map(r => new URLSearchParams(r.body).get('submit'))).toEqual(['false', 'true']);
+    for (const request of writes) expect(new URLSearchParams(request.body).get('evidence[uncategorized_text]')).toBe(report);
+    expect(writes[0].idempotencyKey).not.toBe(writes[1].idempotencyKey);
+    expect(writes[0].idempotencyKey).toContain(':revision:3:draft');
+    const proof = {
+      kind: 'LOCAL_SIMULATION_NOT_STRIPE_ACCEPTANCE', generatedAt: new Date().toISOString(),
+      networkRequests: 0, sdk: 'stripe@23.0.0', reportSha256: createHash('sha256').update(report).digest('hex'), reportCharacters: report.length,
+      syntheticDispute: remote.id, draftThenFinal: writes.map(r => ({ path: r.path, submit: new URLSearchParams(r.body).get('submit'), idempotencyKey: r.idempotencyKey })),
+      exactReportPreserved: true, concurrentFinalWrites: 1, liveDisputeTouched: false,
+    };
+    if (process.env.STRIPE_REHEARSAL_PROOF) await writeFile(process.env.STRIPE_REHEARSAL_PROOF, JSON.stringify(proof, null, 2) + '\n');
   });
 });

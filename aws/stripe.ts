@@ -24,6 +24,7 @@ type StripeSettings = {
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_ALLOW_LIVE?: string;
   STRIPE_ENABLE_SUBMISSION?: string;
+  STRIPE_ENABLE_DRAFT_WRITES?: string;
 };
 export type StripeConnection = {
   accountId: string;
@@ -69,6 +70,7 @@ export function createStripeService(dependencies: Dependencies) {
       configured: !missing.length,
       requiredConfiguration: missing,
       submissionEnabled: env.STRIPE_ENABLE_SUBMISSION === "true",
+      draftWritesEnabled: env.STRIPE_ENABLE_DRAFT_WRITES === "true",
       webhookConfigured: !!env.STRIPE_WEBHOOK_SECRET,
       workspaceId,
     };
@@ -396,15 +398,17 @@ export function createStripeService(dependencies: Dependencies) {
     ]);
     return { imported: page.data.length, hasMore: page.has_more };
   }
-  async function submitStripe(
+  async function writeStripeEvidence(
     workspaceId: string,
     actor: string,
-    input: { caseId: string; confirmed: boolean; draftRevision: number },
+    input: { caseId: string; confirmed: boolean; draftRevision: number; autoSubmitAcknowledged?: boolean },
+    draftOnly = false,
   ) {
-    if (settings().STRIPE_ENABLE_SUBMISSION !== "true")
+    if (draftOnly && input.autoSubmitAcknowledged !== true) throw new ApiError(409, "Acknowledge that Stripe auto-response settings can submit saved evidence at the deadline.", "auto_submit_ack_required");
+    if (draftOnly ? settings().STRIPE_ENABLE_DRAFT_WRITES !== "true" : settings().STRIPE_ENABLE_SUBMISSION !== "true")
       throw new ApiError(
         409,
-        "Stripe submission is disabled. Export the reviewed response for now.",
+        draftOnly ? "Saving Stripe drafts is disabled. Configure a write-capable restricted key and enable draft writes." : "Stripe submission is disabled. Export the reviewed response for now.",
         "submission_disabled",
       );
     const { connection, stripe } = await verifiedConnection(workspaceId);
@@ -466,6 +470,7 @@ export function createStripeService(dependencies: Dependencies) {
         409,
         "Stripe is no longer accepting this dispute response.",
       );
+    if (draftOnly && current.evidence.uncategorized_text && current.evidence.uncategorized_text !== draft.data.content) throw new ApiError(409, "Stripe already has different response text. Review it in Stripe before replacing it.", "stripe_existing_evidence");
     try {
       const result = await performClaimedSubmission({
         claim: async () => {
@@ -498,13 +503,26 @@ export function createStripeService(dependencies: Dependencies) {
             disputeId,
             {
               evidence: { uncategorized_text: draft.data.content },
-              submit: true,
+              submit: !draftOnly,
             },
             {
-              idempotencyKey: `causality:${workspaceId}:${row.data.id}:revision:${input.draftRevision}`,
+              idempotencyKey: `causality:${workspaceId}:${row.data.id}:revision:${input.draftRevision}${draftOnly ? ":draft" : ""}`,
             },
           ),
         settle: async (updated) => {
+          if (draftOnly) {
+            if (updated.id !== disputeId || updated.livemode !== current.livemode ||
+                !['needs_response', 'warning_needs_response'].includes(updated.status) ||
+                updated.evidence.uncategorized_text !== draft.data.content ||
+                updated.evidence_details.submission_count !== current.evidence_details.submission_count)
+              throw new Error('Stripe did not confirm an unchanged submission count and saved draft.');
+            await write(workspaceId, [
+              { key: row.key, expectedVersion: row.version + 1, data: { ...row.data, updatedAt: timestamp() } },
+              { key: draft.key, expectedVersion: draft.version, check: true },
+              auditChange(actor, 'stripe.draft_saved', `Saved approved revision ${input.draftRevision} with submit=false. Stripe auto-response settings still apply.`, row.data.id),
+            ]);
+            return;
+          }
           await importDispute(updated, workspaceId, connection.data, {
             actor,
             submissionRevision: input.draftRevision,
@@ -526,7 +544,7 @@ export function createStripeService(dependencies: Dependencies) {
           "This case changed or another submission started. Refresh and review its current status.",
           "stale_submission",
         );
-      return { submitted: true, stripeStatus: result.result.status };
+      return draftOnly ? { saved: true, submitted: false, stripeStatus: result.result.status, autoResponseMaySubmit: true } : { submitted: true, stripeStatus: result.result.status };
     } catch (error) {
       if (error instanceof ApiError) throw error;
       throw new ApiError(
@@ -536,6 +554,8 @@ export function createStripeService(dependencies: Dependencies) {
       );
     }
   }
+  const submitStripe = (workspaceId: string, actor: string, input: { caseId: string; confirmed: boolean; draftRevision: number }) => writeStripeEvidence(workspaceId, actor, input);
+  const saveStripeDraft = (workspaceId: string, actor: string, input: { caseId: string; confirmed: boolean; draftRevision: number; autoSubmitAcknowledged: boolean }) => writeStripeEvidence(workspaceId, actor, input, true);
   async function handleStripeWebhook(body: string, signature: string) {
     const env = settings(),
       workspaceId = env.STRIPE_WORKSPACE_ID;
@@ -584,6 +604,7 @@ export function createStripeService(dependencies: Dependencies) {
     disconnectStripe,
     syncStripe,
     submitStripe,
+    saveStripeDraft,
     handleStripeWebhook,
   };
 }
@@ -598,6 +619,7 @@ const service = createStripeService({
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     STRIPE_ALLOW_LIVE: process.env.STRIPE_ALLOW_LIVE,
     STRIPE_ENABLE_SUBMISSION: process.env.STRIPE_ENABLE_SUBMISSION,
+    STRIPE_ENABLE_DRAFT_WRITES: process.env.STRIPE_ENABLE_DRAFT_WRITES,
   }),
   client: (key) =>
     new Stripe(key, {
@@ -613,5 +635,6 @@ export const {
   disconnectStripe,
   syncStripe,
   submitStripe,
+  saveStripeDraft,
   handleStripeWebhook,
 } = service;
