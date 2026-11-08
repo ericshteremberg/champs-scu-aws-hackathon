@@ -3,8 +3,6 @@ import type { Integration } from "../lib/domain.ts";
 import {
   accountBindingError,
   normalizeDispute,
-  performClaimedSubmission,
-  submissionEligibility,
 } from "../lib/stripe/model.ts";
 import { commit, getItem, keys, queryItems } from "./store.ts";
 import {
@@ -49,11 +47,10 @@ type Dependencies = {
   client: (key: string) => Stripe;
 };
 
-/** Each source update and submission claim checks the case's DynamoDB version. */
+/** Each source update checks the case's DynamoDB version. Stripe writes stay disabled. */
 export function createStripeService(dependencies: Dependencies) {
   const {
     getItem: read,
-    queryItems: query,
     commit: write,
     settings,
   } = dependencies;
@@ -69,8 +66,8 @@ export function createStripeService(dependencies: Dependencies) {
     return {
       configured: !missing.length,
       requiredConfiguration: missing,
-      submissionEnabled: env.STRIPE_ENABLE_SUBMISSION === "true",
-      draftWritesEnabled: env.STRIPE_ENABLE_DRAFT_WRITES === "true",
+      submissionEnabled: false,
+      draftWritesEnabled: false,
       webhookConfigured: !!env.STRIPE_WEBHOOK_SECRET,
       workspaceId,
     };
@@ -398,164 +395,16 @@ export function createStripeService(dependencies: Dependencies) {
     ]);
     return { imported: page.data.length, hasMore: page.has_more };
   }
-  async function writeStripeEvidence(
-    workspaceId: string,
-    actor: string,
-    input: { caseId: string; confirmed: boolean; draftRevision: number; autoSubmitAcknowledged?: boolean },
-    draftOnly = false,
-  ) {
-    if (draftOnly && input.autoSubmitAcknowledged !== true) throw new ApiError(409, "Acknowledge that Stripe auto-response settings can submit saved evidence at the deadline.", "auto_submit_ack_required");
-    if (draftOnly ? settings().STRIPE_ENABLE_DRAFT_WRITES !== "true" : settings().STRIPE_ENABLE_SUBMISSION !== "true")
-      throw new ApiError(
-        409,
-        draftOnly ? "Saving Stripe drafts is disabled. Configure a write-capable restricted key and enable draft writes." : "Stripe submission is disabled. Export the reviewed response for now.",
-        "submission_disabled",
-      );
-    const { connection, stripe } = await verifiedConnection(workspaceId);
-    const [row, draft, evidence] = await Promise.all([
-      read<CaseDoc>(workspaceId, keys.case(input.caseId)),
-      read<DraftDoc>(workspaceId, keys.draft(input.caseId)),
-      query<EvidenceDoc>(workspaceId, keys.evidencePrefix(input.caseId)),
-    ]);
-    if (
-      !row ||
-      row.data.id !== input.caseId ||
-      row.data.workspaceId !== workspaceId
-    )
-      throw new ApiError(404, "Case not found.");
-    const invalid = submissionEligibility({
-      source: row.data.source,
-      status: row.data.status,
-      draftStatus: draft?.data.status,
-      revision: draft?.data.revision,
-      requestedRevision: input.draftRevision,
-      confirmed: input.confirmed,
-      sourceRevision: draft?.data.sourceRevision,
-      dataRevision: row.data.dataRevision,
-    });
-    if (invalid) throw new ApiError(409, invalid);
-    if (
-      !row.data.stripeDisputeId ||
-      row.data.stripeAccountId !== connection.data.accountId
-    )
-      throw new ApiError(
-        409,
-        "The case belongs to a different Stripe account.",
-      );
-    if (!draft)
-      throw new ApiError(409, "Approve the response before submission.");
-    if (draft.data.content.length > 20000)
-      throw new ApiError(
-        409,
-        "Stripe accepts at most 20,000 characters in this text response. Shorten and review the draft again.",
-      );
-    if (evidence.some((record) => record.data.fileKey))
-      throw new ApiError(
-        409,
-        "This integration currently submits text responses only. Export this case and include its supporting files in Stripe Dashboard.",
-        "attachment_submission_required",
-      );
-    const disputeId = row.data.stripeDisputeId;
-    const current = await stripe.disputes.retrieve(disputeId);
-    if (current.livemode !== (connection.data.mode === "live"))
-      throw new ApiError(
-        409,
-        "Stripe environment does not match the connected account.",
-      );
-    if (
-      !["needs_response", "warning_needs_response"].includes(current.status) ||
-      current.evidence_details.past_due
-    )
-      throw new ApiError(
-        409,
-        "Stripe is no longer accepting this dispute response.",
-      );
-    if (draftOnly && current.evidence.uncategorized_text && current.evidence.uncategorized_text !== draft.data.content) throw new ApiError(409, "Stripe already has different response text. Review it in Stripe before replacing it.", "stripe_existing_evidence");
-    try {
-      const result = await performClaimedSubmission({
-        claim: async () => {
-          try {
-            await write(workspaceId, [
-              {
-                key: row.key,
-                expectedVersion: row.version,
-                data: {
-                  ...row.data,
-                  status: "submitting",
-                  updatedAt: timestamp(),
-                } satisfies CaseDoc,
-              },
-              { key: draft.key, expectedVersion: draft.version, check: true },
-              {
-                key: keys.stripe,
-                expectedVersion: connection.version,
-                check: true,
-              },
-            ]);
-            return true;
-          } catch (error) {
-            if (error instanceof ConflictError) return false;
-            throw error;
-          }
-        },
-        send: () =>
-          stripe.disputes.update(
-            disputeId,
-            {
-              evidence: { uncategorized_text: draft.data.content },
-              submit: !draftOnly,
-            },
-            {
-              idempotencyKey: `causality:${workspaceId}:${row.data.id}:revision:${input.draftRevision}${draftOnly ? ":draft" : ""}`,
-            },
-          ),
-        settle: async (updated) => {
-          if (draftOnly) {
-            if (updated.id !== disputeId || updated.livemode !== current.livemode ||
-                !['needs_response', 'warning_needs_response'].includes(updated.status) ||
-                updated.evidence.uncategorized_text !== draft.data.content ||
-                updated.evidence_details.submission_count !== current.evidence_details.submission_count)
-              throw new Error('Stripe did not confirm an unchanged submission count and saved draft.');
-            await write(workspaceId, [
-              { key: row.key, expectedVersion: row.version + 1, data: { ...row.data, updatedAt: timestamp() } },
-              { key: draft.key, expectedVersion: draft.version, check: true },
-              auditChange(actor, 'stripe.draft_saved', `Saved approved revision ${input.draftRevision} with submit=false. Stripe auto-response settings still apply.`, row.data.id),
-            ]);
-            return;
-          }
-          await importDispute(updated, workspaceId, connection.data, {
-            actor,
-            submissionRevision: input.draftRevision,
-          });
-        },
-        uncertain: () =>
-          write(workspaceId, [
-            auditChange(
-              actor,
-              "stripe.submission_verification_required",
-              `Could not confirm the result for revision ${input.draftRevision}. Case stays locked until Stripe status is verified.`,
-              row.data.id,
-            ),
-          ]),
-      });
-      if (!result.claimed)
-        throw new ApiError(
-          409,
-          "This case changed or another submission started. Refresh and review its current status.",
-          "stale_submission",
-        );
-      return draftOnly ? { saved: true, submitted: false, stripeStatus: result.result.status, autoResponseMaySubmit: true } : { submitted: true, stripeStatus: result.result.status };
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      throw new ApiError(
-        502,
-        "The submission result could not be confirmed. The case is locked to prevent duplicate or changed submissions. Check Stripe Dashboard and sync its status.",
-        "submission_verification_required",
-      );
-    }
+  async function submitStripe(
+    _workspaceId: string,
+    _actor: string,
+    _input: { caseId: string; confirmed: boolean; draftRevision: number },
+  ): Promise<never> {
+    void [_workspaceId, _actor, _input];
+    throw new ApiError(409, "Submissions are disabled. Download the evidence PDF for review.", "submission_disabled");
   }
-  const submitStripe = (workspaceId: string, actor: string, input: { caseId: string; confirmed: boolean; draftRevision: number }) => writeStripeEvidence(workspaceId, actor, input);
-  const saveStripeDraft = (workspaceId: string, actor: string, input: { caseId: string; confirmed: boolean; draftRevision: number; autoSubmitAcknowledged: boolean }) => writeStripeEvidence(workspaceId, actor, input, true);
+  // Saved Stripe drafts can auto-submit later; the review-only workflow blocks them too.
+  const saveStripeDraft = (workspaceId: string, actor: string, input: { caseId: string; confirmed: boolean; draftRevision: number; autoSubmitAcknowledged: boolean }) => submitStripe(workspaceId, actor, input);
   async function handleStripeWebhook(body: string, signature: string) {
     const env = settings(),
       workspaceId = env.STRIPE_WORKSPACE_ID;

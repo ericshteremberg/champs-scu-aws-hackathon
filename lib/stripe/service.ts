@@ -5,7 +5,7 @@ import { getDb } from '@/db';
 import { cases,evidence,drafts,stripeConnections,stripeEvents,auditLogs } from '@/db/schema';
 import type { Integration } from '@/lib/domain';
 import { ApiError } from '@/lib/server/auth';
-import { normalizeDispute, submissionEligibility, accountBindingError, performClaimedSubmission } from './model';
+import { normalizeDispute, accountBindingError } from './model';
 
 type StripeEnv={STRIPE_RESTRICTED_KEY?:string;STRIPE_WORKSPACE_ID?:string;STRIPE_WEBHOOK_SECRET?:string;STRIPE_ALLOW_LIVE?:string;STRIPE_ENABLE_SUBMISSION?:string};
 const settings=()=>env as Cloudflare.Env & StripeEnv;
@@ -14,7 +14,7 @@ export function configuration(workspaceId:string) {
  const e=settings();const missing=[] as string[];
  if(!e.STRIPE_RESTRICTED_KEY)missing.push('STRIPE_RESTRICTED_KEY');
  if(e.STRIPE_WORKSPACE_ID!==workspaceId)missing.push('STRIPE_WORKSPACE_ID');
- return {configured:missing.length===0,requiredConfiguration:missing,submissionEnabled:e.STRIPE_ENABLE_SUBMISSION==='true',webhookConfigured:!!e.STRIPE_WEBHOOK_SECRET,workspaceId};
+ return {configured:missing.length===0,requiredConfiguration:missing,submissionEnabled:false,webhookConfigured:!!e.STRIPE_WEBHOOK_SECRET,workspaceId};
 }
 function stripeClient(workspaceId:string) {
  const e=settings();
@@ -70,33 +70,11 @@ export async function disconnectStripe(workspaceId:string,actor:string) {
  await getDb().update(stripeConnections).set({connected:false,nextCursor:null}).where(eq(stripeConnections.workspaceId,workspaceId));
  await audit(workspaceId,actor,'stripe.disconnected','Disconnected Stripe. Previously imported evidence is retained.');return {disconnected:true};
 }
-export async function submitStripe(workspaceId:string,actor:string,input:{caseId:string;confirmed:boolean;draftRevision:number}) {
- if(settings().STRIPE_ENABLE_SUBMISSION!=='true')throw new ApiError(409,'Stripe submission is disabled. Export the reviewed response for now.','submission_disabled');
- const db=getDb(),{connection,stripe}=await verifiedConnection(workspaceId);
- const row=await db.select().from(cases).where(and(eq(cases.id,input.caseId),eq(cases.workspaceId,workspaceId))).get();if(!row)throw new ApiError(404,'Case not found.');
- const draft=await db.select().from(drafts).where(and(eq(drafts.caseId,row.id),eq(drafts.workspaceId,workspaceId))).get();
- const invalid=submissionEligibility({source:row.source,status:row.status,draftStatus:draft?.status,revision:draft?.revision,requestedRevision:input.draftRevision,confirmed:input.confirmed,sourceRevision:draft?.sourceRevision,dataRevision:row.dataRevision});if(invalid)throw new ApiError(409,invalid);
- if(!row.stripeDisputeId||row.stripeAccountId!==connection.accountId)throw new ApiError(409,'The case belongs to a different Stripe account.');
- if(draft!.content.length>20000)throw new ApiError(409,'Stripe accepts at most 20,000 characters in this text response. Shorten and review the draft again.');
- const attachment=await db.select({id:evidence.id}).from(evidence).where(and(eq(evidence.workspaceId,workspaceId),eq(evidence.caseId,row.id),sql`${evidence.fileKey} IS NOT NULL`)).limit(1);
- if(attachment.length)throw new ApiError(409,'This integration currently submits text responses only. Export this case and include its supporting files in Stripe Dashboard.','attachment_submission_required');
- const disputeId=row.stripeDisputeId;
- const current=await stripe.disputes.retrieve(disputeId);
- if(current.livemode!==(connection.mode==='live'))throw new ApiError(409,'Stripe environment does not match the connected account.');
- if(!['needs_response','warning_needs_response'].includes(current.status)||current.evidence_details.past_due)throw new ApiError(409,'Stripe is no longer accepting this dispute response.');
- try{
-  const result=await performClaimedSubmission({
-   claim:async()=>{
-    const claimed=await db.update(cases).set({status:'submitting',updatedAt:new Date().toISOString()}).where(and(eq(cases.id,row.id),eq(cases.workspaceId,workspaceId),eq(cases.status,'ready'),sql`EXISTS (SELECT 1 FROM drafts WHERE case_id = ${row.id} AND workspace_id = ${workspaceId} AND status = 'approved' AND revision = ${input.draftRevision} AND (source_revision IS NULL OR source_revision = ${cases.dataRevision}))`)).returning({id:cases.id});return claimed.length===1;
-   },
-   send:()=>stripe.disputes.update(disputeId,{evidence:{uncategorized_text:draft!.content},submit:true},{idempotencyKey:`causality:${workspaceId}:${row.id}:revision:${input.draftRevision}`}),
-   settle:async(updated)=>{await db.batch(disputeWrites(updated,workspaceId,connection.accountId));await audit(workspaceId,actor,'stripe.submitted',`Submitted approved response revision ${input.draftRevision}.`,row.id);},
-   uncertain:()=>audit(workspaceId,actor,'stripe.submission_verification_required',`Could not confirm the result for revision ${input.draftRevision}. Case stays locked until Stripe status is verified.`,row.id),
-  });
-  if(!result.claimed)throw new ApiError(409,'This case changed or another submission started. Refresh and review its current status.','stale_submission');
-  return {submitted:true,stripeStatus:result.result.status};
- }catch(error){if(error instanceof ApiError)throw error;throw new ApiError(502,'The submission result could not be confirmed. The case is locked to prevent duplicate or changed submissions. Check Stripe Dashboard and sync its status.','submission_verification_required');}
+export async function submitStripe(_workspaceId:string,_actor:string,_input:{caseId:string;confirmed:boolean;draftRevision:number}):Promise<never> {
+ void [_workspaceId, _actor, _input];
+ throw new ApiError(409,'Submissions are disabled. Download the evidence PDF for review.','submission_disabled');
 }
+
 export async function handleStripeWebhook(body:string,signature:string) {
  const e=settings(),workspaceId=e.STRIPE_WORKSPACE_ID;
  if(!workspaceId||!e.STRIPE_WEBHOOK_SECRET)throw new ApiError(503,'Webhook configuration is incomplete.');

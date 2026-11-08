@@ -1,4 +1,5 @@
 import { sampleDataEnabled } from './sample-data';
+import { evidenceSections } from '../investigation/sections.ts';
 import { env } from 'cloudflare:workers';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { getDb } from '@/db';
@@ -92,24 +93,11 @@ export async function cancelInvestigation(user: ChatGPTUser, runId: string): Pro
   return serializeInvestigation(saved!);
 }
 
-function classify(row: Evidence): EvidenceSection {
-  if (row.provenance && EVIDENCE_SECTIONS.includes(row.provenance.section as EvidenceSection)) return row.provenance.section as EvidenceSection;
-  if (row.source === 'stripe') return 'summary';
-  if ((row.source === 'gmail' || row.source === 'imap')) return 'support';
-  if (row.source === 'policy') return 'policy';
-  const text = `${row.title} ${row.content}`;
-  if (/scan|admission|attendance/i.test(text)) return 'attendance';
-  if (/recover|resend|transfer|replac/i.test(text)) return 'history';
-  if (/deliver|dispatch|email|sms|bounce|mailbox/i.test(text)) return 'delivery';
-  if (/ticket.*issu|issu.*ticket/i.test(text)) return 'tickets';
-  return 'order';
-}
-
 function localEvidence(item: CaseRow, records: Evidence[], section: EvidenceSection): EvidenceEnvelope {
-  const selected = records.filter(record => classify(record) === section);
+  const selected = records.filter(record => evidenceSections(record).includes(section));
   const limitations = [...new Set(selected.flatMap(record => record.provenance?.limitations || []))];
   for (const record of selected) if (record.fileName && !record.content) limitations.push(`The attachment ${record.fileName} requires manual review. Its contents have not been extracted.`);
-  if (!selected.length) limitations.push(`No attached records are classified under ${section}. Related facts may appear in records filed under other sections; this does not establish that source records or events do not exist.`);
+  if (!selected.length) limitations.push(`No attached records were classified under ${section}. Related facts may appear in other source records.`);
   if (section === 'attendance') limitations.push('Missing scan records do not establish nonattendance. A scan alone does not establish cardholder identity.');
   if (section === 'policy') limitations.push('Current terms do not establish which disclosures were shown at purchase time.');
   return { caseId: item.id, section, sourceMode: item.source === 'demo' ? 'synthetic' : 'attached', fetchedAt: now(), status: !selected.length ? 'unavailable' : limitations.length ? 'partial' : 'available', limitations,

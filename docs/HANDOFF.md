@@ -149,7 +149,7 @@ A merchant-imported case does not automatically become a Stripe-submittable case
 
 ## Concurrency and evidence guarantees
 
-Each entity is a DynamoDB item under the workspace partition. Version-conditional transactions protect case changes, draft changes, approvals, active runs, and Stripe submission claims. The case's source revision changes when evidence changes. Every investigation step verifies current run status and the captured source/draft state.
+Each entity is a DynamoDB item under the workspace partition. Version-conditional transactions protect case changes, draft changes, approvals, and active runs. Stripe submission is disabled in both backend implementations, regardless of the legacy environment flag. The case's source revision changes when evidence changes. Every investigation step verifies current run status and the captured source/draft state.
 
 Starting a run returns immediately while a separate private investigator Lambda works. API and investigator concurrency are reserved separately, preserving capacity for status reads and cancellation. Run activity is stored separately from the draft, and the browser polls it. Cancellation prevents later steps and publication. A changed source record, edited or approved draft, closed case, or competing run blocks stale completion.
 
@@ -177,3 +177,14 @@ The older recording under `docs/demo/` documents standalone Casework, not this d
 GitHub is the cross-computer handoff. Share the actual pushed repository, branch, and commit from the final implementation report. The source checkpoint hashes in [BRANCH_COMPARISON.md](BRANCH_COMPARISON.md) are historical inputs, not the final merged revision.
 
 Gmail now has an AWS OAuth lifecycle and reviewed case-email import UI. Its Google developer registration is complete and deployed in External / Testing mode. Real customer consent and mailbox reads remain untested; follow [the setup handoff](handoffs/06-gmail-oauth-registration.md). See [OAuth connector architecture](OAUTH_CONNECTORS.md#gmail-runtime-and-selected-evidence) for scope, temporary preview storage, token handling and untested live boundaries.
+
+
+## Review-only evidence PDFs
+
+The Report tab now leads with a dedicated evidence packet and **Download evidence PDF**. Drafts can be downloaded without approval, labeled Draft for review. Dirty edits, stale source revisions, running investigations and unresolved source references block PDF generation. Approval remains a separate merchant review action. Neither download nor approval submits anything.
+
+The browser dynamically loads `lib/report/pdf.ts` and locally served Ubuntu fonts to generate a paginated PDF from the already authorized case snapshot. It contains the response, numbered source register, material review notes, and full saved source text. Original binary attachments are listed but not embedded. No provider requests or case writes occur during export. The existing approved JSON/S3 archive remains separate. See [EVIDENCE_PACKET.md](EVIDENCE_PACKET.md).
+
+Attached documents can now route to multiple investigation topics. The engine permits identical attached/synthetic records across topics and counts them once; conflicting reuse and remote cross-section ID reuse still fail. Empty category diagnostics no longer become duplicate factual gaps. Existing reports expose those legacy diagnostics in a separate disclosure while retaining material qualifications in the PDF. Fresh investigations produce concise merchant responses with review notes in structured metadata.
+
+Both AWS and legacy Stripe services return `submission_disabled` before constructing a Stripe client or changing storage, even if `STRIPE_ENABLE_SUBMISSION=true`. The submission modal and send action have been removed; the former submission tab is now Review package. Do not restore provider writes as part of frontend merging.

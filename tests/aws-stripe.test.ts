@@ -275,156 +275,19 @@ describe("AWS Stripe integration guards and synchronization", () => {
   });
 });
 
-describe("AWS atomic Stripe submission", () => {
-  it("allows exactly one parallel claim and sends the exact approved revision with an idempotency key", async () => {
+describe("AWS review-only submission boundary", () => {
+  it.each(["true", "false"])("blocks submissions even with legacy enable flag %s", async (flag) => {
     const h = harness();
     await h.ready();
-    const results = await Promise.allSettled([submit(h), submit(h)]);
-    expect(
-      results.filter((result) => result.status === "fulfilled"),
-    ).toHaveLength(1);
-    expect(h.update).toHaveBeenCalledTimes(1);
-    expect(h.update).toHaveBeenCalledWith(
-      h.current.id,
-      {
-        evidence: {
-          uncategorized_text:
-            "Reviewed response with the original source citation.",
-        },
-        submit: true,
-      },
-      { idempotencyKey: `causality:${workspace}:${caseId}:revision:3` },
-    );
-    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe("submitted");
-  });
-
-  it("blocks a claim when evidence changes between validation and the atomic write", async () => {
-    const h = harness();
-    await h.ready();
-    h.beforeCommit((changes) => {
-      if (
-        !changes.some(
-          (change) =>
-            (change.data as CaseDoc | undefined)?.status === "submitting",
-        )
-      )
-        return;
-      h.beforeCommit();
-      const row = h.read<CaseDoc>(keys.case(caseId))!;
-      h.put(row.key, { ...row.data, dataRevision: row.data.dataRevision + 1 });
-    });
-    await expect(submit(h)).rejects.toMatchObject({ code: "stale_submission" });
+    h.env.STRIPE_ENABLE_SUBMISSION = flag;
+    const before = structuredClone([...h.records]);
+    h.commit.mockClear(); h.client.mockClear();
+    expect(h.service.configuration(workspace).submissionEnabled).toBe(false);
+    await expect(submit(h)).rejects.toMatchObject({ status: 409, code: "submission_disabled" });
     expect(h.update).not.toHaveBeenCalled();
-  });
-
-  it("blocks a claim when the connection changes during validation", async () => {
-    const h = harness();
-    await h.ready();
-    h.beforeCommit((changes) => {
-      if (
-        !changes.some(
-          (change) =>
-            (change.data as CaseDoc | undefined)?.status === "submitting",
-        )
-      )
-        return;
-      h.beforeCommit();
-      h.put(keys.stripe, { ...h.connection, connected: false });
-    });
-    await expect(submit(h)).rejects.toMatchObject({ code: "stale_submission" });
-    expect(h.update).not.toHaveBeenCalled();
-  });
-
-  it("keeps an uncertain submission locked and does not resend it", async () => {
-    const h = harness();
-    await h.ready();
-    h.update.mockRejectedValue(new Error("Network result is unknown"));
-    await expect(submit(h)).rejects.toMatchObject({
-      status: 502,
-      code: "submission_verification_required",
-    });
-    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe("submitting");
-    await expect(submit(h)).rejects.toThrow("submission is being verified");
-    expect(h.update).toHaveBeenCalledTimes(1);
-    expect(
-      [...h.records.values()].some(
-        (row) =>
-          (row.data as { action?: string }).action ===
-          "stripe.submission_verification_required",
-      ),
-    ).toBe(true);
-    // A needs_response sync must not unfreeze or rewrite evidence from the pending attempt.
-    h.list.mockResolvedValue({
-      data: [fixture({ amount: 14000 })],
-      has_more: false,
-    });
-    await h.service.syncStripe(workspace, "Reviewer");
-    expect(h.read<CaseDoc>(keys.case(caseId))?.data).toMatchObject({
-      status: "submitting",
-      dataRevision: 1,
-    });
-  });
-
-  it("keeps the claim locked if Stripe succeeds but persistence cannot settle", async () => {
-    const h = harness();
-    await h.ready();
-    h.beforeCommit((changes) => {
-      if (
-        changes.some(
-          (change) =>
-            (change.data as CaseDoc | undefined)?.status === "submitted",
-        )
-      )
-        throw new Error("DynamoDB temporarily unavailable");
-    });
-    await expect(submit(h)).rejects.toMatchObject({
-      code: "submission_verification_required",
-    });
-    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe("submitting");
-    expect(h.update).toHaveBeenCalledTimes(1);
-  });
-
-  it.each([
-    "source_revision",
-    "unapproved",
-    "wrong_revision",
-    "unconfirmed",
-    "attachment",
-    "expired",
-    "wrong_mode",
-    "wrong_owner",
-    "disabled",
-  ] as const)("rejects %s before sending", async (scenario) => {
-    const h = harness();
-    await h.ready();
-    const draft = h.read<DraftDoc>(keys.draft(caseId))!;
-    if (scenario === "source_revision")
-      h.put(draft.key, { ...draft.data, sourceRevision: 0 });
-    if (scenario === "unapproved")
-      h.put(draft.key, { ...draft.data, status: "draft" });
-    if (scenario === "attachment")
-      h.put(keys.evidence(caseId, "file"), {
-        id: "file",
-        caseId,
-        fileKey: "private/attachment.pdf",
-      });
-    if (scenario === "expired")
-      h.retrieve.mockResolvedValue(
-        fixture({
-          evidence_details: { ...h.current.evidence_details, past_due: true },
-        }),
-      );
-    if (scenario === "wrong_mode")
-      h.retrieve.mockResolvedValue(fixture({ livemode: true }));
-    if (scenario === "disabled") h.env.STRIPE_ENABLE_SUBMISSION = "false";
-    await expect(
-      h.service.submitStripe(workspace, "Reviewer", {
-        caseId: scenario === "wrong_owner" ? "another_workspace_case" : caseId,
-        confirmed: scenario !== "unconfirmed",
-        draftRevision: scenario === "wrong_revision" ? 2 : 3,
-      }),
-    ).rejects.toBeInstanceOf(Error);
-    expect(h.update).not.toHaveBeenCalled();
+    expect(h.client).not.toHaveBeenCalled();
+    expect(h.commit).not.toHaveBeenCalled();
+    expect([...h.records]).toEqual(before);
   });
 });
 
@@ -480,88 +343,17 @@ describe("AWS Stripe webhook verification and replay protection", () => {
 const saveDraft = (h: ReturnType<typeof harness>, overrides = {}) =>
   h.service.saveStripeDraft(workspace, 'Reviewer', { caseId, confirmed: true, draftRevision: 3, autoSubmitAcknowledged: true, ...overrides });
 
-describe('Stripe draft writes', () => {
-  it('requires a separate enable flag and auto-response acknowledgement', async () => {
+describe('Review-only Stripe draft boundary', () => {
+  it.each(['true', 'false'])('blocks draft writes even with legacy flag %s', async flag => {
     const h = harness(); await h.ready();
-    await expect(saveDraft(h, { autoSubmitAcknowledged: false })).rejects.toMatchObject({ code: 'auto_submit_ack_required' });
-    h.env.STRIPE_ENABLE_DRAFT_WRITES = 'false';
-    await expect(saveDraft(h)).rejects.toMatchObject({ code: 'submission_disabled' });
+    h.env.STRIPE_ENABLE_DRAFT_WRITES = flag;
+    const before = structuredClone([...h.records]);
+    h.commit.mockClear(); h.client.mockClear();
+    expect(h.service.configuration(workspace).draftWritesEnabled).toBe(false);
+    await expect(saveDraft(h)).rejects.toMatchObject({ status: 409, code: 'submission_disabled' });
     expect(h.update).not.toHaveBeenCalled();
-  });
-  it.each(['unapproved', 'stale', 'unconfirmed', 'existing text'])('blocks %s drafts before writing', async kind => {
-    const h = harness(); await h.ready();
-    const row = h.read<DraftDoc>(keys.draft(caseId))!;
-    if (kind === 'unapproved') h.put(row.key, { ...row.data, status: 'draft' });
-    if (kind === 'stale') h.put(row.key, { ...row.data, sourceRevision: -1 });
-    if (kind === 'existing text') h.current.evidence.uncategorized_text = 'Someone else’s saved response';
-    await expect(saveDraft(h, { confirmed: kind !== 'unconfirmed' })).rejects.toMatchObject({ status: 409 });
-    expect(h.update).not.toHaveBeenCalled();
-  });
-  it('keeps an uncertain draft write locked for reconciliation', async () => {
-    const h = harness(); await h.ready();
-    h.update.mockRejectedValueOnce(new Error('connection lost'));
-    await expect(saveDraft(h)).rejects.toMatchObject({ status: 502 });
-    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe('submitting');
-    await expect(saveDraft(h)).rejects.toMatchObject({ status: 409 });
-    expect(h.update).toHaveBeenCalledTimes(1);
-  });
-  it('does not report a draft save when Stripe returns a submitted response', async () => {
-    const h = harness(); await h.ready();
-    await expect(saveDraft(h)).rejects.toMatchObject({ code: 'submission_verification_required' });
-    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe('submitting');
-  });
-  it('rehearses both write modes with the actual Stripe SDK and zero network requests', async () => {
-    // Every SDK HTTP operation terminates here; there is no fetch/network fallback.
-    const intercepted: { method: string; path: string; body: string; idempotencyKey: string | null }[] = [];
-    let remote = fixture();
-    const transport = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-      const url = new URL(typeof input === 'string' || input instanceof URL ? String(input) : input.url);
-      const method = init?.method || 'GET';
-      const body = String(init?.body || '');
-      const headers = new Headers(init?.headers);
-      intercepted.push({ method, path: url.pathname, body, idempotencyKey: headers.get('idempotency-key') });
-      let result: unknown;
-      if (method === 'GET' && url.pathname === '/v1/account') result = { id: 'acct_test', object: 'account', business_profile: { name: 'Synthetic organizer' } };
-      else if (method === 'GET' && url.pathname === '/v1/disputes') result = { object: 'list', data: [remote], has_more: false, url: '/v1/disputes' };
-      else if (method === 'GET' && url.pathname === `/v1/disputes/${remote.id}`) result = remote;
-      else if (method === 'POST' && url.pathname === `/v1/disputes/${remote.id}`) {
-        const params = new URLSearchParams(body);
-        const submitted = params.get('submit') === 'true';
-        remote = fixture({
-          evidence: { ...remote.evidence, uncategorized_text: params.get('evidence[uncategorized_text]') || '' },
-          status: submitted ? 'under_review' : 'needs_response',
-          evidence_details: { ...remote.evidence_details, has_evidence: true, submission_count: submitted ? 1 : 0 },
-        }); result = remote;
-      } else throw new Error(`Unexpected SDK request ${method} ${url.pathname}`);
-      return new Response(JSON.stringify(result), { status: 200, headers: { 'content-type': 'application/json', 'request-id': 'req_local_rehearsal' } });
-    };
-    const sdk = new Stripe('rk_test_synthetic_rehearsal', { httpClient: Stripe.createFetchHttpClient(transport as typeof fetch), maxNetworkRetries: 0, telemetry: false });
-    const h = harness(sdk); await h.ready();
-    const { readFile, writeFile } = await import('node:fs/promises');
-    const { createHash } = await import('node:crypto');
-    const report = process.env.STRIPE_REHEARSAL_REPORT ? await readFile(process.env.STRIPE_REHEARSAL_REPORT, 'utf8') : 'Reviewed synthetic report.\nStripe payment + Supabase order + Resend email.\nDelivery ≠ reading. Symbols: & + %.';
-    const draft = h.read<DraftDoc>(keys.draft(caseId))!;
-    h.put(draft.key, { ...draft.data, content: report });
-    h.env.STRIPE_ENABLE_SUBMISSION = 'false';
-    await expect(saveDraft(h)).resolves.toMatchObject({ saved: true, submitted: false });
-    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe('ready');
-    await expect(submit(h)).rejects.toMatchObject({ code: 'submission_disabled' });
-    h.env.STRIPE_ENABLE_SUBMISSION = 'true';
-    const attempts = await Promise.allSettled([submit(h), submit(h)]);
-    expect(attempts.filter(a => a.status === 'fulfilled')).toHaveLength(1);
-    expect(h.read<CaseDoc>(keys.case(caseId))?.data.status).toBe('submitted');
-    const writes = intercepted.filter(r => r.method === 'POST');
-    expect(writes).toHaveLength(2);
-    expect(writes.map(r => new URLSearchParams(r.body).get('submit'))).toEqual(['false', 'true']);
-    for (const request of writes) expect(new URLSearchParams(request.body).get('evidence[uncategorized_text]')).toBe(report);
-    expect(writes[0].idempotencyKey).not.toBe(writes[1].idempotencyKey);
-    expect(writes[0].idempotencyKey).toContain(':revision:3:draft');
-    const proof = {
-      kind: 'LOCAL_SIMULATION_NOT_STRIPE_ACCEPTANCE', generatedAt: new Date().toISOString(),
-      networkRequests: 0, sdk: 'stripe@23.0.0', reportSha256: createHash('sha256').update(report).digest('hex'), reportCharacters: report.length,
-      syntheticDispute: remote.id, draftThenFinal: writes.map(r => ({ path: r.path, submit: new URLSearchParams(r.body).get('submit'), idempotencyKey: r.idempotencyKey })),
-      exactReportPreserved: true, concurrentFinalWrites: 1, liveDisputeTouched: false,
-    };
-    if (process.env.STRIPE_REHEARSAL_PROOF) await writeFile(process.env.STRIPE_REHEARSAL_PROOF, JSON.stringify(proof, null, 2) + '\n');
+    expect(h.client).not.toHaveBeenCalled();
+    expect(h.commit).not.toHaveBeenCalled();
+    expect([...h.records]).toEqual(before);
   });
 });

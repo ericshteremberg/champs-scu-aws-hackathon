@@ -1,7 +1,5 @@
 "use client";
 
-import { StripeDraftWriter } from "./stripe-draft-writer";
-
 import { ResendConnector } from "./resend-provider";
 import { ProviderConnectors } from "./provider-connectors";
 
@@ -69,8 +67,9 @@ import {
   ScopeConfiguration,
   SetupChecklist,
   SubmissionOutcome,
-  SubmissionReadiness,
 } from "./workspace-extra";
+import { EvidencePacket } from './evidence-packet';
+import { packetFilename, packetNotes, categoryDiagnostics, citationText, packetSources } from '@/lib/report/packet';
 import type { ScreenPreview } from "@/lib/design/fixtures";
 import { EvidenceConnectors } from "./connector-setup";
 import { LiveEvidenceConnectors } from "./live-connectors";
@@ -870,7 +869,7 @@ export default function WorkspaceApp({
     [preview],
   );
   const stripeAction = async (
-    action: "connect" | "sync" | "disconnect" | "submit",
+    action: "connect" | "sync" | "disconnect",
     body?: object,
   ) => {
     if (preview) {
@@ -909,16 +908,13 @@ export default function WorkspaceApp({
         data.message ??
           (action === "sync"
             ? `${data.imported ?? 0} disputes synchronized.${data.hasMore ? " Sync again for remaining records." : ""}`
-            : action === "submit"
-              ? "Evidence submitted to Stripe."
-              : "Stripe connection updated."),
+            : "Stripe connection updated."),
       );
       const status = await fetch("/api/stripe/status").then(
         async (r) => (await r.json()) as StripeStatus,
       );
       setStripe(status);
     } catch (e) {
-      if (action === "submit") await load();
       setError(
         e instanceof Error ? e.message : "Stripe connection needs attention.",
       );
@@ -1322,10 +1318,6 @@ export default function WorkspaceApp({
                       void archiveCase(current.id, current.draft.revision);
                   }}
                   openConnections={() => navigate("integrations")}
-                  submissionEnabled={Boolean(stripe?.submissionEnabled)}
-                  connected={state.integrations.some(
-                    (i) => i.provider === "stripe" && i.status === "connected",
-                  )}
                   initialTab={detail.tab}
                   initialEvidence={detail.evidence}
                   onTab={(v) => updateDetail("tab", v)}
@@ -1339,7 +1331,6 @@ export default function WorkspaceApp({
                   back={() => navigate("cases")}
                   addEvidence={() => setModal("evidence")}
                   requestAccess={() => setModal("access")}
-                  submit={() => setModal("submit")}
                 />
               )}
               {view === "evidence" && (
@@ -1795,57 +1786,7 @@ export default function WorkspaceApp({
           SYNTHETIC DESIGN PREVIEW · {preview.id}
         </div>
       )}
-      {modal === "submit" && current && (
-        <Modal
-          title="Submit evidence to Stripe?"
-          onClose={closeModal}
-          error={error}
-        >
-          <div className="cw-form">
-            <p>
-              You’re preparing to submit the approved draft for{" "}
-              <strong>{current.orderRef || current.title}</strong> to Stripe.
-            </p>
-            <div className="cw-banner">
-              <TriangleAlert size={22} />
-              <p>
-                Evidence generally cannot be changed after submission. Check the
-                response, sources, and attachments before proceeding.
-              </p>
-            </div>
-            <p>
-              {current.source === "demo"
-                ? "Sample cases cannot be submitted."
-                : "The issuing bank decides the outcome. Causality does not guarantee a decision."}
-            </p>
-            <div className="cw-modal-actions">
-              <Button onClick={closeModal}>Keep reviewing</Button>
-              <Button
-                primary
-                disabled={
-                  busy ||
-                  ["submitting", "submitted", "won", "lost"].includes(
-                    current.status,
-                  ) ||
-                  current.source !== "stripe" ||
-                  current.draft?.status !== "approved" ||
-                  !stripe?.submissionEnabled
-                }
-                onClick={() =>
-                  void stripeAction("submit", {
-                    caseId: current.id,
-                    confirmed: true,
-                    draftRevision: current.draft?.revision,
-                  })
-                }
-              >
-                {busy ? "Submitting…" : "Submit approved evidence"}
-                <ArrowRight size={18} />
-              </Button>
-            </div>
-          </div>
-        </Modal>
-      )}
+
     </div>
   );
 }
@@ -2335,8 +2276,6 @@ function CaseDetail({
   back,
   addEvidence,
   requestAccess,
-  submit,
-  submissionEnabled,
   run,
   investigationConfig,
   investigating,
@@ -2345,7 +2284,6 @@ function CaseDetail({
   cancelInvestigation,
   archive,
   openConnections,
-  connected,
   initialTab = "investigation",
   initialEvidence,
   onTab,
@@ -2358,14 +2296,11 @@ function CaseDetail({
   current: DisputeCase;
   designPreview: boolean;
   onResendImported: (state: WorkspaceState) => void;
-  submissionEnabled: boolean;
-  connected: boolean;
   busy: boolean;
   mutate: (a: WorkspaceAction, message?: string) => Promise<boolean>;
   back: () => void;
   addEvidence: () => void;
   requestAccess: () => void;
-  submit: () => void;
   run: InvestigationRun | null;
   investigationConfig: InvestigationConfig | null;
   investigating: boolean;
@@ -2419,9 +2354,6 @@ function CaseDetail({
   const frozen = ["submitting", "submitted", "won", "lost"].includes(
     current.status,
   );
-  const hasAttachments = current.evidence.some(
-    (e) => e.fileName || e.downloadUrl,
-  );
   const dirty = draft !== (current.draft?.content ?? "");
   useEffect(() => {
     onDirtyChange(dirty);
@@ -2436,11 +2368,35 @@ function CaseDetail({
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfError, setPdfError] = useState("");
   const stale = Boolean(current.draft?.sourceStale);
   const analysis = current.draft?.analysis;
   const canExport = Boolean(
     current.draft?.status === "approved" && !dirty && !stale && !investigating,
   );
+  const canDownloadPdf = Boolean(current.draft?.content && !dirty && !stale && !investigating && !pdfBusy);
+  const downloadPdf = async () => {
+    if (!canDownloadPdf) return;
+    setPdfBusy(true); setPdfError('');
+    try {
+      // Load the PDF engine and same-origin fonts only when requested.
+      const [module, ...fonts] = await Promise.all([
+        import('@/lib/report/pdf'),
+        ...['Ubuntu-Regular.ttf', 'Ubuntu-Bold.ttf'].map(async name => {
+          const response = await fetch(`/fonts/${name}`);
+          if (!response.ok) throw new Error('The PDF fonts could not be loaded. Please retry.');
+          return new Uint8Array(await response.arrayBuffer());
+        }),
+      ]);
+      const bytes = await module.createEvidencePdf(current, { regular: fonts[0], bold: fonts[1] });
+      const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }));
+      const link = document.createElement('a'); link.href = url; link.download = packetFilename(current);
+      document.body.appendChild(link); link.click(); link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) { setPdfError(error instanceof Error ? error.message : 'The PDF could not be generated. Please retry.'); }
+    finally { setPdfBusy(false); }
+  };
   const canInvestigate =
     !busy && !resendBusy && !frozen && !investigating && current.evidence.length > 0;
   const mode = investigationConfig?.bedrockConfigured || current.source !== "demo" ? "bedrock" : "sample";
@@ -2533,7 +2489,7 @@ function CaseDetail({
     ["investigation", "Investigation"],
     ["report", "Report"],
     ["preview", "Report preview"],
-    ["submission", "Submission package"],
+    ["submission", "Review package"],
   ];
   return (
     <>
@@ -2858,12 +2814,12 @@ function CaseDetail({
           >
             <div className="cw-page-head" style={{ marginBottom: 0 }}>
               <div>
-                <h2>Report</h2>
+                <h2>Evidence packet</h2>
               </div>
               <div className="cw-actions">
-                <Button onClick={() => exportDraft()} disabled={!canExport}>
+                <Button primary onClick={() => void downloadPdf()} disabled={!canDownloadPdf}>
                   <ArrowDownToLine size={18} />
-                  Export report
+                  {pdfBusy ? 'Preparing PDF…' : 'Download evidence PDF'}
                 </Button>
                 <Button
                   onClick={() => exportDraft("json")}
@@ -2879,6 +2835,11 @@ function CaseDetail({
                 )}
               </div>
             </div>
+            {pdfError && <p role="alert">{pdfError}</p>}
+            {dirty && <p className="cw-caption">Save your edits before downloading the PDF.</p>}
+            {current.draft && <EvidencePacket current={current} content={draft} />}
+            <details className="cw-disclosure">
+              <summary>Investigation details and source review</summary>
             {current.draft && (
               <div className="cw-draft-provenance">
                 <span className="cw-pill outline">
@@ -2910,7 +2871,7 @@ function CaseDetail({
                         : "More evidence needed"}
                   </h3>
                 </div>
-                <p>{analysis.summary}</p>
+                <p style={{ whiteSpace: "pre-wrap" }}>{citationText(analysis.summary, packetSources(current))}</p>
                 <div className="cw-analysis-metrics">
                   <span>{analysis.metrics.recordCount} records checked</span>
                   <span>{analysis.metrics.toolCalls} evidence requests</span>
@@ -2920,14 +2881,14 @@ function CaseDetail({
                 </div>
                 <div className="cw-analysis-next">
                   <strong>Next step</strong>
-                  <p>{analysis.recommendation}</p>
+                  <p>{citationText(analysis.recommendation, packetSources(current))}</p>
                 </div>
               </div>
             )}
             {current.findings.length > 0 && (
               <div className="cw-findings">
                 {current.findings.map((finding, i) => (
-                  <details className="cw-finding cw-disclosure" key={i} open={finding.kind !== "supported"}>
+                  <details className="cw-finding cw-disclosure" key={i}>
                     <summary>
                       {finding.kind === "conflict"
                         ? "Conflicting evidence · "
@@ -2936,7 +2897,7 @@ function CaseDetail({
                           : "Supported · "}
                       {finding.title}
                     </summary>
-                    <p>{finding.detail}</p>
+                    <p>{citationText(finding.detail, packetSources(current))}</p>
                     {finding.evidenceIds.length > 0 && (
                       <div className="cw-citations">
                         {finding.evidenceIds.map((id) => {
@@ -2963,20 +2924,26 @@ function CaseDetail({
               </div>
             )}
             {analysis?.gaps.length ? (
-              <details className="cw-analysis-gaps cw-disclosure" open>
-                <summary>Evidence gaps ({new Set(analysis.gaps).size})</summary>
+              <details className="cw-analysis-gaps cw-disclosure">
+                <summary>Review notes ({packetNotes(current).length})</summary>
                 <ul>
-                  {[...new Set(analysis.gaps)].map((gap, i) => (
-                    <li key={i}>{gap}</li>
+                  {packetNotes(current).map((gap, i) => (
+                    <li key={i}>{citationText(gap, packetSources(current))}</li>
                   ))}
                 </ul>
               </details>
             ) : null}
+            {categoryDiagnostics(current).length > 0 && <details className="cw-disclosure">
+              <summary>Legacy retrieval diagnostics</summary>
+              <p>These category-level messages came from an older investigation. A document can cover multiple categories. They do not establish that the underlying evidence is absent. Run a fresh investigation to update them.</p>
+              <ul>{categoryDiagnostics(current).map((note, i) => <li key={i}>{note}</li>)}</ul>
+            </details>}
+            </details>
             {current.draft ? (
               <>
                 <Field
                   label="Merchant response draft"
-                  hint="Save changes before approval. Only the approved version can be exported."
+                  hint="Save changes before downloading. Draft PDFs are labeled for review; approval is optional and never submits."
                 >
                   <textarea
                     readOnly={frozen || investigating}
@@ -2992,12 +2959,12 @@ function CaseDetail({
                       {dirty
                         ? "Unsaved changes"
                         : current.draft.status === "approved"
-                          ? "Approved for submission"
+                          ? "Reviewed copy"
                           : "Review required"}
                     </h3>
                     <p>
                       {dirty
-                        ? "Save and approve your changes before exporting."
+                        ? "Save your changes before downloading the PDF."
                         : current.draft.status === "approved"
                           ? `Reviewed ${dateTime(current.draft.approvedAt)} by ${current.draft.approvedBy || "workspace owner"} · Revision ${current.draft.revision}`
                           : "Check the sources. Approving does not submit."}
@@ -3081,132 +3048,21 @@ function CaseDetail({
               current={current}
               draft={draft}
               dirty={dirty}
-              exportEnabled={canExport}
-              exportReport={() => exportDraft()}
+              exportEnabled={canDownloadPdf}
+              exportReport={() => void downloadPdf()}
               openEvidence={openEvidence}
             />
           </div>
         )}
         {tab === "submission" && (
-          <div
-            className="cw-report"
-            role="tabpanel"
-            id="case-panel-submission"
-            aria-labelledby="case-tab-submission"
-          >
-            <div className="cw-page-head" style={{ marginBottom: 0 }}>
-              <div>
-                <h2>
-                  {frozen
-                    ? "A preserved case record."
-                    : "Review submission"}
-                </h2>
-                <p>
-                  Review the response and sources.
-                </p>
-              </div>
-              {current.draft && <Badge status={current.draft.status} />}
-            </div>
-            <div className="cw-banner neutral">
-              <ShieldCheck size={20} />
-              <p>
-                Approval does not submit to Stripe.
-              </p>
-            </div>
-            {current.source === "stripe" && hasAttachments && (
-              <div className="cw-banner neutral">
-                <FileText size={20} />
-                <p>
-                  Files require manual submission in Stripe. Export the report
-                  and include the originals.
-                </p>
-              </div>
-            )}
-            {dirty && (
-              <div className="cw-banner">
-                <TriangleAlert size={20} />
-                <p>
-                  Unsaved edits. Save and approve the latest revision before
-                  submitting.
-                </p>
-              </div>
-            )}
-            {!frozen && (
-              <SubmissionReadiness
-                current={current}
-                submissionEnabled={submissionEnabled}
-                connected={connected}
-              />
-            )}
-            {!frozen && <StripeDraftWriter current={current} disabled={busy || dirty || designPreview} />}
-            <div className="cw-two-col">
-              <div>
-                <h3>{frozen ? "Preserved response" : "Response"}</h3>
-                <div className="cw-source-content">
-                  {current.draft?.content ??
-                    "Prepare and review a response in the Report tab."}
-                </div>
-              </div>
-              <div>
-                <h3>Supporting sources</h3>
-                <ul className="cw-activity">
-                  {current.evidence.map((e) => (
-                    <li key={e.id}>
-                      <FileText size={18} />
-                      <div>
-                        <strong>{e.title}</strong>
-                        <p>
-                          {sourceName(e.provenance?.fields.provider === "Resend" ? "Resend" : e.source)} ·{" "}
-                          {e.reference || date(e.occurredAt)}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-            <div className="cw-review-bar" style={{ borderRadius: 16 }}>
-              <div>
-                <h3>
-                  {current.source === "stripe"
-                    ? "Submit through your Stripe connection"
-                    : "Export for review"}
-                </h3>
-                <p>
-                  {current.source === "demo"
-                    ? "Synthetic sample cases cannot be submitted."
-                    : current.source === "manual"
-                      ? "This manual case is not linked to a Stripe dispute."
-                      : "Requires an approved draft. Text-only submission is available when enabled by your Stripe operator."}
-                </p>
-              </div>
-              <div className="cw-actions">
-                <Button onClick={() => exportDraft()} disabled={!canExport}>
-                  <ArrowDownToLine size={18} />
-                  Export
-                </Button>
-                {current.source === "stripe" &&
-                  submissionEnabled &&
-                  connected && (
-                    <Button
-                      primary
-                      disabled={
-                        busy ||
-                        frozen ||
-                        investigating ||
-                        stale ||
-                        dirty ||
-                        hasAttachments ||
-                        current.draft?.status !== "approved"
-                      }
-                      onClick={submit}
-                    >
-                      Review submission
-                      <ArrowRight size={18} />
-                    </Button>
-                  )}
-              </div>
-            </div>
+          <div className="cw-report" role="tabpanel" id="case-panel-submission" aria-labelledby="case-tab-submission">
+            <h2>Review package</h2>
+            <p>Download the evidence packet for review. Submissions are disabled for all cases.</p>
+            {pdfError && <p role="alert">{pdfError}</p>}
+            <Button primary disabled={!canDownloadPdf} onClick={() => void downloadPdf()}>
+              <ArrowDownToLine size={18} />{pdfBusy ? 'Preparing PDF…' : 'Download evidence PDF'}
+            </Button>
+            <EvidencePacket current={current} content={draft} />
           </div>
         )}
       </div>
@@ -3551,7 +3407,7 @@ function Integrations({
   importCase: () => void;
   busy: boolean;
   stripeAction: (
-    action: "connect" | "sync" | "disconnect" | "submit",
+    action: "connect" | "sync" | "disconnect",
     body?: object,
   ) => Promise<void>;
   requestAccess: () => void;

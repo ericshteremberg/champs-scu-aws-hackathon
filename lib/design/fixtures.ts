@@ -61,21 +61,21 @@ const mainDraft: Draft = {
   content: `SYNTHETIC MERCHANT REVIEW DRAFT — NOT SUBMITTED
 
 CASE SUMMARY
-Mina Patel disputes the $248.00 payment for order #1048 because the parcel was not received. The selected payment export matches the order and billing email. [E1]
+Mina Patel disputes the $248.00 payment for order #1048 because the parcel was not received. The selected payment export matches the order and billing email. [e-payment]
 
 WHAT THE RECORDS SHOW
-October 28 — Payment was captured for order #1048. [E1]
-November 1 — The carrier recorded delivery at the front entrance. No photograph or recipient signature is present in the selected record. [E2]
-November 2 — The customer reported non-receipt and said they had checked the entrance and with a neighbor. [E3]
+October 28 — Payment was captured for order #1048. [e-payment]
+November 1 — The carrier recorded delivery at the front entrance. No photograph or recipient signature is present in the selected record. [e-delivery]
+November 2 — The customer reported non-receipt and said they had checked the entrance and with a neighbor. [e-email]
 
 CONFLICTING EVIDENCE
-The carrier event and the customer account differ. The delivery scan alone does not establish receipt by this customer. [E2, E3]
+The carrier event and the customer account differ. The delivery scan alone does not establish receipt by this customer. [e-delivery] [e-email]
 
 MISSING INFORMATION
 Request the delivery photograph or recipient confirmation for this shipment only. Do not characterize the customer's report as false without additional evidence.
 
 RECOMMENDED NEXT STEP
-Review the original records, resolve the delivery discrepancy if possible, and decide whether the available evidence supports a response. The applicable policy calls for a carrier investigation. [E4]
+Review the original records, resolve the delivery discrepancy if possible, and decide whether the available evidence supports a response. The applicable policy calls for a carrier investigation. [e-policy]
 
 Approval applies only to this saved revision. The issuing bank decides the dispute outcome.`,
 };
@@ -115,7 +115,7 @@ const customerCase: DisputeCase = {
     { kind: 'conflict', title: 'The records support the customer account', detail: 'The acknowledged cancellation preceded the renewal charge. The collected evidence does not support claiming that the customer authorized this renewal.', evidenceIds: ['e-cancellation', 'e-renewal'] },
     { kind: 'missing', title: 'Confirm whether a refund was issued', detail: 'Check the relevant refund record before choosing the next action. The selected export does not establish that no refund exists elsewhere.', evidenceIds: ['e-renewal'] },
   ],
-  draft: { revision: 1, status: 'draft', method: 'evidence_template', generatedAt: REVIEWED_AT, content: 'SYNTHETIC MERCHANT REVIEW DRAFT — NOT SUBMITTED\n\nJess Moreno disputes a $79.00 renewal after cancellation. The selected support thread acknowledged cancellation on October 26. [E1] A renewal payment was captured November 1. [E2]\n\nThe available records support the customer’s account. Confirm the refund status and review an appropriate resolution instead of preparing an unsupported denial. This draft does not accept the dispute or issue a refund.' },
+  draft: { revision: 1, status: 'draft', method: 'evidence_template', generatedAt: REVIEWED_AT, content: 'SYNTHETIC MERCHANT REVIEW DRAFT — NOT SUBMITTED\n\nJess Moreno disputes a $79.00 renewal after cancellation. The selected support thread acknowledged cancellation on October 26. [e-cancellation] A renewal payment was captured November 1. [e-renewal]\n\nThe available records support the customer’s account. Confirm the refund status and review an appropriate resolution instead of preparing an unsupported denial. This draft does not accept the dispute or issue a refund.' },
 };
 
 function lifecycleCase(id: string, status: DisputeCase['status'], name: string, order: string, amount: number): DisputeCase {
