@@ -1,0 +1,24 @@
+{
+  "id": "com.blacklabelcreators.causality",
+  "version": "0.1.0",
+  "name": "Causality",
+  "icon": "./icon.png",
+  "distribution_type": "public",
+  "stripe_api_access_type": "oauth",
+  "allowed_redirect_uris": [
+    "https://causality-hackathon-dev.slidah60.workers.dev/api/providers/stripe/callback"
+  ],
+  "permissions": [
+    {
+      "permission": "dispute_read",
+      "purpose": "Read the selected payment dispute and its evidence requirements for investigation."
+    },
+    {
+      "permission": "charge_read",
+      "purpose": "Read the disputed payment and refund history to match payment records to the selected case."
+    }
+  ],
+  "ui_extension": {
+    "views": []
+  }
+}

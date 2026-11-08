@@ -1,0 +1,12 @@
+{
+  "name": "Causality",
+  "organization": "Glowchat",
+  "appId": "4ae2f41e-b308-4f76-af4d-56b110d0dbd0",
+  "clientId": "708982e7-e164-45b1-b230-7f3d1d2cf48b",
+  "website": "https://causality-hackathon-dev.slidah60.workers.dev",
+  "redirectUri": "https://causality-hackathon-dev.slidah60.workers.dev/api/providers/supabase/callback",
+  "scopes": ["projects:read", "database:read"],
+  "secretArn": "arn:aws:secretsmanager:us-east-1:156129572861:secret:causality/dev/oauth/supabase-cWTJnA",
+  "region": "us-east-1",
+  "customerAuthorizationTested": false
+}
