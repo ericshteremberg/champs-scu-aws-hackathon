@@ -80,3 +80,8 @@ Deployed November 8, 2026 from source commit `649bc5a` to the AWS API, investiga
 The Report and Review package action areas include an enabled “Send to Stripe” button for presentation only. It is a plain `type="button"` element with no event handler, form submission, navigation or API call. Its tooltip identifies it as demo-only. It does not show a success state or change case status. Real Stripe submissions remain disabled on the backend. Testing is left to the team as requested.
 
 Demo button deployed November 8, 2026 from source `7307978` to Worker `13f51efd-81ce-436c-9491-5166d7949846`. The frontend build and deployment completed; no test suite was run at the user’s request. The four seeded sample cases were subsequently removed from the live workspace, leaving Mason and Thomas for the presentation.
+
+
+## Persuasive merchant voice
+
+The Bedrock draft and correction instructions now prioritize a firm first-person merchant rebuttal, strongest contradiction first, precise dates/amounts/order links, short relevant quotations, and an explicit explanation after each fact table. Independent corroboration supports the argument; duplicate exports do not count as independent sources. The closing synthesizes the strongest supported grounds for reversal. Generic caveats are consolidated, while material uncertainty and counterevidence remain. No unsupported accusations, inferred agreement from silence, or stronger factual claims are introduced. This changes newly generated responses only. Testing remains with the team as requested.
