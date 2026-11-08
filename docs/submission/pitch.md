@@ -41,6 +41,18 @@ It does not issue refunds, message customers, decide disputes, or guarantee reco
 
 If a live model call is slow, switch to the recorded backup and say it is a recording. A deterministic sample or replay must never be described as live AWS inference.
 
+## Evaluation evidence (observed, 2026-11-07)
+
+Six live Bedrock runs over the three fictional cases are recorded in [`../evaluation/results.md`](../evaluation/results.md). What we can say:
+
+- Every citation resolved to a real record (53 of 53), and no run claimed receipt or failed delivery for ATM-1044 from missing history.
+- No run omitted ATM-1043's counterevidence (bounces, undelivered SMS, failed resend, pre-event complaint).
+- The runs also overstated things. ATM-1042's summaries said the tickets were "delivered" although only the SMS was marked delivered; ATM-1043's drafts said the customer "did not attend", which nothing in the case says; some drafts gave advice on refunds or likely outcomes. These are reported as open issues, not fixed.
+
+This is why the review step exists. The sentence to edit in the demo (1:30-2:00) should be a real one from the run on screen, for example replacing "delivered" with "SMS marked delivered; email accepted by the provider". Say that a person made the edit. Do not describe the model as accurate in general: it is two runs per case on fictional data.
+
+If a recording uses a particular run, record its run ID in the manifest and do not choose a run only because it reads better without saying so.
+
 ## Claims we make, and claims we do not
 
 Make:

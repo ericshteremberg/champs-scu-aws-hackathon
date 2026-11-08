@@ -23,9 +23,10 @@ Links to re-check by hand: <https://aws.scuacm.com/>, <https://a10-x-aws-hack-26
 
 ## Evaluation (from the handoff)
 
-- [ ] Three evaluation cases run and reviewed claim by claim against sources ([results.md](../evaluation/results.md)). Currently all **not run**.
-- [ ] Reasoning failures sent to Aiden; interaction problems sent to Eric; affected cases rerun.
-- [ ] Unresolved limitations disclosed in the results file and in the submission text.
+- [x] Three evaluation cases run live (two runs each, 2026-11-07) and compared claim by claim against the fixtures ([results.md](../evaluation/results.md)). AI-assisted; human confirmation still **open**.
+- [ ] Human source-level review of the material findings, ideally with Aiden.
+- [ ] Reasoning failures sent to Aiden; interaction problem sent to Eric (drafted in results.md, not sent); affected cases rerun after fixes.
+- [x] Unresolved limitations disclosed in the results file. Still to add to the submission text.
 
 ## Presentation and recording
 

@@ -1,0 +1,671 @@
+{
+  "order": "ATM-1043",
+  "caseId": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043",
+  "startedAt": "2026-11-08T02:19:09.459Z",
+  "finishedAt": "2026-11-08T02:19:29.404Z",
+  "repoCommit": "994158b",
+  "backendLambda": {
+    "name": "causality-hackathon-backend",
+    "lastModified": "2026-11-08T01:36:07.000+0000",
+    "codeSha256": "rX+Z9iqF7AqE+qKr84Q6sa6m5+lNdOx8LFnXwaZkSfs="
+  },
+  "inputProvenance": "synthetic fixture (lib/ticket-demo.ts) seeded into a fresh throwaway workspace",
+  "run": {
+    "id": "run_501011c7-bb63-4426-97ea-6ac5e776f6e2",
+    "caseId": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043",
+    "status": "completed",
+    "mode": "bedrock",
+    "startedAt": "2026-11-08T02:19:09.552Z",
+    "finishedAt": "2026-11-08T02:19:28.175Z",
+    "modelId": "us.amazon.nova-2-lite-v1:0",
+    "events": [
+      {
+        "at": "2026-11-08T02:19:09.778Z",
+        "detail": "Amazon Bedrock will investigate the evidence available to this case.",
+        "id": "809581df-a42e-40ae-ba0d-330c17dcb5d4",
+        "title": "Investigation started",
+        "type": "started"
+      },
+      {
+        "at": "2026-11-08T02:19:09.873Z",
+        "detail": "Reading summary records for this case.",
+        "id": "a36255d4-6665-4683-bde1-ddbcbb52bf1e",
+        "section": "summary",
+        "title": "Checking summary",
+        "type": "tool_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:10.053Z",
+        "detail": "Source records are available for review.",
+        "evidenceIds": [
+          "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:dispute",
+          "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:payment"
+        ],
+        "id": "5bb61b8f-4b6f-41b3-a9e4-d0109cfbf2d9",
+        "latencyMs": 27,
+        "section": "summary",
+        "title": "2 summary records retrieved",
+        "type": "tool_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:10.133Z",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "284f3bd6-433a-4826-8b1b-58d8ae13123d",
+        "title": "Reviewing the evidence",
+        "type": "model_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:11.398Z",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "f992e709-39b0-4400-af6a-6794d9bdfc16",
+        "title": "Model response received",
+        "type": "model_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:11.473Z",
+        "detail": "Reading order records for this case.",
+        "id": "2bb42529-3892-4281-b54b-3992c0cc16e4",
+        "section": "order",
+        "title": "Checking order",
+        "type": "tool_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:11.553Z",
+        "detail": "Source records are available for review.",
+        "evidenceIds": [
+          "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:order"
+        ],
+        "id": "6f2bec66-76b6-4d16-ae5e-1db411ca4d5c",
+        "latencyMs": 19,
+        "section": "order",
+        "title": "1 order record retrieved",
+        "type": "tool_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:11.633Z",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "5102be6e-d6c4-42d7-b2ca-15359ff34d58",
+        "title": "Reviewing the evidence",
+        "type": "model_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:12.256Z",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "ef137272-7c03-4b20-a3c4-44c74b1e6fa9",
+        "title": "Model response received",
+        "type": "model_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:12.333Z",
+        "detail": "Reading tickets records for this case.",
+        "id": "ee8366a6-0b48-444e-80af-ae631865b396",
+        "section": "tickets",
+        "title": "Checking tickets",
+        "type": "tool_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:12.413Z",
+        "detail": "Source records are available for review.",
+        "evidenceIds": [
+          "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:ticket"
+        ],
+        "id": "69d52b68-3ce9-4bea-8bdf-a6eb16c68ae2",
+        "latencyMs": 18,
+        "section": "tickets",
+        "title": "1 tickets record retrieved",
+        "type": "tool_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:12.481Z",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "85da1d19-a946-4de6-91b7-63e14a39d54b",
+        "title": "Reviewing the evidence",
+        "type": "model_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:13.763Z",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "8ed64771-9c75-4fc4-9187-fc6d503d075f",
+        "title": "Model response received",
+        "type": "model_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:13.954Z",
+        "detail": "Reading delivery records for this case.",
+        "id": "b7d38876-b0b4-45b6-84cf-d89addee5cec",
+        "section": "delivery",
+        "title": "Checking delivery",
+        "type": "tool_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:14.194Z",
+        "detail": "These records cover the listed delivery attempts. They do not prove that every possible delivery route failed.",
+        "evidenceIds": [
+          "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:email",
+          "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:retry",
+          "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:sms"
+        ],
+        "id": "9f08f418-4574-4a27-8c90-9d46a312bcd7",
+        "latencyMs": 101,
+        "section": "delivery",
+        "title": "3 delivery records retrieved",
+        "type": "tool_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:14.258Z",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "a21947d4-0d1a-4e21-8a10-b8cc86f19653",
+        "title": "Reviewing the evidence",
+        "type": "model_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:15.553Z",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "14ed159a-b92d-4693-bc2e-5b7548ababed",
+        "title": "Model response received",
+        "type": "model_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:15.633Z",
+        "detail": "Reading support records for this case.",
+        "id": "327f23c2-407a-455a-abe2-9c473e93c38c",
+        "section": "support",
+        "title": "Checking support",
+        "type": "tool_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:15.693Z",
+        "detail": "The selected export contains two messages. Other conversations have not been verified.",
+        "evidenceIds": [
+          "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:support-1",
+          "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:support-2"
+        ],
+        "id": "3042f233-e603-45f4-8ba6-6ea59aae2067",
+        "latencyMs": 15,
+        "section": "support",
+        "title": "2 support records retrieved",
+        "type": "tool_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:15.760Z",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "a2157059-d6b7-4150-b57c-9503e7acc955",
+        "title": "Reviewing the evidence",
+        "type": "model_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:17.053Z",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "b0f4bbbe-acab-4ae5-ac91-806467a877be",
+        "title": "Model response received",
+        "type": "model_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:17.153Z",
+        "detail": "Reading history records for this case.",
+        "id": "5fd13e01-2436-4489-a7f5-25fd819e291b",
+        "section": "history",
+        "title": "Checking history",
+        "type": "tool_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:17.233Z",
+        "detail": "No successful order-recovery record is available. Missing recovery history does not prove the customer never accessed the account.",
+        "evidenceIds": [
+          "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:resend"
+        ],
+        "id": "ab1f472a-2bbd-4288-b921-316c77f06ea9",
+        "latencyMs": 17,
+        "section": "history",
+        "title": "1 history record retrieved",
+        "type": "tool_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:17.300Z",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "b6837d4a-ad11-41f1-8e01-04fa60853aed",
+        "title": "Reviewing the evidence",
+        "type": "model_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:18.673Z",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "16bda77a-7c0a-49e8-a20c-c388e6fe8298",
+        "title": "Model response received",
+        "type": "model_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:18.738Z",
+        "detail": "Reading attendance records for this case.",
+        "id": "9dbf96d3-43c5-4f27-8e96-509dda582f9d",
+        "section": "attendance",
+        "title": "Checking attendance",
+        "type": "tool_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:18.813Z",
+        "detail": "No attendance records are attached to this case. This does not establish that an event did not occur.",
+        "evidenceIds": [],
+        "id": "dc12d63d-4947-4717-9981-29d75866054f",
+        "latencyMs": 18,
+        "section": "attendance",
+        "title": "attendance evidence unavailable",
+        "type": "tool_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:18.899Z",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "269b8093-bf5b-4c2d-a020-47602bb6d590",
+        "title": "Reviewing the evidence",
+        "type": "model_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:20.213Z",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "7dc0b3fd-fbde-4a93-9175-31c3954a6155",
+        "title": "Model response received",
+        "type": "model_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:20.278Z",
+        "detail": "Reading policy records for this case.",
+        "id": "6b42de95-a75e-4134-b990-9aa25477330e",
+        "section": "policy",
+        "title": "Checking policy",
+        "type": "tool_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:20.377Z",
+        "detail": "No policy records are attached to this case. This does not establish that an event did not occur.",
+        "evidenceIds": [],
+        "id": "1893a544-e85f-4930-a7ec-ea160d0bb2a3",
+        "latencyMs": 36,
+        "section": "policy",
+        "title": "policy evidence unavailable",
+        "type": "tool_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:20.493Z",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "8779ff01-738c-4d01-92b1-4dc23b616760",
+        "title": "Reviewing the evidence",
+        "type": "model_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:25.133Z",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "4a251448-73a7-460d-b43e-da20c0be6da1",
+        "title": "Model response received",
+        "type": "model_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:25.213Z",
+        "detail": "The report cites records that were not retrieved for this case.",
+        "id": "c02e23a7-a70b-4c5a-9e87-7fac3f3fe9af",
+        "title": "Request blocked",
+        "type": "blocked"
+      },
+      {
+        "at": "2026-11-08T02:19:25.293Z",
+        "detail": "Amazon Bedrock is selecting the next evidence request or preparing sourced findings.",
+        "id": "d47c6c12-0dc5-4796-b33d-bccad0c9f7c9",
+        "title": "Reviewing the evidence",
+        "type": "model_requested"
+      },
+      {
+        "at": "2026-11-08T02:19:28.036Z",
+        "detail": "Requested actions and citations are being validated.",
+        "id": "6c02fa72-81b4-4a77-8dd3-8b1af8f39461",
+        "title": "Model response received",
+        "type": "model_completed"
+      },
+      {
+        "at": "2026-11-08T02:19:28.113Z",
+        "detail": "The sourced response is ready for merchant review. Nothing was submitted to Stripe.",
+        "id": "bbe0e198-3960-4549-b70d-2d7e66e8c952",
+        "title": "Investigation complete",
+        "type": "completed"
+      }
+    ]
+  },
+  "draft": {
+    "analysis": {
+      "assessment": "insufficient",
+      "evidenceIds": [
+        "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:payment",
+        "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:order",
+        "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:ticket",
+        "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:email",
+        "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:retry",
+        "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:sms",
+        "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:support-1",
+        "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:support-2",
+        "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:dispute",
+        "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:resend"
+      ],
+      "findings": [
+        {
+          "detail": "A payment of USD 75.00 was captured for order ATM-1043.",
+          "evidenceIds": [
+            "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:payment"
+          ],
+          "kind": "supported",
+          "title": "Payment captured"
+        },
+        {
+          "detail": "The ticket for order ATM-1043 was issued but not scanned.",
+          "evidenceIds": [
+            "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:order",
+            "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:ticket"
+          ],
+          "kind": "supported",
+          "title": "Ticket issued"
+        },
+        {
+          "detail": "Email and SMS delivery attempts for the ticket failed due to mailbox unavailability and undelivered status.",
+          "evidenceIds": [
+            "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:email",
+            "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:retry",
+            "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:sms"
+          ],
+          "kind": "supported",
+          "title": "Delivery attempts failed"
+        },
+        {
+          "detail": "The customer contacted support before the event, reporting that they did not receive the ticket.",
+          "evidenceIds": [
+            "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:support-1"
+          ],
+          "kind": "supported",
+          "title": "Customer contacted support"
+        },
+        {
+          "detail": "The organizer promised to resend the ticket after the customer's complaint.",
+          "evidenceIds": [
+            "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:support-2"
+          ],
+          "kind": "supported",
+          "title": "Organizer promised resend"
+        },
+        {
+          "detail": "No attendance records are available to confirm or refute the customer's claim of non-attendance.",
+          "evidenceIds": [],
+          "kind": "missing",
+          "title": "Attendance records"
+        }
+      ],
+      "gaps": [
+        "No attendance records are available to confirm or refute the customer's claim of non-attendance.",
+        "These records cover the listed delivery attempts. They do not prove that every possible delivery route failed.",
+        "The selected export contains two messages. Other conversations have not been verified.",
+        "No successful order-recovery record is available. Missing recovery history does not prove the customer never accessed the account.",
+        "No attendance records are attached to this case. This does not establish that an event did not occur.",
+        "Missing scan records do not establish nonattendance. A scan alone does not establish cardholder identity.",
+        "No policy records are attached to this case. This does not establish that an event did not occur.",
+        "Current terms do not establish which disclosures were shown at purchase time.",
+        "Attendance evidence is unavailable.",
+        "Policy evidence is unavailable."
+      ],
+      "metrics": {
+        "durationMs": 18334,
+        "modelCalls": 9,
+        "recordCount": 10,
+        "toolCalls": 8
+      },
+      "modelId": "us.amazon.nova-2-lite-v1:0",
+      "recommendation": "The merchant should consider providing additional evidence of delivery attempts or alternative delivery methods. If the customer did not receive the ticket despite multiple attempts, the merchant may need to evaluate their delivery processes. However, without further evidence of attendance, the dispute cannot be fully resolved at this time.",
+      "summary": "This case involves a customer who claims they did not receive a ticket for order ATM-1043 and therefore did not attend the event. The customer contacted support before the event, and the organizer attempted to resend the ticket. However, the delivery attempts failed due to mailbox unavailability and undelivered SMS. No attendance records are available."
+    },
+    "caseId": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043",
+    "content": "The customer claims they did not receive a ticket for order ATM-1043 and therefore did not attend the event [ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:dispute]. The payment was captured successfully [ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:payment], and the order contains one general-admission ticket [ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:order]. The ticket was issued but not scanned [ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:ticket]. Delivery attempts via email and SMS failed due to mailbox unavailability and undelivered status [ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:email][ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:retry][ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:sms]. The customer contacted support before the event, reporting the issue [ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:support-1], and the organizer promised to resend the ticket [ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:support-2]. A resend was requested, but it also failed [ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:resend]. No attendance records are available.\n\nSOURCE LIMITATIONS\n- No attendance records are available to confirm or refute the customer's claim of non-attendance.\n- These records cover the listed delivery attempts. They do not prove that every possible delivery route failed.\n- The selected export contains two messages. Other conversations have not been verified.\n- No successful order-recovery record is available. Missing recovery history does not prove the customer never accessed the account.\n- No attendance records are attached to this case. This does not establish that an event did not occur.\n- Missing scan records do not establish nonattendance. A scan alone does not establish cardholder identity.\n- No policy records are attached to this case. This does not establish that an event did not occur.\n- Current terms do not establish which disclosures were shown at purchase time.\n- Attendance evidence is unavailable.\n- Policy evidence is unavailable.",
+    "generatedAt": "2026-11-08T02:19:28.175Z",
+    "method": "bedrock",
+    "revision": 1,
+    "sourceRevision": 10,
+    "status": "draft",
+    "sourceStale": false
+  },
+  "evidence": [
+    {
+      "caseId": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043",
+      "content": "The ticket email never arrived. I contacted support before the event.",
+      "id": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:dispute",
+      "occurredAt": "2026-11-06T18:42:00Z",
+      "provenance": {
+        "fields": {
+          "amount": 7500,
+          "currency": "USD",
+          "disputeStatus": "needs_response",
+          "evidenceDueAt": "2026-11-11T07:59:00Z",
+          "reason": "product_not_received"
+        },
+        "limitations": [],
+        "originalSourceId": "dp_demo_atm-1043",
+        "section": "summary",
+        "sourceMode": "synthetic"
+      },
+      "reference": "Synthetic: dp_demo_atm-1043",
+      "source": "stripe",
+      "title": "Dispute requires a response"
+    },
+    {
+      "caseId": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043",
+      "content": "The email delivery attempt returned a permanent mailbox error.",
+      "id": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:email",
+      "occurredAt": "2026-11-04T02:24:35Z",
+      "provenance": {
+        "fields": {
+          "channel": "email",
+          "delivered": false,
+          "errorCode": "mailbox_unavailable",
+          "orderRef": "ATM-1043",
+          "providerStatus": "bounced",
+          "read": null
+        },
+        "limitations": [
+          "These records cover the listed delivery attempts. They do not prove that every possible delivery route failed."
+        ],
+        "originalSourceId": "email_demo_1043",
+        "section": "delivery",
+        "sourceMode": "synthetic"
+      },
+      "reference": "Synthetic: email_demo_1043",
+      "source": "database",
+      "title": "Confirmation email bounced"
+    },
+    {
+      "caseId": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043",
+      "content": "Order ATM-1043 contains one general-admission ticket to Warehouse Sessions.",
+      "id": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:order",
+      "occurredAt": "2026-11-04T02:24:00Z",
+      "provenance": {
+        "fields": {
+          "currency": "USD",
+          "eventStartsAt": "2026-11-06T05:00:00Z",
+          "eventTimezone": "America/Los_Angeles",
+          "fees": 500,
+          "orderRef": "ATM-1043",
+          "paymentRef": "pi_demo_atm_1043",
+          "quantity": 1,
+          "status": "paid",
+          "subtotal": 7000,
+          "total": 7500
+        },
+        "limitations": [],
+        "originalSourceId": "order_demo_1043",
+        "section": "order",
+        "sourceMode": "synthetic"
+      },
+      "reference": "Synthetic: order_demo_1043",
+      "source": "database",
+      "title": "Paid order for one ticket"
+    },
+    {
+      "caseId": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043",
+      "content": "A fictional USD 75.00 payment maps to order ATM-1043.",
+      "id": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:payment",
+      "occurredAt": "2026-11-04T02:24:00Z",
+      "provenance": {
+        "fields": {
+          "amount": 7500,
+          "chargeCaptured": true,
+          "currency": "USD",
+          "disputeStatus": "needs_response",
+          "liveMode": false,
+          "orderRef": "ATM-1043",
+          "paymentRef": "pi_demo_atm_1043",
+          "refundAmount": 0,
+          "stripeAccount": "acct_demo_atmsphr"
+        },
+        "limitations": [],
+        "originalSourceId": "pi_demo_atm_1043",
+        "section": "summary",
+        "sourceMode": "synthetic"
+      },
+      "reference": "Synthetic: pi_demo_atm_1043",
+      "source": "stripe",
+      "title": "Payment captured"
+    },
+    {
+      "caseId": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043",
+      "content": "A resend was requested after the support complaint. Its provider outcome is recorded in delivery evidence.",
+      "id": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:resend",
+      "occurredAt": "2026-11-04T12:05:00Z",
+      "provenance": {
+        "fields": {
+          "action": "resend_requested",
+          "deliverySourceId": "email_demo_1043_retry",
+          "orderRef": "ATM-1043",
+          "recoveryCompleted": false
+        },
+        "limitations": [
+          "No successful order-recovery record is available. Missing recovery history does not prove the customer never accessed the account."
+        ],
+        "originalSourceId": "resend_demo_1043",
+        "section": "history",
+        "sourceMode": "synthetic"
+      },
+      "reference": "Synthetic: resend_demo_1043",
+      "source": "database",
+      "title": "Organizer requested a resend"
+    },
+    {
+      "caseId": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043",
+      "content": "A later resend to the same recipient returned another permanent failure.",
+      "id": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:retry",
+      "occurredAt": "2026-11-04T12:05:18Z",
+      "provenance": {
+        "fields": {
+          "channel": "email",
+          "delivered": false,
+          "errorCode": "mailbox_unavailable",
+          "orderRef": "ATM-1043",
+          "providerStatus": "bounced",
+          "read": null
+        },
+        "limitations": [
+          "These records cover the listed delivery attempts. They do not prove that every possible delivery route failed."
+        ],
+        "originalSourceId": "email_demo_1043_retry",
+        "section": "delivery",
+        "sourceMode": "synthetic"
+      },
+      "reference": "Synthetic: email_demo_1043_retry",
+      "source": "database",
+      "title": "Resent email also bounced"
+    },
+    {
+      "caseId": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043",
+      "content": "The SMS provider returned an undelivered result. No successful SMS attempt is present in the case records.",
+      "id": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:sms",
+      "occurredAt": "2026-11-04T02:25:12Z",
+      "provenance": {
+        "fields": {
+          "channel": "sms",
+          "delivered": false,
+          "errorCode": "30003",
+          "orderRef": "ATM-1043",
+          "providerStatus": "undelivered",
+          "read": null
+        },
+        "limitations": [
+          "These records cover the listed delivery attempts. They do not prove that every possible delivery route failed."
+        ],
+        "originalSourceId": "sms_demo_1043",
+        "section": "delivery",
+        "sourceMode": "synthetic"
+      },
+      "reference": "Synthetic: sms_demo_1043",
+      "source": "database",
+      "title": "Ticket-link SMS was undelivered"
+    },
+    {
+      "caseId": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043",
+      "content": "Fictional customer message: \"Order ATM-1043 was charged, but I have not received an email or text. Can you help before tomorrow?\"",
+      "id": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:support-1",
+      "occurredAt": "2026-11-04T11:40:00Z",
+      "provenance": {
+        "fields": {
+          "customerAcknowledgedReceipt": false,
+          "messageRole": "customer",
+          "orderRef": "ATM-1043",
+          "threadMatch": "explicit_order_reference"
+        },
+        "limitations": [
+          "The selected export contains two messages. Other conversations have not been verified."
+        ],
+        "originalSourceId": "thread_demo_1043:message_1",
+        "section": "support",
+        "sourceMode": "synthetic"
+      },
+      "reference": "Synthetic: thread_demo_1043:message_1",
+      "source": "manual",
+      "title": "Customer reported missing delivery before the event"
+    },
+    {
+      "caseId": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043",
+      "content": "Fictional organizer message: \"I will resend the ticket confirmation for ATM-1043 now.\" No later receipt acknowledgement is in this export.",
+      "id": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:support-2",
+      "occurredAt": "2026-11-04T12:04:00Z",
+      "provenance": {
+        "fields": {
+          "customerAcknowledgedReceipt": false,
+          "messageRole": "organizer",
+          "orderRef": "ATM-1043",
+          "threadMatch": "explicit_order_reference"
+        },
+        "limitations": [
+          "The selected export contains two messages. Other conversations have not been verified."
+        ],
+        "originalSourceId": "thread_demo_1043:message_2",
+        "section": "support",
+        "sourceMode": "synthetic"
+      },
+      "reference": "Synthetic: thread_demo_1043:message_2",
+      "source": "manual",
+      "title": "Organizer promised another delivery attempt"
+    },
+    {
+      "caseId": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043",
+      "content": "The ticket exists in the order record. The application has no recorded customer acknowledgement of access.",
+      "id": "ws_0cbd016619289a4dcbb163927a1c6b5563366c1f_case_atm_1043:ticket",
+      "occurredAt": "2026-11-04T02:24:05Z",
+      "provenance": {
+        "fields": {
+          "orderRef": "ATM-1043",
+          "scanRecorded": false,
+          "ticketStatus": "issued",
+          "transferredFrom": null,
+          "transferredTo": null
+        },
+        "limitations": [],
+        "originalSourceId": "ticket_demo_1043",
+        "section": "tickets",
+        "sourceMode": "synthetic"
+      },
+      "reference": "Synthetic: ticket_demo_1043",
+      "source": "database",
+      "title": "Ticket issued in the application"
+    }
+  ]
+}
