@@ -20,6 +20,59 @@ These are two runs per case on a model that is not deterministic. Two runs show 
 
 Repository commit when the runs were made: `994158b` (application code unchanged from `62f3adc`; baseline `e78d7a1`). The deployed backend Lambda is a separate artifact: `causality-hackathon-backend`, code SHA-256 `rX+Z9iqF7AqE+qKr84Q6sa6m5+lNdOx8LFnXwaZkSfs=`, last modified 2026-11-08T01:36:07Z. That is about 40 minutes before the runs, so someone redeployed it. Which source commit that deployment came from is not recorded in the Lambda configuration and has not been verified.
 
+## Label and field definitions
+
+These definitions are the standard the review below uses. They follow the wording the interface already shows the organizer (`components/workspace/workspace-app.tsx`): `supported` shows "Evidence supports a response.", `mixed` shows "The evidence needs a closer look.", and `insufficient` shows "More evidence is needed." They are also what the investigator's prompt should say, because the prompt currently never defines them.
+
+The assessment is a signal about the evidence for the person reviewing the draft. It is not a ruling on the dispute and not a prediction of the bank's decision.
+
+| Label | Meaning | Use it when | Expected here |
+| --- | --- | --- | --- |
+| `supported` | The records contradict the customer's claim directly, so the organizer has a sourced response to give. | A record shows the thing the customer says did not happen (for example the customer's own message saying they found the tickets), and nothing material points the other way. | ATM-1042 |
+| `mixed` | The records point in both directions, or they materially back the customer's claim. The organizer needs to look closely before responding. | Evidence supports the customer on some points and the organizer on others, or the records mostly confirm the complaint. | ATM-1043 |
+| `insufficient` | The records cannot show either side of the claim. | The key facts are missing, so neither delivery nor failure can be established. | ATM-1044 |
+
+Notes on the definitions:
+
+- `mixed` deliberately also covers "the records back the customer". With only three values there is no honest place for that case, and `insufficient` would tell the organizer to find more evidence when the evidence is already conclusive in the customer's favor. A fourth value (for example `contradicted`, meaning the records support the customer's claim) would be cleaner. That is a schema and interface change for Aiden to decide.
+- `supported` does not mean the merchant will win. It means the records give the organizer something sourced to respond with.
+- Missing records never push a case toward `supported` or toward the customer. They are gaps. Absence of delivery history is neither delivery nor failure.
+
+| Field | Purpose | What it must not do |
+| --- | --- | --- |
+| `summary` | Restate the customer's claim in the customer's own words and say what the records show. | Add claims the customer did not make (for example non-attendance). |
+| `findings` | One sourced point each, tagged supported, conflict or missing. Each cited record must itself contain the fact in the sentence. | Cite a record that merely relates to the fact, such as a resend request for a bounce. |
+| `content` (the response draft) | A response the organizer could send after editing. Where the records support the organizer, it states the sourced facts persuasively. Where they support the customer, it says so plainly and does not argue against the claim. Where they are silent, it names what is missing. | Say "delivered" or "received" for the case as a whole unless the customer says so. Each channel gets its recorded status ("accepted", "marked delivered", "bounced", "undelivered"). |
+| `recommendation` | The organizer's next step about the evidence: which records to use, what to obtain, or that the records support a response. | Predict the bank's decision, suggest a refund, or say to close, contest or escalate the dispute. |
+| `gaps` | What the records cannot show, each stated once. | Turn absence into a negative ("no support interactions were recorded" is fine only if the source says no conversation was matched). |
+
+### Proposed prompt wording (for Aiden; not applied)
+
+The investigator prompt is in `lib/investigation/engine.ts`. These lines address the issues in the table below. They are suggestions only; this branch changes documentation, not application code.
+
+```text
+Compare the customer's claim with the records and draft the merchant's response using only
+facts the cited records state. Quote the customer's claim as the customer wrote it; do not
+add claims the customer did not make.
+
+assessment:
+- supported: the records directly contradict the claim; the organizer has a sourced response.
+- mixed: the records point both ways, or materially support the customer's claim.
+- insufficient: the key facts are missing, so neither side of the claim can be established.
+Missing records are gaps, never evidence for either side.
+
+Describe each delivery channel by its recorded status (accepted, marked delivered, bounced,
+undelivered). Say "delivered" or "received" for the case as a whole only if a record shows it
+(for example the customer's own acknowledgement). Provider acceptance is not receipt.
+
+If the records support the customer, say so plainly. Do not argue against a claim the records
+back. Each cited record must itself contain the fact in the sentence that cites it.
+
+recommendation: the organizer's next step about the evidence (which records to use, what to
+obtain). Do not predict the bank's decision or suggest refunds, closing, contesting or escalating.
+Give times in the event's recorded time zone.
+```
+
 ## Expected evidence facts
 
 Taken from the fixtures only. The "Source IDs" are the `originalSourceId` values a correct citation can point to.
@@ -146,11 +199,12 @@ Reasoning failures go to Aiden; interaction problems go to Eric. Include case, e
 | 1 | ATM-1042 | Reasoning | Aiden (drafted, not sent) | Email acceptance is not receipt. Say SMS was marked delivered and the customer found tickets in their account after recovery | Summary says tickets "delivered" in both runs. Run 2's body says the customer "received the tickets electronically" and recommends submitting "delivery confirmations" | `email_demo_1042`, `sms_demo_1042`, `thread_demo_1042:message_3`, `recovery_demo_1042` | 2 of 2 summaries; 1 of 2 bodies | Pending |
 | 2 | ATM-1043 | Reasoning | Aiden (drafted, not sent) | Describe the claim as written: the ticket email never arrived and the customer contacted support before the event | Both runs state the customer "therefore did not attend the event", citing the dispute record, which says no such thing. The recommendation then turns on attendance | `dp_demo_atm-1043` | 2 of 2 | Pending |
 | 3 | ATM-1043 | Reasoning | Aiden (drafted, not sent) | A citation should support its sentence. "Also failed" should cite the bounced retry | Run 1 cites the resend *request* record for a failure | `resend_demo_1043`, `email_demo_1043_retry` | 1 of 2 | Pending |
-| 4 | ATM-1043 | Reasoning | Aiden (drafted, not sent) | Preserve that the evidence supports the customer's complaint, and carry the "not every route" limit into the narrative | Label is "insufficient" in both runs and run 2 says "not delivered" flatly, although the limitations section says other routes are unverified | `email_demo_1043`, `sms_demo_1043`, `email_demo_1043_retry` | 2 of 2 labels | Pending |
-| 5 | ATM-1044 | Reasoning | Aiden (drafted, not sent) | Label matches the conclusion: insufficient evidence | Run 1 label is "supported" over a body that says delivery cannot be confirmed. Run 2 is "insufficient". The label is unstable | draft analysis, no single source | 1 of 2 | Pending |
+| 4 | ATM-1043 | Reasoning | Aiden (drafted, not sent) | Label `mixed` per the definitions above (the UI banner for `insufficient`, "More evidence is needed", is wrong when the records back the customer). Preserve that the evidence supports the complaint, and carry the "not every route" limit into the narrative | Label is "insufficient" in both runs and run 2 says "not delivered" flatly, although the limitations section says other routes are unverified | `email_demo_1043`, `sms_demo_1043`, `email_demo_1043_retry` | 2 of 2 labels | Pending |
+| 5 | ATM-1044 | Reasoning | Aiden (drafted, not sent) | Label `insufficient` per the definitions above, matching a body that says delivery cannot be confirmed | Run 1 label is "supported" over a body that says delivery cannot be confirmed. Run 2 is "insufficient". The label is unstable | draft analysis, no single source | 1 of 2 | Pending |
 | 6 | ATM-1042, ATM-1044 | Reasoning | Aiden (drafted, not sent) | Do not advise on refunds, closing, contesting or likely outcomes | "consider offering a refund" (1044 run 1); "may lean toward the customer" (1044 run 2); "closing the dispute as unresolved... or as supported" (1042 run 1); "contest the dispute" (1042 run 2); "escalated to a higher authority" (1043 run 2) | none | 5 of 6 runs have such a line | Pending |
 | 7 | ATM-1044 | Reasoning | Aiden (drafted, not sent) | State local time zone from the fixture, or avoid dates | "November 4, 2026" is the UTC date; the event is November 3 local | `order_demo_1044` | 1 of 2 | Pending |
 | 8 | ATM-1044 | Interaction | Eric (drafted, not sent) | Limitations read cleanly and are not repeated | Run 1 lists 17 limitation lines, many restating each other, with the stock phrase "does not establish that an event did not occur" attached to records that are not about an event | `gaps` list in the draft | Seen in 1044 run 1 | Pending |
+| 9 | All | Reasoning | Aiden (drafted, not sent) | The `content` field is the "Merchant response draft": something the organizer could send after editing. Where records support the organizer (ATM-1042), it should state the sourced facts as a response; where they support the customer (ATM-1043), say so plainly; where silent (ATM-1044), name what is missing | Drafts read as third-person case recaps ("This case involves a customer who claims...", "We have a payment captured..."), not as a response to the issuer. Only ATM-1042 run 2 argues a position, and it overreaches (issue 1) | all six saved drafts | 6 of 6 recaps | Pending |
 
 ## Disclosed limitations
 
