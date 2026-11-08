@@ -4,6 +4,11 @@ import { useEffect, useRef } from "react";
 import { receiptMarkup } from "./receipt-markup";
 import { EvidenceHero } from "./evidence-hero";
 
+// Frame the artwork to the wordmark bounds, retaining half a unit for its outline.
+const framedReceiptMarkup = receiptMarkup
+  .replace('viewBox="0 0 1296 280"', 'viewBox="111.43 17.5 1073.14 245"')
+  .replace('width="1296" height="280"', 'width="1073.14" height="245"');
+
 export function HeroVisual() {
   return <EvidenceHero />;
 }
@@ -41,5 +46,5 @@ export function ReceiptReveal() {
     update();
     return () => { cancelAnimationFrame(frame); window.removeEventListener("scroll", schedule); window.removeEventListener("resize", schedule); reducedMotion.removeEventListener("change", schedule); };
   }, []);
-  return <div className="landing-receipt-art" ref={artRef} dangerouslySetInnerHTML={{ __html: receiptMarkup }} />;
+  return <div className="landing-receipt-art" ref={artRef} dangerouslySetInnerHTML={{ __html: framedReceiptMarkup }} />;
 }
