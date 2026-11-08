@@ -35,7 +35,7 @@ for (const [address, prefix] of [
   ['2620:4f:8000::', 48], ['3fff::', 20],
 ] as const) deniedV6.addSubnet(address, prefix, 'ipv6');
 
-function publicAddress(address: string): boolean {
+export function publicAddress(address: string): boolean {
   const family = isIP(address);
   if (family === 4) return !deniedV4.check(address, 'ipv4');
   if (family === 6) return globalV6.check(address, 'ipv6') && !deniedV6.check(address, 'ipv6');

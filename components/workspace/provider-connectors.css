@@ -26,3 +26,11 @@
 .cw-gmail-card p, .cw-gmail-preview h4 { overflow-wrap: anywhere; }
 .cw-gmail-preview { margin-top: 20px; padding: 16px; border: 1px solid var(--cw-border, #dededb); border-radius: 8px; }
 .cw-gmail-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow-y: auto; font: inherit; line-height: 1.6; }
+
+.cw-imap-card { grid-column: 1 / -1; grid-row: 3; }
+.cw-imap-card p, .cw-imap-card label { overflow-wrap: anywhere; }
+.cw-imap-card .cw-field { margin-top: 16px; }
+.cw-imap-form { display: grid; gap: 12px; }
+.cw-imap-form input:not([type="checkbox"]), .cw-imap-card select { width: 100%; min-width: 0; max-width: 100%; }
+.cw-imap-consent { display: flex; align-items: start; gap: 10px; line-height: 1.5; }
+.cw-imap-consent input { flex-shrink: 0; margin-top: 4px; }

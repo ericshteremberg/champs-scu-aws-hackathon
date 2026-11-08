@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Database, Link2, LoaderCircle, ShieldCheck, Unplug } from 'lucide-react';
 import type { ProviderStatus, SchemaTable, SupabaseConnection, SupabaseProject } from '../../lib/providers/types';
 import './provider-connectors.css';
+import { ImapConnector } from './imap-provider';
 import { GmailConnector } from './gmail-provider';
 import type { WorkspaceState } from '../../lib/domain';
 import { StripeAccountConnector } from './stripe-provider';
@@ -121,6 +122,7 @@ export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceStat
         </>}
       </article>
       <GmailConnector status={status?.gmail} cases={cases} onImported={onImported} onChange={connection => setStatus(current => current ? { ...current, gmail: { configured: current.gmail?.configured || false, connection } } : current)} />
+      <ImapConnector status={status?.imap} cases={cases} onImported={onImported} onChange={connection => setStatus(current => current ? { ...current, imap: { configured: current.imap?.configured || false, connection } } : current)} />
       <StripeAccountConnector status={status?.stripe} onChange={connection => setStatus(current => current ? { ...current, stripe: { ...current.stripe, connection } } : current)} />
     </div>
   </section>;

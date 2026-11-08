@@ -8,6 +8,7 @@ export type SupabaseConnection = {
   revocationPending?: boolean;
 };
 export type ProviderStatus = {
+  imap?: { configured: boolean; connection: ImapConnection | null };
   gmail?: { configured: boolean; connection: GmailConnection | null };
   supabase: { configured: boolean; connection: SupabaseConnection | null };
   stripe: { configured: boolean; connection?: StripeProviderConnection | null; reason?: string };
@@ -30,3 +31,7 @@ export type GmailConnection = {
 };
 export type GmailMessage = { id: string; threadId: string; subject: string; from: string; to: string; occurredAt: string };
 export type GmailPreview = GmailMessage & { text: string; truncated: boolean };
+
+export type ImapConnection = { status: 'disconnected' | 'authorized' | 'reconnect_required'; updatedAt: string; email?: string; host?: string; folders?: string[] };
+export type ImapMessage = { id: string; folder: string; subject: string; from: string; to: string; occurredAt: string };
+export type ImapPreview = ImapMessage & { text: string; truncated: boolean };

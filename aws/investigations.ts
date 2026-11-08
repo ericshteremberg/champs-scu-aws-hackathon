@@ -126,7 +126,7 @@ export async function startInvestigation(user: TrustedUser, caseId: string, mode
 function classify(row: Evidence): EvidenceSection {
   if (row.provenance && EVIDENCE_SECTIONS.includes(row.provenance.section as EvidenceSection)) return row.provenance.section as EvidenceSection;
   if (row.source === 'stripe') return 'summary';
-  if (row.source === 'gmail') return 'support';
+  if ((row.source === 'gmail' || row.source === 'imap')) return 'support';
   if (row.source === 'policy') return 'policy';
   const text = `${row.title} ${row.content}`;
   if (/scan|admission|attendance/i.test(text)) return 'attendance';

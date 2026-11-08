@@ -55,6 +55,7 @@ const sourceLabel = (s: string) =>
   ({
     stripe: "Stripe",
     gmail: "Customer email",
+    imap: "Customer email (IMAP)",
     database: "Company record",
     manual: "Manual evidence",
     policy: "Company policy",
