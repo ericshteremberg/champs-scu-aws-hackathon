@@ -40,12 +40,13 @@ async function setup(page: Page) {
   });
   await page.route("**/api/investigations", route => route.request().method() === "GET" ? route.fulfill({ json: { config: { bedrockConfigured: false, merchantConfigured: false, archiveConfigured: false, region: "us-east-1" } } }) : route.continue());
   await page.goto("/workspace?view=integrations");
+  await page.getByText("Custom data sources", { exact: false }).click();
   return { requests, connections, setError: (message: string) => { error = message; } };
 }
 
 async function fillConnection(page: Page, endpoint = "https://evidence.example.com") {
   const panel = page.getByRole("region", { name: "Installed evidence connections" });
-  await panel.getByRole("button", { name: "Connect installed endpoint", exact: true }).click();
+  await panel.getByRole("button", { name: "Add endpoint", exact: true }).click();
   await panel.getByRole("textbox", { name: "Connection name", exact: true }).fill(name);
   await panel.getByRole("textbox", { name: "Approved case ID", exact: true }).fill("approved_case_1042");
   await panel.getByLabel("Connector HTTPS base URL", { exact: false }).fill(endpoint);
@@ -65,9 +66,9 @@ test("a workspace connects, clears the secret, rechecks and imports through its 
   expect(requests[0]).toEqual({ action: "connect", name, baseUrl: "https://evidence.example.com", externalCaseId: "approved_case_1042", token });
   await expect(connection).toContainText("Example Ticket Business");
   await expect(connection).toContainText("ORDER-1042");
-  await panel.getByRole("button", { name: "Connect installed endpoint", exact: true }).click();
+  await panel.getByRole("button", { name: "Add endpoint", exact: true }).click();
   await expect(panel.getByLabel("Approved-case access token", { exact: false })).toHaveValue("");
-  await panel.getByRole("button", { name: "Close connection form", exact: true }).click();
+  await panel.getByRole("button", { name: "Cancel", exact: true }).click();
   expect(await page.evaluate(() => JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage }, url: location.href }))).not.toContain(token);
   await connection.getByRole("button", { name: "Verify again", exact: true }).click();
   await expect(panel.getByRole("status")).toContainText("verified successfully");
@@ -84,7 +85,7 @@ test("disconnect requires an explicit choice and disables subsequent reads", asy
   await panel.getByRole("button", { name: "Verify and connect", exact: true }).click();
   const connection = panel.getByRole("article", { name: `Connection ${name}` });
   await connection.getByRole("button", { name: "Disconnect", exact: true }).click();
-  await expect(connection).toContainText("Existing imported records stay in your workspace");
+  await expect(connection).toContainText("imported evidence stays");
   expect(requests).toHaveLength(1);
   await connection.getByRole("button", { name: "Keep connection", exact: true }).click();
   await connection.getByRole("button", { name: "Disconnect", exact: true }).click();

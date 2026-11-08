@@ -25,6 +25,7 @@ try {
   for (const template of list.templates) {
     const name = `${template.name} connector demo`;
     await page.goto(`${base}/workspace?view=integrations`);
+    await page.getByText("Custom data sources", { exact: false }).click();
     const section = page.getByRole('region', { name: 'Evidence connectors' });
     const existing = list.connections.find(item => item.name === name && item.status === 'demo_ready' && JSON.stringify(item.manifest) === JSON.stringify(template.manifest));
     if (existing) {
@@ -40,7 +41,7 @@ try {
       await page.screenshot({ path: `.aws-build/${template.id}-access-preview.png`, fullPage: true });
       await section.getByRole('button', { name: 'Save configuration', exact: true }).click();
     }
-    await expect(section.getByText('Your mapping is ready to install.', { exact: true })).toBeVisible({ timeout: 30000 });
+    await expect(section.getByText('Install connector', { exact: true })).toBeVisible({ timeout: 30000 });
     const download = page.waitForEvent('download');
     await section.getByRole('button', { name: 'manifest.json', exact: true }).click();
     const file = await download;

@@ -24,7 +24,7 @@ export function GmailConnector({ status, cases, onChange, onImported }: { status
         window.location.assign(url.toString()); return;
       }
       if (action === 'disconnect') { onChange(result.connection || null); setMessages([]); setPreview(null); setConfirm(false); setNotice(result.connection?.revocationPending ? 'Gmail access stopped. Google revocation is pending. Retry revocation or remove Causality in your Google Account connections.' : 'Gmail disconnected. Previously imported evidence remains on its case.'); }
-      if (action === 'search') { setMessages(result.messages || []); setPreview(null); setMore(!!result.moreAvailable); setNotice(result.messages?.length ? 'Review a message before importing it. Matching a customer email does not establish relevance to this dispute.' : 'No matching emails found. You can still add a selected message manually inside the case.'); }
+      if (action === 'search') { setMessages(result.messages || []); setPreview(null); setMore(!!result.moreAvailable); setNotice(result.messages?.length ? 'Check that the message concerns this dispute before importing.' : 'No matches. Add the message manually in the case.'); }
       if (action === 'preview') setPreview(result.preview || null);
       if (action === 'import') {
         setPreview(null); setMessages([]); setNotice('Email imported. Previous draft approval was cleared.');
@@ -37,18 +37,18 @@ export function GmailConnector({ status, cases, onChange, onImported }: { status
   };
   return <article className="cw-provider-card cw-gmail-card" aria-label="Gmail account authorization">
     <h3><Mail size={20} />Gmail <span className={`cw-pill${authorized ? ' green' : ''}`}>{authorized ? 'Authorized' : connection?.status === 'reconnect_required' ? 'Reconnect required' : 'Not connected'}</span></h3>
-    <p>Find customer emails for a case, review the original text, then import selected messages as evidence.</p>
-    <p className="cw-provider-note">Google grants read access to the mailbox. Causality searches by the selected case’s customer email, retrieves at most ten matching message headers, and reads a body only when you choose Preview. It cannot send, delete or change your mail.</p>
+    <p>Find and import emails for a case.</p>
+    <p className="cw-provider-note">Read-only mailbox access. Causality searches the case’s customer email and opens messages only on preview. No sending or deletion.</p>
     {error && <p className="cw-banner error" role="alert">{error}</p>}
     {notice && <p className="cw-banner neutral" role="status">{notice}</p>}
     {connection?.email && <p>Mailbox: <strong>{connection.email}</strong></p>}
-    {!status?.configured && <p className="cw-provider-note">The Causality operator must complete the one-time Google app registration before Gmail can be connected. Customers will authorize here, without entering API keys.</p>}
+    {!status?.configured && <p className="cw-provider-note">Google app setup is required before connecting.</p>}
     {(!connection || connection.status === 'disconnected') && <button className="cw-button primary" disabled={busy || !status?.configured} onClick={() => void run(connection?.revocationPending ? 'disconnect' : 'connect')}><Link2 size={16} />{connection?.revocationPending ? 'Retry Gmail revocation' : status?.configured ? 'Connect Gmail' : 'Gmail setup unavailable'}</button>}
     {authorized && <>
       <label className="cw-field"><span>Case for Gmail evidence</span><select value={caseId} disabled={busy} onChange={e => { setCaseId(e.target.value); setMessages([]); setPreview(null); setMore(false); setNotice(''); setError(''); }}><option value="">Choose a case</option>{cases.filter(c => ['needs_review', 'investigating', 'ready'].includes(c.status)).map(c => <option key={c.id} value={c.id}>{c.title} ({c.email})</option>)}</select></label>
       {selected && <p className="cw-provider-note">Search: mail from or to {selected.email}. Spam and Trash are excluded.</p>}
       <button className="cw-button" disabled={busy || !caseId} onClick={() => void run('search')}><Search size={16} />Find customer emails</button>
-      {more && <p className="cw-provider-note">More matches exist. This prototype shows up to ten results; older messages can be imported manually.</p>}
+      {more && <p className="cw-provider-note">Showing up to 10 matches. Add older messages manually.</p>}
       {messages.length > 0 && <ul className="cw-gmail-results">{messages.map(m => <li key={m.id}><div><strong>{m.subject || '(No subject)'}</strong><p>{m.from}<br />{new Date(m.occurredAt).toLocaleString()}</p></div><button className="cw-button" disabled={busy} onClick={() => void run('preview', m.id)}>Preview email <span className="sr-only">{m.subject}</span></button></li>)}</ul>}
       {preview && <section className="cw-gmail-preview" aria-label="Gmail message preview"><h4>{preview.subject || '(No subject)'}</h4><p>From: {preview.from}<br />To: {preview.to}<br />{new Date(preview.occurredAt).toLocaleString()}</p><pre>{preview.text}</pre><p className="cw-provider-note">Plain text only. Attachments and HTML are excluded.{preview.truncated && ' This is an excerpt truncated at 20,000 characters.'} Preview text is temporarily stored in AWS with a ten-minute expiry; automatic deletion can take longer. Imported evidence is retained with the case.</p><p>Confirm that this email is relevant to <strong>{selected?.title}</strong>. Importing clears any previous draft approval.</p><button className="cw-button primary" disabled={busy} onClick={() => void run('import', preview.id)}>Import reviewed email</button></section>}
     </>}

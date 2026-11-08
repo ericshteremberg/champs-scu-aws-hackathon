@@ -156,7 +156,7 @@ function AccessPreview({ preview }: { preview: ConnectorPreview }) {
           <ul className="cw-connector-checks">{preview.checks.map(check => <li key={check.name}>
             {check.passed ? <Check size={16} /> : <TriangleAlert size={16} />}<div><strong>{check.name}</strong><p>{check.detail}</p></div>
           </li>)}</ul>
-          <p>This preview uses fictional records. Live access is tested separately after the connector is installed.</p>
+          <p>Fictional preview. Verify live access after installation.</p>
         </div>
       </aside>
     </div>
@@ -246,7 +246,7 @@ export function EvidenceConnectors({ onImported }: { onImported: (state: Workspa
 
   return <section className="cw-panel cw-connectors" aria-label="Evidence connectors">
     <div className="cw-connector-heading">
-      <div><span className="cw-connector-eyebrow">Company records · Guided setup</span><h2>Connect the evidence behind a payment.</h2><p>Choose how your records link, preview the permitted evidence, and get a ready-to-run connector.</p></div>
+      <div><span className="cw-connector-eyebrow">Company records · Guided setup</span><h2>Custom database connector</h2><p>Map your records, preview access, then install.</p></div>
       {open ? <Action onClick={() => { setOpen(false); setError(""); }} disabled={busy}><X size={17} />Close setup</Action>
         : <Action primary disabled={loading || busy || !templates.length} onClick={() => begin()}><Plus size={17} />Add evidence connector</Action>}
     </div>
@@ -260,18 +260,18 @@ export function EvidenceConnectors({ onImported }: { onImported: (state: Workspa
           <Action disabled={busy} onClick={() => void showInstallation(item)}><Download size={16} />Installation files</Action>
           <Action disabled={busy} label={`Revoke configuration ${item.name}`} onClick={() => void revoke(item)}>Revoke configuration</Action>
         </>}</div>
-      </div>)}</div> : <div className="cw-connector-empty"><p>Try the ticketing or rental example with fictional records. Your database stays untouched during the preview.</p></div>}
+      </div>)}</div> : <div className="cw-connector-empty"><p>Preview a ticketing or rental example with fictional data.</p></div>}
     </>}
     {open && <>
       <ol className="cw-connector-steps" aria-label="Connector setup steps">{steps.map((title, index) => <li key={title}>
         <button type="button" aria-current={step === index ? "step" : undefined} disabled={busy || index > step || (step === 3 && index !== 3)} onClick={() => { setStep(index); setError(""); }}><span className="cw-connector-step-number">{index < step ? <Check size={13} /> : index + 1}</span>{title}</button>
       </li>)}</ol>
       <div className="cw-connector-content" aria-busy={busy}>
-        <div className="cw-connector-step-intro"><h3 ref={heading} tabIndex={-1}>{["Start with your business workflow.", "Confirm the evidence you want to share.", "See the boundary before you connect.", "Your mapping is ready to install."][step]}</h3><p>{[
-          "Both examples use fictional records. Select a starting template, then review its table and field mappings.",
-          "Review the example schema below. Keep the business and payment links accurate; exclude any sections or optional fields you do not need.",
-          "These results come from the reusable connector running against the selected example. Expand a record to inspect the exact fields.",
-          "Your configuration is saved in this workspace. Download the installation files to run the connector beside your own database.",
+        <div className="cw-connector-step-intro"><h3 ref={heading} tabIndex={-1}>{["Choose a template", "Select evidence fields", "Preview access", "Install connector"][step]}</h3><p>{[
+          "Choose an example, then review its mapping.",
+          "Check the business and payment links. Exclude unnecessary fields.",
+          "Expand a sample record to inspect its fields.",
+          "Download the files and install beside your database.",
         ][step]}</p></div>
         {step === 0 && <>
           <div className="cw-connector-templates">{templates.map(item => <button type="button" key={item.id} className="cw-connector-template" aria-pressed={item.id === templateId} onClick={() => choose(item)}>
@@ -283,7 +283,7 @@ export function EvidenceConnectors({ onImported }: { onImported: (state: Workspa
         {step === 1 && manifest && template && <>
           <fieldset disabled={busy} className="cw-connector-fieldset">
           <MappingEditor manifest={manifest} template={template} onChange={value => { setManifest(value); setConfirmed(false); setPreview(null); }} />
-          <label className="cw-connector-confirm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /><span>I have reviewed the business, purchase, and payment relationships and the fields included in this example.</span></label>
+          <label className="cw-connector-confirm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} /><span>I reviewed the business, order, payment links and selected fields.</span></label>
           </fieldset>
           <div className="cw-connector-step-footer"><Action disabled={busy} onClick={() => setStep(0)}><ArrowLeft size={17} />Back</Action><Action primary disabled={busy || !confirmed} onClick={() => void previewAccess()}>{busy ? <LoaderCircle size={17} /> : <ShieldCheck size={17} />}{busy ? "Checking access…" : "Preview case access"}</Action></div>
         </>}

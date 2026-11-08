@@ -82,7 +82,7 @@ test("a sample investigation preserves source inspection and revision-bound revi
   await runSample(page);
   await expect(
     page.getByRole("heading", {
-      name: "Evidence supports a response.",
+      name: "Response supported",
       exact: true,
     }),
   ).toBeVisible();
@@ -93,6 +93,9 @@ test("a sample investigation preserves source inspection and revision-bound revi
     .locator(".cw-citation")
     .filter({ hasText: "Customer acknowledged finding both tickets" })
     .first();
+  if (!(await citation.isVisible())) {
+    await page.locator(".cw-finding").filter({ has: citation }).locator("summary").click();
+  }
   await citation.click();
   await expect(
     page.getByRole("tab", { name: "Investigation", exact: true }),
@@ -152,18 +155,18 @@ test("failed delivery and incomplete evidence produce distinct findings", async 
   await runSample(page);
   await expect(
     page.getByRole("heading", {
-      name: "The evidence needs a closer look.",
+      name: "Conflicting evidence",
       exact: true,
     }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "What remains unknown", exact: true }),
+    page.locator(".cw-analysis-gaps > summary"),
   ).toBeVisible();
   await openTicket(page, state, "ATM-1044");
   await runSample(page);
   await expect(
     page.getByRole("heading", {
-      name: "More evidence is needed.",
+      name: "More evidence needed",
       exact: true,
     }),
   ).toBeVisible();
@@ -325,6 +328,7 @@ test("mobile keeps the Causality workspace and sources within the viewport", asy
     ),
   ).toBe(true);
   await page.getByRole("button", { name: "Connections", exact: true }).click();
+  await page.getByText("More sources & services", { exact: false }).click();
   await expect(
     page.getByRole("heading", { name: "Amazon Bedrock", exact: true }),
   ).toBeVisible();
@@ -663,7 +667,7 @@ test("upstream search filters, case recovery, and setup routes remain available"
   await page.goto("/workspace?view=cases&case=unavailable-case");
   await expect(
     page.getByRole("heading", {
-      name: "This case isn’t available.",
+      name: "Case unavailable",
       exact: true,
     }),
   ).toBeVisible();
@@ -676,7 +680,7 @@ test("upstream search filters, case recovery, and setup routes remain available"
     .getByRole("button", { name: "Setup checklist", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "A considered start.", exact: true }),
+    page.getByRole("heading", { name: "Workspace setup", exact: true }),
   ).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   expect(
@@ -699,7 +703,7 @@ test("unsaved navigation protection and report preview preserve reviewed export 
   await page.getByRole("tab", { name: "Report preview", exact: true }).click();
   await expect(page).toHaveURL(/tab=preview/);
   await expect(
-    page.getByRole("heading", { name: "The complete record.", exact: true }),
+    page.getByRole("heading", { name: "Report preview", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Export TXT", exact: true }),
@@ -711,7 +715,7 @@ test("unsaved navigation protection and report preview preserve reviewed export 
   await page.getByRole("button", { name: "Overview", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(encodeURIComponent(item.id)));
   await expect(
-    page.getByRole("heading", { name: "The complete record.", exact: true }),
+    page.getByRole("heading", { name: "Report preview", exact: true }),
   ).toBeVisible();
   page.once("dialog", (dialog) => dialog.accept());
   await page.getByRole("button", { name: "Overview", exact: true }).click();

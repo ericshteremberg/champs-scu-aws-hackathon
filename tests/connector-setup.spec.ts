@@ -71,6 +71,7 @@ async function setup(page: Page, initiallyUnavailable = false) {
     }
   });
   await page.goto("/workspace?view=integrations");
+  await page.getByText("Custom data sources", { exact: false }).click();
   return { connections, available: () => { unavailable = false; } };
 }
 
@@ -92,7 +93,7 @@ for (const templateId of ["atmsphr-tickets", "rentul-rentals"] as const) {
     await expect(setupSection.getByText("Unrelated case", { exact: true })).toBeVisible();
     await expect(setupSection.getByRole("region", { name: "Permitted case evidence" })).toContainText(templateId === "atmsphr-tickets" ? "Ticket" : "Rental");
     await setupSection.getByRole("button", { name: "Save configuration", exact: true }).click();
-    await expect(setupSection.getByText("Your mapping is ready to install.", { exact: true })).toBeVisible();
+    await expect(setupSection.getByText("Install connector", { exact: true })).toBeVisible();
     await expect(setupSection.getByText("This saved setup is not a live connection.", { exact: false })).toBeVisible();
     const file = page.waitForEvent("download");
     await setupSection.getByRole("button", { name: "connector-manifest.json", exact: true }).click();
@@ -134,7 +135,7 @@ test("setup displays backend unavailability honestly and supports retry on mobil
   available();
   await section.getByRole("button", { name: "Retry loading", exact: true }).click();
   await section.getByRole("button", { name: "Add evidence connector" }).click();
-  await expect(section.getByRole("heading", { name: "Start with your business workflow.", exact: true })).toBeVisible();
+  await expect(section.getByRole("heading", { name: "Choose a template", exact: true })).toBeVisible();
   const width = await page.evaluate(() => ({ viewport: document.documentElement.clientWidth, content: document.documentElement.scrollWidth }));
   expect(width.content).toBeLessThanOrEqual(width.viewport + 1);
 });
