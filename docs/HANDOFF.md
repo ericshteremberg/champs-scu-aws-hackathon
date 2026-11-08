@@ -6,6 +6,9 @@ The deployment has no Cloudflare database or R2 binding. The temporary developme
 
 ## Current state
 
+- Latest frontend: source `7307978`, Worker `13f51efd-81ce-436c-9491-5166d7949846`, with inert Send to Stripe demo buttons on Report and Review package. Backend remains on the rebuttal prompt deployment (`649bc5a`); real submissions remain disabled.
+- Development demo cleanup, November 8, 2026: removed four explicitly seeded sample cases and 319 related evidence/draft/run/event records from DynamoDB. The live workspace now contains only Mason Mueller and Thomas Larson. Their records and active investigations were not modified. A recovery copy of the removed sample records is in ignored local storage. Fixture source and explicit sample-loading tools remain available for regression work; samples are not automatically reloaded.
+
 - Feature branch `codex/policy-evidence-workflow` adds dated policy intake (URL, PDF/text upload and paste), purchase-period matching, scoped policy correspondence collection, original policy exhibits, and numbered response arguments. See [POLICY_COLLECTION.md](POLICY_COLLECTION.md). Deployed November 8, 2026 from source commit `649bc5a`, with Worker version `c4d004e7-f0f0-4988-ac35-85dfe68afb93` and matching AWS API/investigator/webhook bundles. Hosted policy controls and Mason’s existing case passed read-only checks on the prior deployment. The current prompt update explicitly emphasizes why the evidence supports rejecting the cardholder claim. It was redeployed without tests at the user’s request; the team is testing it. Submissions remain disabled. The feature branch is not merged to main; older hosted-state notes below describe prior deployments.
 
 - AWS stack: `causality-hackathon-dev`, region `us-east-1`; stack creation completed.

@@ -78,3 +78,5 @@ Deployed November 8, 2026 from source commit `649bc5a` to the AWS API, investiga
 ## Demo submission button
 
 The Report and Review package action areas include an enabled “Send to Stripe” button for presentation only. It is a plain `type="button"` element with no event handler, form submission, navigation or API call. Its tooltip identifies it as demo-only. It does not show a success state or change case status. Real Stripe submissions remain disabled on the backend. Testing is left to the team as requested.
+
+Demo button deployed November 8, 2026 from source `7307978` to Worker `13f51efd-81ce-436c-9491-5166d7949846`. The frontend build and deployment completed; no test suite was run at the user’s request. The four seeded sample cases were subsequently removed from the live workspace, leaving Mason and Thomas for the presentation.
