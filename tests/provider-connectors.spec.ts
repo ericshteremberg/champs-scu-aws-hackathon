@@ -7,7 +7,7 @@ async function setup(page: Page, connection: SupabaseConnection | null = null, s
   await page.context().setExtraHTTPHeaders(headers);
   const base = process.env.CAUSALITY_UI_TEST_BASEURL || 'http://127.0.0.1:8788';
   expect((await page.request.post(`${base}/api/workspace`, { headers: { ...headers, Origin: base }, data: { action: 'createWorkspace', name: 'Provider UI test' } })).status()).toBe(200);
-  const status: ProviderStatus = { supabase: { configured: true, connection }, stripe, gmail };
+  const status: ProviderStatus = { supabase: { configured: true, connection }, stripe, gmail, imap: { configured: true, connection: null } };
   const requests: Record<string, unknown>[] = [];
   await page.route('**/api/providers', route => route.fulfill({ json: status }));
   await page.route('**/api/providers/stripe', async route => {
@@ -139,4 +139,66 @@ test('Gmail stays unavailable without developer registration', async ({ page }) 
   const { panel } = await setup(page);
   await expect(panel.getByRole('button', { name: 'Gmail setup unavailable' })).toBeDisabled();
   await expect(panel).toContainText('one-time Google app registration');
+});
+
+test('IMAP setup requires consent, clears passwords on failure and fits a phone', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setup(page);
+  const card = page.getByRole('article', { name: 'Other email IMAP connection' });
+  await card.getByRole('button', { name: 'Connect other email' }).click();
+  await card.getByLabel('Mailbox email', { exact: true }).fill('merchant@example.test');
+  await card.getByLabel('Incoming IMAP server').fill('imap.provider.com');
+  await card.getByLabel('Mailbox or app password').fill('synthetic_private_password');
+  const submit = card.getByRole('button', { name: 'Test and connect mailbox' });
+  await expect(submit).toBeDisabled();
+  await card.getByRole('checkbox').check();
+  let sent: Record<string, unknown> | undefined;
+  await page.route('**/api/providers/imap', async route => { sent = route.request().postDataJSON(); return route.fulfill({ status: 502, json: { error: 'Could not read this mailbox. Check the server.' } }); });
+  await submit.click();
+  await expect(card.getByRole('alert')).toContainText('Check the server');
+  await expect(card.getByLabel('Mailbox or app password')).toHaveValue('');
+  expect(sent).toEqual({ action: 'connect', settings: { email: 'merchant@example.test', host: 'imap.provider.com', password: 'synthetic_private_password', folders: ['INBOX'] }, confirmed: true });
+  expect(await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]))).not.toContain('synthetic_private_password');
+  expect(await card.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+});
+
+test('IMAP connection searches a selected case and imports only after preview', async ({ page }) => {
+  const { status, base, headers } = await setup(page);
+  const response = await page.request.post(`${base}/api/workspace`, { headers: { ...headers, Origin: base }, data: { action: 'addCase', title: 'Missing IMAP ticket', customerName: 'Customer', email: 'customer@example.test', amount: 5000, currency: 'usd', reason: 'Ticket not received', orderRef: 'ORDER-IMAP', dueAt: '2026-12-01' } });
+  const caseId = (await response.json()).cases[0].id;
+  const requests: Record<string, unknown>[] = [];
+  const message = { id: 'SU5CT1g.7.123', folder: 'INBOX', subject: 'Ticket support', from: 'customer@example.test', to: 'merchant@example.test', occurredAt: '2026-11-01T00:00:00Z' };
+  await page.route('**/api/providers/imap', async route => {
+    const body = route.request().postDataJSON(); requests.push(body);
+    if (body.action === 'connect') { status.imap!.connection = { status: 'authorized', updatedAt: new Date().toISOString(), email: body.settings.email, host: body.settings.host, folders: body.settings.folders }; return route.fulfill({ json: { connection: status.imap!.connection } }); }
+    if (body.action === 'search') return route.fulfill({ json: { messages: [message], scanLimited: true, moreAvailable: false } });
+    if (body.action === 'preview') return route.fulfill({ json: { preview: { ...message, text: '<script>window.imapInjected=true</script> Original statement', truncated: false } } });
+    if (body.action === 'import') return route.fulfill({ json: { imported: true, caseId } });
+    status.imap!.connection = { status: 'disconnected', updatedAt: new Date().toISOString() };
+    return route.fulfill({ json: { connection: status.imap!.connection } });
+  });
+  await page.goto('/workspace?view=integrations');
+  const card = page.getByRole('article', { name: 'Other email IMAP connection' });
+  await card.getByRole('button', { name: 'Connect other email' }).click();
+  await card.getByLabel('Mailbox email', { exact: true }).fill('merchant@example.test');
+  await card.getByLabel('Incoming IMAP server').fill('imap.provider.com');
+  await card.getByLabel('Mailbox or app password').fill('synthetic_private_password');
+  await card.getByLabel('Sent folder name (optional)').fill('Sent');
+  await card.getByRole('checkbox').check();
+  await card.getByRole('button', { name: 'Test and connect mailbox' }).click();
+  await expect(card.getByRole('button', { name: 'Find customer emails via IMAP' })).toBeDisabled();
+  await card.getByLabel('Case for IMAP evidence').selectOption(caseId);
+  await card.getByRole('button', { name: 'Find customer emails via IMAP' }).click();
+  await expect(card.getByRole('status')).toContainText('newest 500 messages');
+  await expect(card.getByRole('button', { name: 'Import reviewed IMAP email' })).toHaveCount(0);
+  await card.getByRole('button', { name: 'Preview email Ticket support' }).click();
+  await expect(card.locator('pre')).toContainText('<script>window.imapInjected=true</script>');
+  expect(await page.evaluate(() => 'imapInjected' in window)).toBe(false);
+  await card.getByRole('button', { name: 'Import reviewed IMAP email' }).click();
+  await expect(page).toHaveURL(/view=cases/);
+  expect(requests.at(-1)).toEqual({ action: 'import', caseId, messageId: message.id, confirmed: true });
+  await page.goto('/workspace?view=integrations');
+  await card.getByRole('button', { name: 'Disconnect IMAP', exact: true }).click();
+  await card.getByRole('button', { name: 'Confirm disconnect IMAP' }).click();
+  await expect(card.getByRole('button', { name: 'Connect other email' })).toBeEnabled();
 });

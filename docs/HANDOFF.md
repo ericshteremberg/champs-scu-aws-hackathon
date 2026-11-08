@@ -16,6 +16,10 @@ The deployment has no Cloudflare database or R2 binding. The temporary developme
 
 All six bundled cases are synthetic. The three ticket cases demonstrate receipt acknowledgement, delivery failures, and insufficient evidence. **Sample investigation** is deterministic. **AWS investigation** calls Bedrock. AWS failures remain errors and never silently become sample results.
 
+## IMAP customer setup
+
+Other email provider is available in Connections for Network Solutions and compatible password-based IMAP servers. The customer supplies the mailbox login, exact server and optional Sent folder directly in the app. No Google registration or custom endpoint is needed. Lambda verifies TLS and read-only folder access, then stores credentials in private encrypted-at-rest DynamoDB records. Search/preview/import is bound to an open case and requires review. Real provider login and mailbox reads remain untested. See [IMAP connector handoff](IMAP_CONNECTOR.md).
+
 ## Access and credential refresh
 
 Use username `dev` and the password stored locally in ignored `.dev-worker-access.txt`. Share that file's value privately, outside Git. This is one shared team development workspace after authentication, not separate production accounts.

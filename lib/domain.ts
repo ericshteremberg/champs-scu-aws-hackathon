@@ -1,5 +1,5 @@
 export type CaseStatus = 'needs_review' | 'investigating' | 'ready' | 'submitting' | 'submitted' | 'won' | 'lost';
-export type EvidenceSource = 'stripe' | 'gmail' | 'database' | 'policy' | 'manual';
+export type EvidenceSource = 'stripe' | 'gmail' | 'imap' | 'database' | 'policy' | 'manual';
 export type Evidence = {
   id: string; caseId: string; source: EvidenceSource; title: string; content: string;
   occurredAt: string; reference: string; fileName?: string; mimeType?: string; downloadUrl?: string;
@@ -17,7 +17,7 @@ export type DisputeCase = {
   investigation?: InvestigationRun;
 };
 export type Workspace = { id: string; name: string; industry: string; website: string; onboardingComplete: boolean; retentionDays: number; createdAt: string };
-export type Integration = { id: string; provider: 'stripe' | 'gmail' | 'database' | 'bedrock'; name: string; status: 'connected' | 'not_connected' | 'configuration_required'; mode?: 'test' | 'live'; accountName?: string; lastSyncAt?: string; description: string };
+export type Integration = { id: string; provider: 'stripe' | 'gmail' | 'imap' | 'database' | 'bedrock'; name: string; status: 'connected' | 'not_connected' | 'configuration_required'; mode?: 'test' | 'live'; accountName?: string; lastSyncAt?: string; description: string };
 export type Activity = { id: string; action: string; detail: string; actor: string; caseId?: string; createdAt: string };
 export type AccessRequest = { id: string; caseId?: string; scope: string; reason: string; status: 'pending' | 'approved' | 'denied'; requestedBy: string; createdAt: string; reviewedBy?: string; canReview: boolean };
 export type Policy = { id: string; name: string; content: string; effectiveDate: string; createdAt: string };

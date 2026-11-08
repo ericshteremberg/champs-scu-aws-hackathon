@@ -5,6 +5,7 @@ import { ApiError, type Stored, type StoreChange, type TrustedUser } from './typ
 import { auditChange, requireWorkspace } from './workspace.ts';
 import { exchangeSupabaseToken, fetchSupabaseProjects, fetchSupabaseSchema, frontendOrigin, loadSupabaseApp, projectRef, revokeSupabaseToken, tableSelection, type SupabaseTokens } from './supabase-api.ts';
 import type { ProviderStatus, SchemaTable, SupabaseConnection } from '../lib/providers/types.ts';
+import { imapProviderStatus } from './imap-provider.ts';
 import { gmailProviderStatus } from './gmail-provider.ts';
 import { stripeProviderStatus } from './stripe-provider.ts';
 
@@ -33,8 +34,8 @@ function publicConnection(row: Stored<SupabaseConnection> | null): SupabaseConne
 
 export async function providerStatus(user: TrustedUser): Promise<ProviderStatus> {
   const wid = (await requireWorkspace(user)).data.id;
-  const [supabase, stripe, gmail] = await Promise.all([getItem<SupabaseConnection>(wid, connectionKey), stripeProviderStatus(wid), gmailProviderStatus(wid)]);
-  return { supabase: { configured: !!process.env.SUPABASE_OAUTH_SECRET_ARN, connection: publicConnection(supabase) }, stripe, gmail };
+  const [supabase, stripe, gmail, imap] = await Promise.all([getItem<SupabaseConnection>(wid, connectionKey), stripeProviderStatus(wid), gmailProviderStatus(wid), imapProviderStatus(wid)]);
+  return { supabase: { configured: !!process.env.SUPABASE_OAUTH_SECRET_ARN, connection: publicConnection(supabase) }, stripe, gmail, imap };
 }
 
 export async function startSupabase(user: TrustedUser, binding: string | undefined) {

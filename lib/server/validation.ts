@@ -1,7 +1,7 @@
 import { z } from 'zod';
 const date=z.string().max(40).refine(v=>!Number.isNaN(Date.parse(v)),'Enter a valid date.');
 const id=z.string().min(1).max(180);
-const source=z.enum(['stripe','gmail','database','policy','manual']);
+const source=z.enum(['stripe','gmail','imap','database','policy','manual']);
 const website=z.string().max(500).optional().default('').refine(v=>!v||/^https?:\/\//i.test(v),'Use a full http or https URL.');
 export const actionSchema=z.discriminatedUnion('action',[
  z.object({action:z.literal('createWorkspace'),name:z.string().trim().min(2).max(100),industry:z.string().max(100).optional().default(''),website}),

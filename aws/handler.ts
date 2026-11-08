@@ -7,6 +7,7 @@ import { configuration, listStripeIntegration, connectStripe, disconnectStripe, 
 import { listEvidenceConnections, executeConnectorAction, getConnectorInstallation } from './connectors.ts';
 import { listManagedConnections, executeManagedConnectorAction, parseLiveImport } from './managed-connectors.ts';
 import { providerStatus, startSupabase, finishSupabase, supabaseAction } from './providers.ts';
+import { imapProviderAction } from './imap-provider.ts';
 import { startGmailProvider, finishGmailProvider, gmailProviderAction } from './gmail-provider.ts';
 import { startStripeProvider, finishStripeProvider, stripeProviderAction } from './stripe-provider.ts';
 import { resendAction, resendStatus } from './resend.ts';
@@ -42,6 +43,7 @@ async function route(raw:unknown) {
   if(path==='/api/providers' && event.method==='GET')return {status:200,body:await providerStatus(user)};
   if(path==='/api/providers/gmail/start' && event.method==='POST')return {status:200,body:await startGmailProvider(user,event.oauthBinding)};
   if(path==='/api/providers/gmail/callback' && event.method==='GET')return {status:302,redirect:await finishGmailProvider(user,url,event.oauthBinding)};
+  if(path==='/api/providers/imap' && event.method==='POST')return {status:200,body:await imapProviderAction(user,event.body)};
   if(path==='/api/providers/gmail' && event.method==='POST')return {status:200,body:await gmailProviderAction(user,event.body)};
   if(path==='/api/providers/stripe/start' && event.method==='POST')return {status:200,body:await startStripeProvider(user,event.oauthBinding)};
   if(path==='/api/providers/stripe/callback' && event.method==='GET')return {status:302,redirect:await finishStripeProvider(user,url,event.oauthBinding)};

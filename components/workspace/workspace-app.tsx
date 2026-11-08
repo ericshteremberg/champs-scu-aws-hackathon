@@ -175,6 +175,7 @@ function sourceName(value: string) {
       {
         stripe: "Stripe",
         gmail: "Gmail",
+        imap: "Email (IMAP)",
         database: "Company records",
         policy: "Company policy",
         manual: "Manual evidence",
@@ -183,7 +184,7 @@ function sourceName(value: string) {
   );
 }
 function sourceIcon(value: string) {
-  return value === "gmail"
+  return value === "gmail" || value === "imap"
     ? Mail
     : value === "database"
       ? Database
