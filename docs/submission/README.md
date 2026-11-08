@@ -1,6 +1,6 @@
 # Causality submission preparation
 
-Status: prepared for team review, not submitted. Checked November 8, 2026, approximately 3:50 AM PST. The user has explicitly asked not to submit yet. No Devpost form, judging-portal form, team membership, repository visibility, or application report was changed during this review.
+Status: prepared for team review, not submitted. Checked November 8, 2026, approximately 3:50 AM PST. The user has explicitly asked not to submit yet. Follow-up: with explicit permission, both AWS prizes were selected and saved on Devpost. The entry remains a draft. Eric will remove Zach from the judging portal. No final submission, repository visibility change or customer-report update was performed.
 
 ## Deadline and required actions
 
@@ -16,12 +16,12 @@ The 2:55 AM announcement from Chris Shobe in [Discord announcements](https://dis
 | Item | Observed status | Next action / suggested owner |
 | --- | --- | --- |
 | Final application and report | User accepted the latest Opus result. Latest completed Opus run took 120.37 seconds from queued start to completion. | Freeze application/report for this presentation. Aiden. |
-| Devpost submission | DRAFT, 3/5 steps | Finish remaining fields, review, then submit only when authorized. Aiden/Ayan. |
+| Devpost submission | DRAFT, 4/5 steps | Finish remaining fields, review, then submit only when authorized. Aiden/Ayan. |
 | Devpost team | Four members: Ayan, Alex, Aiden, Eric | Correct for the final team confirmed by Aiden. |
-| Judging-portal team | Five members, including Zach | Eric is captain and must remove Zach, or ask an organizer. Do not add Zach to Devpost. |
-| AWS track | Prize selector has no selections | Select AWS Track - First Place and AWS Track - Second Place when updating the draft. Do not switch to A10. |
+| Judging-portal team | Five members, including Zach | Eric is handling removal of Zach. Do not add Zach to Devpost. |
+| AWS track | AWS Track - First Place and AWS Track - Second Place selected and saved | Complete. Entry remains a draft. |
 | GitHub access | Repository is private; portal says public repositories only | Eric must resolve visibility or publish an approved clean final-code repository. No visibility change performed. |
-| Final code location | Feature branch differs from main | Use the explicit final branch/commit. A generic repository link opens main, which is not this deployment. No merge performed. |
+| Final code location | Final deployed feature integrated with main | Main includes the accepted Opus/PDF workflow plus compatible main updates. The live deployment remains frozen at the accepted version. |
 | Judging portal GitHub field | Existing repository URL already saved | Recheck access and final-code discoverability before deadline. |
 | Judging portal Devpost field | Blank | Prepared URL below; save only when submission is authorized. |
 | Devpost story | Old Nova description and fictional-case-only pilot status | Replace with [prepared current story](devpost-story.md). |
@@ -43,7 +43,7 @@ The official [Devpost requirements](https://a10-x-aws-hack-26.devpost.com/) requ
 - Judging portal: https://judging.scuacm.com/team
 - Live application: https://causality-hackathon-dev.slidah60.workers.dev
 - Repository: https://github.com/ericshteremberg/champs-scu-aws-hackathon
-- Final application branch: https://github.com/ericshteremberg/champs-scu-aws-hackathon/tree/codex/policy-evidence-workflow
+- Final integrated branch: https://github.com/ericshteremberg/champs-scu-aws-hackathon/tree/main
 - Frozen code and deployment notes: https://github.com/ericshteremberg/champs-scu-aws-hackathon/tree/0df300af9207d503c872d3c5c8b8a95dbad0b14d
 - Deployment: AWS source `116fd74`, Cloudflare Worker `327e3bc7-db20-4615-8a70-4dc66887caed`.
 - Suggested tags: amazon-bedrock, anthropic, claude, aws-lambda, amazon-dynamodb, amazon-s3, aws-secrets-manager, aws-cloudformation, typescript, react, next.js, tailwind-css, node.js, cloudflare-workers, supabase, stripe, resend, gmail, imap, vite, vitest.

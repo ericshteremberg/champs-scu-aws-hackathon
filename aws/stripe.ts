@@ -22,6 +22,7 @@ type StripeSettings = {
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_ALLOW_LIVE?: string;
   STRIPE_ENABLE_SUBMISSION?: string;
+  STRIPE_ENABLE_DRAFT_WRITES?: string;
 };
 export type StripeConnection = {
   accountId: string;
@@ -46,7 +47,7 @@ type Dependencies = {
   client: (key: string) => Stripe;
 };
 
-/** Each source update and submission claim checks the case's DynamoDB version. */
+/** Each source update checks the case's DynamoDB version. Stripe writes stay disabled. */
 export function createStripeService(dependencies: Dependencies) {
   const {
     getItem: read,
@@ -66,6 +67,7 @@ export function createStripeService(dependencies: Dependencies) {
       configured: !missing.length,
       requiredConfiguration: missing,
       submissionEnabled: false,
+      draftWritesEnabled: false,
       webhookConfigured: !!env.STRIPE_WEBHOOK_SECRET,
       workspaceId,
     };
@@ -401,6 +403,8 @@ export function createStripeService(dependencies: Dependencies) {
     void [_workspaceId, _actor, _input];
     throw new ApiError(409, "Submissions are disabled. Download the evidence PDF for review.", "submission_disabled");
   }
+  // Saved Stripe drafts can auto-submit later; the review-only workflow blocks them too.
+  const saveStripeDraft = (workspaceId: string, actor: string, input: { caseId: string; confirmed: boolean; draftRevision: number; autoSubmitAcknowledged: boolean }) => submitStripe(workspaceId, actor, input);
   async function handleStripeWebhook(body: string, signature: string) {
     const env = settings(),
       workspaceId = env.STRIPE_WORKSPACE_ID;
@@ -449,6 +453,7 @@ export function createStripeService(dependencies: Dependencies) {
     disconnectStripe,
     syncStripe,
     submitStripe,
+    saveStripeDraft,
     handleStripeWebhook,
   };
 }
@@ -463,6 +468,7 @@ const service = createStripeService({
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
     STRIPE_ALLOW_LIVE: process.env.STRIPE_ALLOW_LIVE,
     STRIPE_ENABLE_SUBMISSION: process.env.STRIPE_ENABLE_SUBMISSION,
+    STRIPE_ENABLE_DRAFT_WRITES: process.env.STRIPE_ENABLE_DRAFT_WRITES,
   }),
   client: (key) =>
     new Stripe(key, {
@@ -478,5 +484,6 @@ export const {
   disconnectStripe,
   syncStripe,
   submitStripe,
+  saveStripeDraft,
   handleStripeWebhook,
 } = service;

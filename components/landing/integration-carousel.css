@@ -5,7 +5,7 @@
 .integration-carousel:focus-visible{outline:2px solid var(--landing-orange,#f48120);outline-offset:-2px}
 .integration-carousel-viewport{overflow:hidden;margin-top:20px;mask-image:linear-gradient(90deg,transparent,#000 32px,#000 calc(100% - 32px),transparent)}
 .integration-carousel-track{display:flex;width:max-content;animation:integration-carousel-drift 50s linear infinite;will-change:transform}
-.causality-landing .integration-carousel-list{display:grid;grid-template-columns:repeat(6,240px);flex:none;width:1440px;padding:0;list-style:none;margin:0}
+.causality-landing .integration-carousel-list{display:grid;grid-auto-flow:column;grid-auto-columns:240px;flex:none;width:max-content;padding:0;list-style:none;margin:0}
 .integration-carousel-item{display:flex;align-items:center;justify-content:center;gap:12px;height:64px;padding-inline:24px;color:#414141;font-size:16px;line-height:24px;font-weight:500;white-space:nowrap}
 .integration-carousel-item img{display:block;flex:0 0 32px;width:32px;height:32px;object-fit:contain}
 .integration-carousel:is(:hover,:focus-within,[data-paused="true"]) .integration-carousel-track{animation-play-state:paused}
@@ -13,7 +13,7 @@
 @media(prefers-reduced-motion:reduce){
   .integration-carousel-viewport{mask-image:none}
   .integration-carousel-track{width:100%;animation:none;transform:none;will-change:auto}
-  .causality-landing .integration-carousel-list{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
+  .causality-landing .integration-carousel-list{width:100%;grid-auto-flow:row;grid-auto-columns:auto;grid-template-columns:repeat(3,minmax(0,1fr))}
   .integration-carousel-list[data-duplicate]{display:none}
 }
 @media(max-width:700px){

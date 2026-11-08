@@ -16,7 +16,7 @@ npm ci
 npm run deploy:dev
 ```
 
-This connector reads existing sent-email metadata and captures signed delivery events. It has no email-send, resend, delete, or broadcast action. It does not connect a mailbox or prove attendance. Resend currently offers Full access or Sending access keys; the approved Full access credential is held only in AWS Secrets Manager. Runtime requests are restricted to GET `/domains`, GET `/emails/{uuid}`, and bounded GET `/emails?limit=100&after={uuid}` metadata pagination.
+This connector reads existing sent-email metadata and captures signed delivery events. It has no email-send, resend, delete, or broadcast action. It does not connect a mailbox or prove attendance. Resend currently offers Full access or Sending access keys; the approved Full access credential is held only in AWS Secrets Manager. Runtime requests are restricted to GET `/domains` and GET `/emails/{uuid}`.
 
 ## Development configuration
 
@@ -36,19 +36,21 @@ The receiver drops events from unrelated sender domains. It stores only the prov
 
 ## Importing evidence
 
-Open Connections → Resend → Verify access → Import email evidence. Choose a real case. The app finds explicit Resend references already attached to it, including structured `message_log.provider_id` evidence. A single linked reference is retrieved automatically for preview. A live response is verified against the case; if the provider cannot return it, the app can display evidence already attached under that exact Resend reference, explicitly labeled as not reverified. If no reference exists, it scans one page of sent-email metadata, filters to the exact case recipient and approved sender domains, and offers candidate previews. **Search older Resend emails** advances one page at a time. The manual UUID input is an Advanced fallback. Preview before attaching.
+Open a real case → Investigation → Resend → Add email evidence. Verify access, paste the specific email UUID, preview its recipient/order match, and choose Attach to report. The case refreshes immediately; its next compilation includes the imported delivery source. Connections → Resend offers the same controls with a case selector. Linked records have a Check latest status action; refresh still requires preview and attach. No message is sent.
+
+The controls distinguish connection loading, missing deployment, missing configuration, and provider errors. Live imports are disabled on sample or closed cases and while an investigation is running. Unsaved response edits must be saved before importing from the case view. Deploy matching frontend and AWS backend versions; local-only storage cannot call the live Resend connector.
+
 
 The private API `/api/providers/resend` supports:
 
 - GET: public configuration/verification status, never credentials.
 - POST `{ "action": "verify" }`: read configured domain metadata and save an audit event.
-- POST `{ "action": "find", "caseId": "..." }`: resolve case-linked Resend IDs first, otherwise search up to 100 sent-email metadata records. Optional `recent: true` bypasses existing references; `after` advances a validated UUID cursor. Only matching recipient/sender summaries leave the backend. No bodies are downloaded by listing.
 - POST `{ "action": "preview", "caseId": "...", "emailId": "..." }`: retrieve one message and its captured events.
 - POST `{ "action": "import", "caseId": "...", "emailId": "...", "confirmed": true }`: attach the previewed source, or refresh it if its status changed.
 
 All actions require the authenticated, explicitly bound workspace. The case must belong to that workspace and remain editable. Sample cases cannot receive live evidence. The email UUID, approved sender domain, single recipient, and exact order reference must match the case. The order reference must occur in the source subject/text/HTML or an `order_id`, `order_ref`, or `order_number` tag. An email address match alone is insufficient. If historical messages lack a matchable order reference, the automatic importer refuses them; inspect and attach a carefully scoped original manually instead of weakening the check.
 
-The standard preview/import path persists minimal metadata and status facts, using message bodies transiently for order matching. The separate original-evidence collector below retains case-matched provider bodies for visual PDF exhibits. Re-importing unchanged evidence is idempotent. Updating evidence increments the case revision and clears prior draft approval. Run a new investigation afterward. Captured future webhook events are included on refresh; they never silently rewrite approved or submitted evidence.
+The standard preview/import path persists minimal metadata and status facts, using message bodies transiently for order matching. Provider provenance assigns standard imported metadata to the delivery section, and the source register labels it Resend. Normalized provider status preserves bounced or failed messages as counterevidence. The separate original-evidence collector below retains case-matched provider bodies for visual PDF exhibits. Re-importing unchanged evidence is idempotent. Updating evidence increments the case revision and clears prior draft approval. Run a new investigation afterward. Captured future webhook events are included on refresh; they never silently rewrite approved or submitted evidence.
 
 ## Automatic original email capture
 
@@ -75,6 +77,20 @@ The browser-based Resend setup and AWS backend deployment are separate from the 
 
 Rollback: remove/disable the dedicated webhook in Resend, revoke the dedicated API key, and clear the Resend environment/stack parameters if retiring the integration. Do not revoke other applications' existing Resend keys. Previously imported evidence remains part of its case until handled through the normal retention process.
 
+
+## Retained email history (November 8)
+
+The case connector discovers reviewed Supabase `public.message_log` evidence already attached to the selected case. Map that table under **delivery**, joined by `order_id`, with `channel`, `kind`, `status`, `provider_id`, and `created_at` (and optional `subject` / a small approved body field). Import the exact payment-linked order and its related records using the linked-evidence workflow. Discovery then requires no pasted UUID. No bulk mailbox scan or new database scope is introduced.
+
+- `discover` returns the case's saved order email rows, including rows with no usable provider UUID.
+- `preview_log` takes `caseId` and `evidenceId`, tries Resend if possible, and uses the retained log on a 404, 502, 503, missing ID, or missing Resend configuration.
+- `import_log` with `confirmed: true` attaches available provider metadata, or acknowledges the already-attached log without duplicating it. Prior provider evidence is never downgraded by an unavailable lookup.
+- Manual email-ID preview also finds a retained matching log before returning an unavailable error.
+
+The compiler consumes the saved log regardless of message age or provider API availability, preserves its original status and content, and labels it merchant sending evidence. `sent` and merchant `delivered` do not become provider-confirmed delivery; failed/bounced records remain counterevidence. API unavailability cannot recover an absent email body. A separately captured historical body remains usable as its own cited evidence.
+
+Deploy both frontend and AWS backend from `codex/resend-history`. This implementation has not been deployed from Eric's machine because the AWS session expired. The current manually assembled Mason case still needs structured order-log import through the reviewed mapping workflow for automatic discovery. Its manually captured Resend content already remains attached.
+
 ## Case-driven search limitations
 
 Case references are discovery hints, not trusted proof. Preview/import still re-read the exact Resend record and require configured sender, single exact recipient and exact order matching. Arbitrary UUIDs in case text are not treated as Resend IDs. A manually attached `Resend <uuid>` reference is supported, as are reviewed structured provider IDs. This does not query an unapproved Supabase message-log table in the background. Import scoped linked records first when their IDs are not yet on the case, or use paginated recipient discovery. Resend's [sent-email list API](https://resend.com/docs/api-reference/emails/list-emails) supplies metadata and pagination; the app does not invent a server-side recipient filter. A page with no matches is not proof of non-delivery or a complete history.
@@ -87,6 +103,6 @@ The `preview` and `import` paths recognize already-attached case evidence explic
 
 This preview does not reconstruct an absent body or certify manual captures. It preserves original source labels/content and conflicting saved records, includes at most 20 referenced records and 60,000 content characters total (20,000 per record), and reports excerpt truncation. The full originals remain on the case. A wrong live recipient, sender, order or malformed live response remains an error; these are not hidden by the fallback. With no matching saved evidence, provider errors remain visible.
 
-`aws/resend-history.ts` and the merchant-log compiler context were selectively adapted from Eric's `5fffd36` retained-history work. Structured, reviewed, order-bound Supabase message logs retain merchant status limitations; merchant `delivered` is not promoted to provider-confirmed delivery, and failed/bounced counterevidence is preserved. Manual historical captures, including the reported case, are shown as previously attached evidence without inventing structured provenance. The rest of Eric's branch, including later Stripe-write work, is not merged by this change.
+`aws/resend-history.ts` and the merchant-log compiler context were selectively adapted from Eric's `5fffd36` retained-history work. Structured, reviewed, order-bound Supabase message logs retain merchant status limitations; merchant `delivered` is not promoted to provider-confirmed delivery, and failed/bounced counterevidence is preserved. Manual historical captures, including the reported case, are shown as previously attached evidence without inventing structured provenance. The merged implementation also retains UUID-free structured-log discovery, case-level Resend controls, and the separate guarded Stripe draft-write path.
 
 For an authorized case with an unavailable live reference and saved evidence, run `CAUSALITY_SMOKE_CASE_ID=<case-id> CAUSALITY_EXPECT_SAVED_RESEND=1 node scripts/smoke-customer-evidence.mjs`. It verifies the hosted fallback and combined collector, confirms no Attach action is offered, and checks the case/report remain unchanged. It never imports or sends email.

@@ -62,3 +62,22 @@
 @media(max-width:600px){.landing-container{width:calc(100% - 40px)}.landing-nav{height:90px;gap:16px}.landing-brand{gap:8px}.landing-brand svg{width:24px}.landing-nav-cta{padding:10px 16px}.landing-hero h1{font-size:32px;line-height:38px;letter-spacing:-.03em}.landing-hero-grid{padding-block:48px}.landing-hero-copy{gap:24px}.landing-hero-visual figcaption{align-items:flex-start;flex-direction:column}.landing-caption-row{flex-direction:column;align-items:flex-start;gap:8px}.landing-showcase,.landing-investigation-grid{padding-block:48px}.landing-control-panel{padding:28px 24px}.landing-scope-list>div{align-items:flex-start;gap:12px}.landing-scope-list dd{width:120px}.landing-outcome-band{padding:28px 24px}.landing-footer{padding-block:40px 28px}.landing-footer-top{flex-direction:column;align-items:flex-start}.landing-footer-bottom{display:flex;flex-direction:column;align-items:flex-start}.landing-footer-bottom nav{flex-wrap:wrap;gap:16px 24px}.landing-receipt-art{padding-block:32px}}
 @media(prefers-reduced-motion:reduce){.causality-landing *,.causality-landing *::before,.causality-landing *::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}.landing-receipt-art .receipt{will-change:auto}.landing-motion-toggle{display:none}.landing-hero-preview:hover,.landing-button:hover,.landing-button:active{transform:none}}
 @media(prefers-reduced-motion:reduce),(max-height:700px),(max-width:1000px){.landing-footer-runway{min-height:0}.landing-footer{position:relative;min-height:0;display:block}.landing-footer>.landing-container{min-height:0;gap:0}}
+
+/* Case-scoped lookup: source tables, an order predicate, and cited evidence. */
+.landing-query-diagram { margin-top: 30px; max-width: 480px; }
+.landing-query-diagram svg { display: block; width: 100%; height: auto; overflow: visible; }
+.landing-query-diagram text { font-family: inherit; font-size: 16px; fill: #252522; }
+.landing-query-diagram .lookup-label { fill: #777770; }
+.lookup-routes path { fill: none; stroke: #dfdfd9; stroke-width: 1.5; }
+.lookup-flow path { fill: none; stroke: #e88439; stroke-width: 2; stroke-dasharray: 6 28; animation: lookup-flow 3s linear infinite; }
+.lookup-flow path:nth-child(2) { animation-delay: -.7s; }
+.lookup-flow path:nth-child(3) { animation-delay: -1.4s; }
+.lookup-table rect, .lookup-output rect { fill: #fff; stroke: #dcdcd6; }
+.lookup-table path, .lookup-output path { fill: none; stroke: #8e8e84; stroke-width: 1.2; }
+.lookup-match > rect:first-child { stroke: #e6b28b; }
+.lookup-match .lookup-key { fill: #fff0e2; stroke: #f4d1b3; }
+.lookup-match .lookup-key-text { fill: #a74a0b; font-weight: 600; }
+.lookup-bracket { fill: none; stroke: #deded8; stroke-width: 1; }
+.landing-query-note { margin-top: 0; font-size: 16px; line-height: 1.6; }
+@keyframes lookup-flow { to { stroke-dashoffset: -68; } }
+@media (prefers-reduced-motion: reduce) { .lookup-flow path { animation: none; stroke-dasharray: none; opacity: .5; } }

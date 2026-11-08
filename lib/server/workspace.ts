@@ -3,7 +3,7 @@ import { getDb } from '@/db';
 import { workspaces, cases, evidence, drafts, policies, accessRequests, auditLogs, investigationRuns } from '@/db/schema';
 import type { ChatGPTUser } from '@/app/chatgpt-auth';
 import type { DisputeCase, Evidence, Finding, WorkspaceState, CaseStatus, Draft, InvestigationAnalysis } from '@/lib/domain';
-import { DEMO_CASES } from '@/lib/demo';
+import { sampleDataEnabled, visibleWorkspaceCases, visibleWorkspaceEvents } from './sample-data';
 import { listStripeIntegration } from '@/lib/stripe/service';
 import { ApiError, requireWorkspace } from './auth';
 import { buildFindings, buildReport } from './report';
@@ -16,7 +16,7 @@ export const newId = (prefix:string) => `${prefix}_${crypto.randomUUID()}`;
 export function auditValues(workspaceId:string,user:ChatGPTUser,action:string,detail:string,caseId?:string) { return {id:newId('log'),workspaceId,actor:user.email,action,detail,caseId:caseId??null,createdAt:now()}; }
 export async function ownedCase(workspaceId:string,caseId:string) {
  const row=await getDb().select().from(cases).where(and(eq(cases.id,caseId),eq(cases.workspaceId,workspaceId))).get();
- if(!row)throw new ApiError(404,'Case not found.');return row;
+ if(!row || (!sampleDataEnabled() && row.source==='demo'))throw new ApiError(404,'Case not found.');return row;
 }
 export function assertMutableCase(row:{status:string}) { if(!['needs_review','investigating','ready'].includes(row.status))throw new ApiError(409,'This case is closed to changes. Its submitted evidence remains unchanged.'); }
 export function mutableCaseGuard(workspaceId:string,caseId:string) { return sql`EXISTS (SELECT 1 FROM cases WHERE id = ${caseId} AND workspace_id = ${workspaceId} AND status IN ('needs_review','investigating','ready'))`; }
@@ -38,7 +38,8 @@ export async function getWorkspaceState(user:ChatGPTUser):Promise<WorkspaceState
  listStripeIntegration(workspace.id),
  db.select().from(investigationRuns).where(eq(investigationRuns.workspaceId,workspace.id)).orderBy(desc(investigationRuns.startedAt)).limit(500),
  ]);
- base.cases=caseRows.map(row=>{
+ const hiddenCaseIds=new Set(caseRows.filter(row=>row.source==='demo').map(row=>row.id));
+ base.cases=visibleWorkspaceCases(caseRows).map(row=>{
   const records:Evidence[]=evidenceRows.filter(e=>e.caseId===row.id).map(evidenceForClient);
   const draft=draftRows.find(d=>d.caseId===row.id);
   const latestRun=runRows.find(run=>run.caseId===row.id);
@@ -52,12 +53,12 @@ export async function getWorkspaceState(user:ChatGPTUser):Promise<WorkspaceState
  });
  const investigationConfig=getInvestigationConfig(workspace.id);
  base.integrations=[stripe,
-  {id:'bedrock',provider:'bedrock',name:'Amazon Bedrock',status:investigationConfig.bedrockConfigured?'connected':'configuration_required',accountName:investigationConfig.modelId,description:investigationConfig.bedrockConfigured?'Configured for sourced AI investigations. Model access is verified when an investigation runs.':'Configure temporary AWS credentials and a tool-capable model in us-east-1. Sample investigation remains available for sample cases.'},
+  {id:'bedrock',provider:'bedrock',name:'Amazon Bedrock',status:investigationConfig.bedrockConfigured?'connected':'configuration_required',accountName:investigationConfig.modelId,description:investigationConfig.bedrockConfigured?'Configured for sourced AI investigations. Model access is verified when an investigation runs.':'Configure temporary AWS credentials and a tool-capable model in us-east-1.'},
   {id:'gmail',provider:'gmail',name:'Gmail',status:'configuration_required',description:'Import selected customer emails as evidence. Automatic mailbox access requires a configured OAuth integration.'},
   {id:'database',provider:'database',name:'Company records',status:investigationConfig.merchantConfigured?'connected':'configuration_required',description:investigationConfig.merchantConfigured?'A merchant-owned evidence API is configured for this workspace. Import an approved case to retrieve only its linked records.':'Connect a merchant-owned evidence API with a workspace binding. No database credentials are required.'}];
  base.policies=policyRows;
- base.accessRequests=requestRows.map(r=>({...r,caseId:r.caseId??undefined,status:r.status as 'pending'|'approved'|'denied',reviewedBy:r.reviewedBy??undefined,canReview:r.status==='pending'&&canReviewAccess(r.requestedBy,user.userId)}));
- base.activity=logs.map(l=>({...l,caseId:l.caseId??undefined}));
+ base.accessRequests=requestRows.filter(r=>sampleDataEnabled() || !r.caseId || !hiddenCaseIds.has(r.caseId)).map(r=>({...r,caseId:r.caseId??undefined,status:r.status as 'pending'|'approved'|'denied',reviewedBy:r.reviewedBy??undefined,canReview:r.status==='pending'&&canReviewAccess(r.requestedBy,user.userId)}));
+ base.activity=visibleWorkspaceEvents(logs,hiddenCaseIds).map(l=>({...l,caseId:l.caseId??undefined}));
  return base;
 }
 
@@ -74,6 +75,8 @@ export async function executeAction(user:ChatGPTUser,input:unknown):Promise<Work
  const workspace=await requireWorkspace(user.userId);const wid=workspace.id;
  switch(action.action){
  case 'seedDemo':{
+  if(!sampleDataEnabled())throw new ApiError(404,'Sample data is not available.');
+  const {DEMO_CASES}=await import('@/lib/demo');
   const existing=await db.select({id:cases.id}).from(cases).where(and(eq(cases.workspaceId,wid),eq(cases.source,'demo')));
   const existingIds=new Set(existing.map(row=>row.id));
   const missing=DEMO_CASES.filter(record=>!existingIds.has(`${wid}_${record.id}`));

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { Database, Link2, LoaderCircle, ShieldCheck, Unplug } from 'lucide-react';
+import { Database, Link2, LoaderCircle, Unplug } from 'lucide-react';
 import type { ProviderStatus, SchemaTable, SupabaseConnection, SupabaseProject } from '../../lib/providers/types';
 import './provider-connectors.css';
 import { EvidenceCollector } from './evidence-collector';
@@ -29,8 +29,8 @@ const outcomes: Record<string, string> = {
 
 async function api<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(path, { method: body ? 'POST' : 'GET', headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
-  const value = await response.json() as T & { error?: string };
-  if (!response.ok) throw new Error(value.error || 'The connection could not be updated. Try again.');
+  const value = await response.json() as T & { error?: string; code?: string };
+  if (!response.ok) throw new Error(value.code === 'aws_required' ? 'Connections require the deployed workspace.' : value.error || 'Could not update the connection. Try again.');
   return value as T;
 }
 
@@ -81,12 +81,12 @@ export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceStat
   const selectProject = () => run('select', async () => {
     const result = await api<{ connection: SupabaseConnection }>('/api/providers/supabase', { action: 'select_project', projectRef: selected });
     saveConnection(result.connection); setSchema(null); setTables([]);
-    setNotice('Project selected. Review its table and column names next.');
+    setNotice('Project selected. Choose evidence fields.');
   });
   const loadSchema = () => run('schema', async () => {
     const result = await api<{ schema: SchemaTable[] }>('/api/providers/supabase', { action: 'schema' });
     setSchema(result.schema); setTables(connection?.approvedTables || []);
-    setNotice(result.schema.length ? 'Choose the tables and columns Causality may use for evidence. No customer rows were read.' : 'No supported tables were found in the public schema.');
+    setNotice(result.schema.length ? 'Choose evidence fields. No rows read yet.' : 'No supported tables were found in the public schema.');
   });
   const toggleColumn = (table: string, column: string) => setTables(current => {
     const existing = current.find(t => t.name === table)?.columns || [];
@@ -96,7 +96,7 @@ export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceStat
   const approve = () => run('approve', async () => {
     const result = await api<{ connection: SupabaseConnection }>('/api/providers/supabase', { action: 'approve_tables', tables });
     saveConnection(result.connection); setSchema(null);
-    setNotice('Evidence scope saved. Map these columns to a verified Stripe payment below.');
+    setNotice('Scope saved. Map the payment below.');
   });
   const disconnect = () => run('disconnect', async () => {
     const result = await api<{ connection: SupabaseConnection | null }>('/api/providers/supabase', { action: 'disconnect' });
@@ -105,29 +105,28 @@ export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceStat
   });
 
   return <section className="cw-panel cw-provider-panel" aria-label="Business account connections">
-    <div className="cw-provider-heading"><div><h2>Accounts</h2><p>Connect a source to import evidence.</p></div><ShieldCheck size={24} /></div>
+    <div className="cw-provider-heading"><h2>Sources</h2></div>
     {error && <p className="cw-banner error" role="alert">{error}</p>}
     {notice && <p className="cw-banner neutral" role="status">{notice}</p>}
     <div className="cw-provider-grid">
       <EvidenceCollector cases={cases} onImported={onImported} />
       <article className="cw-provider-card" aria-label="Supabase account">
         <h3><Database size={20} />Supabase <span className={`cw-pill${authorized ? ' green' : ''}`}>{authorized ? 'Authorized' : connection?.status === 'reconnect_required' ? 'Reconnect required' : 'Not connected'}</span></h3>
-        <p>Choose a project and review its tables.</p>
-        <p className="cw-provider-note">Supabase grants database read access. Causality limits row queries to approved fields linked to a verified Stripe payment. Save your mapping below.</p>
+        <p>Orders, customers and records.</p><details className="cw-help"><summary>Access details</summary><p>Read-only database access. Queries use approved fields linked to the case’s payment.</p></details>
         {!connection || connection.status === 'disconnected' ? <div className="cw-actions">
           {connection?.revocationPending ? <button className="cw-button" disabled={!!busy} onClick={() => void disconnect()}>Retry Supabase revocation</button> : <button className="cw-button primary" disabled={!!busy || !status?.supabase.configured} onClick={() => void connect()}>{busy === 'connect' ? <LoaderCircle size={16} /> : <Link2 size={16} />}{busy === 'loading' ? 'Loading…' : status?.supabase.configured ? 'Connect Supabase' : 'Setup unavailable'}</button>}
         </div> : <>
           {connection.project && <p>Selected project: <strong>{connection.project.name}</strong> <span className="cw-provider-note">({connection.project.organization})</span></p>}
           {authorized && <div className="cw-actions"><button className="cw-button" disabled={!!busy} onClick={() => void loadProjects()}>{projects.length ? 'Refresh projects' : connection.project ? 'Change project' : 'Choose project'}</button>{connection.project && <button className="cw-button" disabled={!!busy} onClick={() => void loadSchema()}>Review tables and columns</button>}</div>}
           {!!projects.length && authorized && <div className="cw-provider-project"><label className="cw-field"><span>Supabase project</span><select value={selected} disabled={!!busy} onChange={e => setSelected(e.target.value)}><option value="">Select a project</option>{projects.map(p => <option key={p.ref} value={p.ref}>{p.name} ({p.organization})</option>)}</select></label><button className="cw-button primary" disabled={!!busy || !selected} onClick={() => void selectProject()}>Use selected project</button></div>}
-          {!!connection.approvedTables?.length && <p>Approved scope: {connection.approvedTables.length} tables, {connection.approvedTables.reduce((sum, t) => sum + t.columns.length, 0)} columns. Set up your evidence mapping below.</p>}
+          {!!connection.approvedTables?.length && <p>Approved scope: {connection.approvedTables.length} tables, {connection.approvedTables.reduce((sum, t) => sum + t.columns.length, 0)} columns.</p>}
           {schema && schema.length > 0 && <fieldset className="cw-provider-scope" disabled={!!busy}><legend>Approved evidence columns, public schema</legend><p>Select evidence fields only. Exclude secrets, QR codes and unrelated personal data.</p>{schema.map(table => <details key={table.name}><summary>{table.name}</summary><div className="cw-provider-columns">{table.columns.map(column => <label key={column}><input type="checkbox" checked={tables.some(t => t.name === table.name && t.columns.includes(column))} onChange={() => toggleColumn(table.name, column)} />{column}</label>)}</div></details>)}<button className="cw-button primary" disabled={!tables.length} onClick={() => void approve()}>Save approved scope</button></fieldset>}
           {confirmDisconnect ? <div className="cw-provider-disconnect"><p>Stop Supabase access and clear the selected project and scope?</p><div className="cw-actions"><button className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(false)}>Keep connection</button><button className="cw-button danger" disabled={!!busy} onClick={() => void disconnect()}>Confirm disconnect Supabase</button></div></div> : <button className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(true)}><Unplug size={16} />Disconnect Supabase</button>}
         </>}
       </article>
       <StripeAccountConnector status={status?.stripe} onChange={connection => setStatus(current => current ? { ...current, stripe: { ...current.stripe, connection } } : current)} />
       <GmailConnector status={status?.gmail} cases={cases} onImported={onImported} onChange={connection => setStatus(current => current ? { ...current, gmail: { configured: current.gmail?.configured || false, connection } } : current)} />
-      <ResendConnector />
+      <ResendConnector cases={cases} onImported={onImported} />
       <ImapConnector onScopeChanged={async () => { setStatus(await api<ProviderStatus>('/api/providers')); }} status={status?.imap} cases={cases} onImported={onImported} onChange={connection => setStatus(current => current ? { ...current, imap: { configured: current.imap?.configured || false, connection } } : current)} />
       {status && <ProviderEvidence key={`${status.supabase.connection?.updatedAt}:${status.stripe.connection?.updatedAt}`} status={status} cases={cases} onImported={onImported} />}
     </div>

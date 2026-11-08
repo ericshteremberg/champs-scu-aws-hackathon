@@ -71,6 +71,15 @@ describe('portable investigation engine', () => {
     expect(options.events.filter(e => e.type === 'tool_completed' && e.section === 'policy')).toHaveLength(1);
   });
 
+
+  it('does not equate an empty attached classification with missing source evidence', () => {
+    const empty = { ...envelope('order'), sourceMode: 'attached' as const, status: 'unavailable' as const, records: [], limitations: [] };
+    const result = validateReport(report(), [envelope('summary'), empty]);
+    expect(result.gaps).toEqual([]);
+    expect(result.gaps).not.toContain('Order evidence is unavailable.');
+    const live = validateReport(report(), [envelope('summary'), { ...empty, sourceMode: 'live' }]);
+    expect(live.gaps).toContain('The live order source was unavailable during this investigation.');
+  });
   it('retrieves scoped records, preserves IDs, and labels sample output honestly', async () => {
     const options = input();
     const result = await runInvestigation(options);

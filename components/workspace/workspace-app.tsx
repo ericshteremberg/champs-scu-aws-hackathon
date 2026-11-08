@@ -1,6 +1,7 @@
 "use client";
 
 import { PolicyEditor } from "./policy-editor";
+import { ResendConnector } from "./resend-provider";
 import { ProviderConnectors } from "./provider-connectors";
 
 import { useDialogMotion } from "./use-dialog-motion";
@@ -187,7 +188,7 @@ function sourceName(value: string) {
   );
 }
 function sourceIcon(value: string) {
-  return value === "gmail" || value === "imap"
+  return value === "gmail" || value === "imap" || value === "resend"
     ? Mail
     : value === "database"
       ? Database
@@ -1065,11 +1066,6 @@ export default function WorkspaceApp({
           .toLowerCase()
           .includes(search.toLowerCase()),
     ) ?? [];
-  const seed = () =>
-    mutate(
-      { action: "seedDemo" },
-      "Sample cases added. They are clearly labeled and do not connect to Stripe.",
-    );
 
   return (
     <div className="cw cw-shell" data-design-screen={preview?.id}>
@@ -1232,9 +1228,7 @@ export default function WorkspaceApp({
               {view === "overview" && (
                 <Overview
                   state={state}
-                  busy={busy}
                   navigate={navigate}
-                  seed={seed}
                   addCase={() => setModal("case")}
                 />
               )}
@@ -1318,6 +1312,8 @@ export default function WorkspaceApp({
                 <CaseDetail
                   key={`${current.id}:${current.draft?.revision}:${current.draft?.status}`}
                   current={current}
+                  designPreview={!!preview}
+                  onResendImported={(nextState) => setState(nextState)}
                   run={visibleRun || null}
                   investigationConfig={investigationConfig}
                   investigating={
@@ -1963,20 +1959,14 @@ function Onboarding({
 
 function Overview({
   state,
-  busy,
   navigate,
-  seed,
   addCase,
 }: {
   state: WorkspaceState;
-  busy: boolean;
   navigate: (view: View, id?: string) => void;
-  seed: () => Promise<boolean>;
   addCase: () => void;
 }) {
-  const realCases = state.cases.filter((c) => c.source !== "demo"),
-    sampleOnly = !realCases.length && !!state.cases.length,
-    cases = realCases.length ? realCases : state.cases;
+  const cases = state.cases;
   const open = cases.filter((c) => !["won", "lost"].includes(c.status));
   const currencies = [...new Set(open.map((c) => c.currency))];
   const amounts = currencies.length
@@ -2002,31 +1992,17 @@ function Overview({
           <h1 style={{ marginTop: 8 }}>Overview</h1>
         </div>
         <div className="cw-actions">
-          {state.cases.length > 0 && (
-            <Button onClick={() => void seed()} disabled={busy}>
-              <Sparkles size={18} />
-              Load sample cases
-            </Button>
-          )}
           <Button primary onClick={addCase}>
             <Plus size={18} />
             New case
           </Button>
         </div>
       </div>
-      {sampleOnly && (
-        <div className="cw-banner neutral">
-          <Sparkles size={20} />
-          <p>
-            Sample data · No live Stripe records
-          </p>
-        </div>
-      )}
       <div className="cw-grid">
         <div className="cw-stat accent">
           <div className="cw-stat-label">
             <span>
-              {sampleOnly ? "Sample amount disputed" : "Amount disputed"}
+              Amount disputed
             </span>
             <CreditCard size={20} />
           </div>
@@ -2060,7 +2036,7 @@ function Overview({
         </div>
       </div>
       {!state.cases.length ? (
-        <div className="cw-two-col">
+        <div>
           <div className="cw-panel">
             <Empty
               title="No cases yet"
@@ -2076,25 +2052,7 @@ function Overview({
               </Button>
             </Empty>
           </div>
-          <div className="cw-panel">
-            <div className="cw-panel-body">
-              <span className="cw-icon-well">
-                <Sparkles size={24} />
-              </span>
-              <h2 style={{ margin: "16px 0 12px" }}>Try a sample case</h2>
-              <p>
-                Explore fictional payment, delivery and customer records.
-              </p>
-              <Button
-                className="full"
-                onClick={() => void seed()}
-                disabled={busy}
-              >
-                <Sparkles size={18} />
-                {busy ? "Loading…" : "Load sample cases"}
-              </Button>
-            </div>
-          </div>
+
         </div>
       ) : (
         <div className="cw-panel-stack">
@@ -2284,6 +2242,8 @@ function draftMethodLabel(method?: string) {
 function CaseDetail({
   current,
   collectOriginals,
+  designPreview,
+  onResendImported,
   busy,
   mutate,
   back,
@@ -2308,6 +2268,8 @@ function CaseDetail({
 }: {
   current: DisputeCase;
   collectOriginals: () => void;
+  designPreview: boolean;
+  onResendImported: (state: WorkspaceState) => void;
   busy: boolean;
   mutate: (a: WorkspaceAction, message?: string) => Promise<boolean>;
   back: () => void;
@@ -2334,6 +2296,7 @@ function CaseDetail({
   ) => void;
   attachPolicy: () => void;
 }) {
+  const [resendBusy, setResendBusy] = useState(false);
   const tab = ["investigation", "report", "preview", "submission"].includes(
       initialTab,
     )
@@ -2410,9 +2373,9 @@ function CaseDetail({
     finally { setPdfBusy(false); }
   };
   const canInvestigate =
-    !busy && !frozen && !investigating && current.evidence.length > 0;
-  const mode = investigationConfig?.bedrockConfigured ? "bedrock" : "sample";
-  const canUseMode = mode === "bedrock" || current.source === "demo";
+    !busy && !resendBusy && !frozen && !investigating && current.evidence.length > 0;
+  const mode = investigationConfig?.bedrockConfigured || current.source !== "demo" ? "bedrock" : "sample";
+  const canUseMode = Boolean(investigationConfig?.bedrockConfigured) || current.source === "demo";
   const confirmReplace = () =>
     !dirty ||
     window.confirm("Replace your unsaved response edits with a new draft?");
@@ -2462,7 +2425,7 @@ function CaseDetail({
       "SOURCE RECORDS",
       ...current.evidence.map(
         (e) =>
-          `[${e.id}] ${e.title} · ${sourceName(e.source)} · ${e.occurredAt}\nReference: ${e.reference}\n${e.content || "Attachment requires inspection of the original file."}`,
+          `[${e.id}] ${e.title} · ${sourceName(e.provenance?.fields.provider === "Resend" ? "Resend" : e.source)} · ${e.occurredAt}\nReference: ${e.reference}\n${e.content || "Attachment requires inspection of the original file."}`,
       ),
     ].join("\n");
     const packet = {
@@ -2668,6 +2631,7 @@ function CaseDetail({
                 </details>
               </div>
             </div>
+            <ResendConnector cases={[current]} caseId={current.id} disabled={busy || investigating || frozen || dirty} designPreview={designPreview} onBusyChange={setResendBusy} onImported={onResendImported} />
             <div className="cw-evidence-split">
               <aside className="cw-timeline">
                 <div className="cw-timeline-head">
@@ -2689,7 +2653,7 @@ function CaseDetail({
                         <span>
                           <strong>{e.title}</strong>
                           <p>
-                            {sourceName(e.source)}
+                            {sourceName(e.provenance?.fields.provider === "Resend" ? "Resend" : e.source)}
                             {e.reference ? ` · ${e.reference}` : ""}
                           </p>
                         </span>
@@ -2705,10 +2669,10 @@ function CaseDetail({
                     <div className="cw-source-meta">
                       <span className="cw-pill outline">
                         {(() => {
-                          const Icon = sourceIcon(selected.source);
+                          const Icon = sourceIcon(selected.provenance?.fields.provider === "Resend" ? "resend" : selected.source);
                           return <Icon size={17} />;
                         })()}
-                        {sourceName(selected.source)}
+                        {sourceName(selected.provenance?.fields.provider === "Resend" ? "Resend" : selected.source)}
                       </span>
                       {selected.downloadUrl ? (
                         <a
@@ -3381,7 +3345,7 @@ function EvidenceLibrary({
                     </td>
                     <td>
                       <span className="cw-pill outline">
-                        {sourceName(e.source)}
+                        {sourceName(e.provenance?.fields.provider === "Resend" ? "Resend" : e.source)}
                       </span>
                     </td>
                     <td>
@@ -3447,21 +3411,18 @@ function Integrations({
         <div>
           <h1>Connections</h1>
         </div>
-        <span className="cw-pill outline">
-          <ShieldCheck size={16} />
-          Workspace-scoped
-        </span>
+
       </div>
       {!isDesignPreview && <>
         <ProviderConnectors cases={state.cases} onImported={onConnectorImported} />
         <details className="cw-disclosure cw-connection-group">
-          <summary>Custom data sources <span>Installed endpoints and database setup</span></summary>
+          <summary>Custom data sources</summary>
           <LiveEvidenceConnectors onImported={onConnectorImported} />
           <EvidenceConnectors onImported={onConnectorImported} />
         </details>
       </>}
       <details className="cw-disclosure cw-connection-group" open={isDesignPreview || undefined}>
-      <summary>More sources & services <span>Manual imports, policies, analysis and archives</span></summary>
+      <summary>More sources & services</summary>
       <div className="cw-integration-grid">
         <section className="cw-panel cw-integration">
           <div className="cw-integration-head">

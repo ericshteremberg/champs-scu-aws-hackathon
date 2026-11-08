@@ -5,7 +5,7 @@ Causality assembles transaction evidence into a cited chargeback response and a 
 ## Where to start
 
 - [Live app](https://causality-hackathon-dev.slidah60.workers.dev), team-guided access. This is a shared development workspace, not a public self-service trial.
-- [Final source snapshot](https://github.com/ericshteremberg/champs-scu-aws-hackathon/tree/0df300af9207d503c872d3c5c8b8a95dbad0b14d). Repository access must be resolved before submission; `main` is not the deployed feature branch.
+- [Final source snapshot](https://github.com/ericshteremberg/champs-scu-aws-hackathon/tree/0df300af9207d503c872d3c5c8b8a95dbad0b14d). Repository access must be resolved before submission. [Main](https://github.com/ericshteremberg/champs-scu-aws-hackathon/tree/main) integrates this deployed feature with the compatible workspace updates; the live deployment and accepted report remain unchanged.
 - [Current implementation handoff](../HANDOFF.md), [policy workflow](../POLICY_COLLECTION.md), and [PDF evidence system](../EVIDENCE_PACKET.md).
 
 ## Demonstration sequence

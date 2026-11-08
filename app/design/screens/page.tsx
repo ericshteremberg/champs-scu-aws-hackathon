@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { sampleDataEnabled } from "@/lib/server/sample-data";
 import WorkspaceApp from "@/components/workspace/workspace-app";
 import LoginView from "@/components/workspace/login-view";
 import NotFoundView from "@/components/workspace/not-found-view";
@@ -8,6 +10,7 @@ import "@/components/workspace/workspace.css";
 
 export const metadata = {title:"Causality · Desktop screen library", robots:{index:false,follow:false}};
 export default async function ScreenLibrary({searchParams}: {searchParams:Promise<{screen?:string}>}) {
+  if (!sampleDataEnabled()) notFound();
   const {screen}=await searchParams;
   if(screen==="login") return <div data-design-screen="login"><LoginView signInPath="/design/screens"/><div className="cw-design-note">SYNTHETIC DESIGN PREVIEW · login</div></div>;
   if(screen==="page-not-found") return <><NotFoundView/><div className="cw-design-note">DESIGN PREVIEW · page-not-found</div></>;

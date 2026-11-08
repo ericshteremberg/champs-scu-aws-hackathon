@@ -1,3 +1,4 @@
+import { sampleDataEnabled } from './sample-data';
 import { evidenceSections } from '../investigation/sections.ts';
 import { env } from 'cloudflare:workers';
 import { and, desc, eq, sql } from 'drizzle-orm';
@@ -65,7 +66,7 @@ export function evidenceForClient(row: EvidenceRow): Evidence {
 
 async function getOwnedCase(workspaceId: string, id: string) {
   const row = await getDb().select().from(cases).where(and(eq(cases.workspaceId, workspaceId), eq(cases.id, id))).get();
-  if (!row) throw new ApiError(404, 'Case not found.');
+  if (!row || (!sampleDataEnabled() && row.source === 'demo')) throw new ApiError(404, 'Case not found.');
   return row;
 }
 
@@ -97,7 +98,6 @@ function localEvidence(item: CaseRow, records: Evidence[], section: EvidenceSect
   const limitations = [...new Set(selected.flatMap(record => record.provenance?.limitations || []))];
   for (const record of selected) if (record.fileName && !record.content) limitations.push(`The attachment ${record.fileName} requires manual review. Its contents have not been extracted.`);
   if (!selected.length) limitations.push(`No attached records were classified under ${section}. Related facts may appear in other source records.`);
-  if (section === 'delivery' && !selected.length) limitations.push('No delivery record is available. This establishes neither successful delivery nor delivery failure.');
   if (section === 'attendance') limitations.push('Missing scan records do not establish nonattendance. A scan alone does not establish cardholder identity.');
   if (section === 'policy') limitations.push('Current terms do not establish which disclosures were shown at purchase time.');
   return { caseId: item.id, section, sourceMode: item.source === 'demo' ? 'synthetic' : 'attached', fetchedAt: now(), status: !selected.length ? 'unavailable' : limitations.length ? 'partial' : 'available', limitations,

@@ -22,7 +22,7 @@ export function evidenceSections(record: Evidence): EvidenceSection[] {
 
 /** Legacy bucket diagnostics are not evidence that a fact or record is absent. */
 export function isCategoryDiagnostic(text: string): boolean {
-  return /^(?:No (?:summary|order|tickets|delivery|support|history|attendance|policy) records are attached to this case\.|(?:Summary|Order|Tickets|Delivery|Support|History|Attendance|Policy) evidence is unavailable\.|No attached records were classified under )/.test(text);
+  return /^(?:No (?:summary|order|tickets|delivery|support|history|attendance|policy) records are attached to this case\.|(?:Summary|Order|Tickets|Delivery|Support|History|Attendance|Policy) evidence is unavailable\.|No attached records (?:were|are) classified under |No records were returned from the (?:summary|order|tickets|delivery|support|history|attendance|policy) classification\.)/.test(text);
 }
 
 export function reviewNotes(notes: string[]): string[] {

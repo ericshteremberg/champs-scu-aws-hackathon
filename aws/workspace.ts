@@ -1,7 +1,7 @@
 import type { GmailConnection, ImapConnection } from '../lib/providers/types.ts';
 import { randomUUID } from 'node:crypto';
 import type { AccessRequest, Finding, InvestigationRun, Policy, WorkspaceState } from '../lib/domain.ts';
-import { DEMO_CASES } from '../lib/demo.ts';
+import { sampleDataEnabled, visibleWorkspaceCases, visibleWorkspaceEvents } from '../lib/server/sample-data.ts';
 import { actionSchema, canReviewAccess } from '../lib/server/validation.ts';
 import { buildFindings, buildReport } from '../lib/server/report.ts';
 import { reportEvidenceIds } from '../lib/investigation/report.ts';
@@ -22,7 +22,7 @@ export async function requireWorkspace(user: TrustedUser | string): Promise<Stor
 }
 export async function ownedCase(workspaceId: string, caseId: string): Promise<Stored<CaseDoc>> {
   const record = await getItem<CaseDoc>(workspaceId, keys.case(caseId));
-  if (!record || record.data.id !== caseId || record.data.workspaceId !== workspaceId) throw new ApiError(404, 'Case not found.');
+  if (!record || (!sampleDataEnabled() && record.data.source === 'demo') || record.data.id !== caseId || record.data.workspaceId !== workspaceId) throw new ApiError(404, 'Case not found.');
   return record;
 }
 export function assertMutableCase(record: Pick<CaseDoc, 'status'>) {
@@ -88,7 +88,8 @@ export async function getWorkspaceState(user: TrustedUser): Promise<WorkspaceSta
     getItem<GmailConnection>(workspaceId, 'provider#gmail'),
     getItem<ImapConnection>(workspaceId, 'provider#imap'),
   ]);
-  base.cases = await Promise.all(caseRows.map(async ({ data: item }) => {
+  const hiddenCaseIds = new Set(caseRows.filter(row => row.data.source === 'demo').map(row => row.data.id));
+  base.cases = await Promise.all(visibleWorkspaceCases(caseRows.map(row => row.data)).map(async item => {
     const evidence = evidenceRows.filter(record => record.data.caseId === item.id).map(record => evidenceForClient(record.data));
     const draft = draftRows.find(record => record.data.caseId === item.id)?.data;
     const sourceStale = Boolean(draft && draft.sourceRevision !== null && draft.sourceRevision !== item.dataRevision);
@@ -98,14 +99,15 @@ export async function getWorkspaceState(user: TrustedUser): Promise<WorkspaceSta
   base.cases.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const bedrockConfigured = Boolean(process.env.BEDROCK_MODEL_ID && (process.env.AWS_REGION || 'us-east-1') === 'us-east-1');
   base.integrations = [stripe,
-    { id: 'bedrock', provider: 'bedrock', name: 'Amazon Bedrock', status: bedrockConfigured ? 'connected' : 'configuration_required', accountName: process.env.BEDROCK_MODEL_ID, description: bedrockConfigured ? 'Configured for sourced AI investigations using the AWS execution role. Model access is checked when an investigation runs.' : 'Configure a tool-capable Bedrock model in us-east-1. Sample investigations remain available for sample cases.' },
+    { id: 'bedrock', provider: 'bedrock', name: 'Amazon Bedrock', status: bedrockConfigured ? 'connected' : 'configuration_required', accountName: process.env.BEDROCK_MODEL_ID, description: bedrockConfigured ? 'Configured for sourced AI investigations using the AWS execution role. Model access is checked when an investigation runs.' : 'Configure a tool-capable Bedrock model in us-east-1.' },
     { id: 'gmail', provider: 'gmail', name: 'Gmail', status: gmail?.data.status === 'authorized' ? 'connected' : process.env.GMAIL_OAUTH_SECRET_ARN ? 'not_connected' : 'configuration_required', accountName: gmail?.data.email, description: 'Authorize read-only Gmail access in Connections, search by case customer email, and review selected plain-text messages before importing.' },
     { id: 'imap', provider: 'imap', name: 'Other email (IMAP)', status: imap?.data.status === 'authorized' ? 'connected' : 'not_connected', accountName: imap?.data.email, description: 'Connect a mailbox over TLS, then review selected customer emails before importing.' },
     { id: 'database', provider: 'database', name: 'Company records', status: merchantConfigured(workspaceId) ? 'connected' : 'configuration_required', description: merchantConfigured(workspaceId) ? 'A merchant-owned evidence API is configured for this workspace. Only records linked to an approved case are retrieved.' : 'Connect a merchant-owned evidence API with a workspace binding. No database credentials are required.' },
   ];
   base.policies = policyRows.map(record => { const { fileKey, ...policy } = record.data as Policy & { fileKey?: string }; return { ...policy, ...(fileKey ? { downloadUrl: `/api/policies/${encodeURIComponent(policy.id)}` } : {}) }; }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  base.activity = auditRows.map(record => record.data).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 100);
-  base.accessRequests = accessRows.map(({ data }) => ({ ...data, canReview: data.status === 'pending' && canReviewAccess(data.requestedBy, user.userId) })).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 100);
+  base.activity = visibleWorkspaceEvents(auditRows.map(record => record.data), hiddenCaseIds).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 100);
+  base.accessRequests = accessRows.filter(row => sampleDataEnabled() || !row.data.caseId || !hiddenCaseIds.has(row.data.caseId)).map(({ data }) => ({ ...data, canReview: data.status === 'pending' && canReviewAccess(data.requestedBy, user.userId) })).sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 100);
+
   if (Buffer.byteLength(JSON.stringify(base)) > 4 * 1024 * 1024) throw new ApiError(413, 'This workspace exceeds the prototype response limit. Reduce the attached records before loading all cases.', 'workspace_too_large');
   return base;
 }
@@ -124,6 +126,8 @@ export async function executeAction(user: TrustedUser, input: unknown): Promise<
   const workspace = await requireWorkspace(user); const wid = workspace.data.id;
   switch (action.action) {
     case 'seedDemo': {
+      if (!sampleDataEnabled()) throw new ApiError(404, 'Sample data is not available.');
+      const { DEMO_CASES } = await import('../lib/demo.ts');
       for (const sample of DEMO_CASES) {
         const id = `${wid}_${sample.id}`;
         if (await getItem(wid, keys.case(id))) continue;

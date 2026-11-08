@@ -6,7 +6,7 @@ import { ApiError, type TrustedUser } from './types.ts';
 import { getWorkspaceState, executeAction, requireWorkspace } from './workspace.ts';
 import { getInvestigationConfig, startInvestigation, getLatestInvestigation, cancelInvestigation, processInvestigation, importMerchantCase, importManagedMerchantCase } from './investigations.ts';
 import { prepareUpload, completeUpload, getDownload, archiveApprovedCase } from './files.ts';
-import { configuration, listStripeIntegration, connectStripe, disconnectStripe, syncStripe, submitStripe, handleStripeWebhook } from './stripe.ts';
+import { configuration, listStripeIntegration, connectStripe, disconnectStripe, syncStripe, submitStripe, saveStripeDraft, handleStripeWebhook } from './stripe.ts';
 import { listEvidenceConnections, executeConnectorAction, getConnectorInstallation } from './connectors.ts';
 import { listManagedConnections, executeManagedConnectorAction, parseLiveImport } from './managed-connectors.ts';
 import { providerStatus, startSupabase, finishSupabase, supabaseAction } from './providers.ts';
@@ -99,6 +99,7 @@ async function route(raw:unknown) {
     if(path==='/api/stripe/connect')return {status:200,body:await connectStripe(wid,user.displayName)};
     if(path==='/api/stripe/disconnect')return {status:200,body:await disconnectStripe(wid,user.displayName)};
     if(path==='/api/stripe/sync')return {status:200,body:await syncStripe(wid,user.displayName)};
+    if(path==='/api/stripe/draft')return {status:200,body:await saveStripeDraft(wid,user.displayName,parse(submissionSchema.extend({autoSubmitAcknowledged:z.literal(true)}),event.body))};
     if(path==='/api/stripe/submit')return {status:200,body:await submitStripe(wid,user.displayName,parse(submissionSchema,event.body))};
    }
   }

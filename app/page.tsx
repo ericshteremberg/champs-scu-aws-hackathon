@@ -5,9 +5,9 @@ import { IntegrationCarousel } from "@/components/landing/integration-carousel";
 import "./landing.css";
 
 const principles = [
-  { icon: ArrowUpRight, title: "Query only approved records.", description: "Customer and transaction IDs constrain each query. The access layer filters permitted fields before results reach the investigator." },
-  { icon: ArrowLeftRight, title: "Use a fresh context at each stage.", description: "Pass only filtered evidence and the task-specific toolset. Exclude case records from training, fine-tuning, and shared customer memory." },
-  { icon: ArrowRight, title: "Enforce permissions outside the AI.", description: "An independent policy layer approves broader access. Reports and audit logs stay separate from agent context, under explicit retention rules." },
+  { icon: ArrowUpRight, title: "Choose the source.", description: "Select a database project, review its schema, and map the tables and fields your cases need." },
+  { icon: ArrowLeftRight, title: "Follow the order.", description: "A configured read-only connector looks up records for the selected case. Payment and order references keep the search scoped." },
+  { icon: ArrowRight, title: "Compile the evidence.", description: "Bring matched records and email delivery events into a cited report. Inspect the sources, missing facts, and contradictions before approving." },
 ];
 
 function Brand() {
@@ -34,12 +34,30 @@ export default function Home() {
           <ProductDemo />
         </section>
         <section className="landing-investigation" id="investigation" aria-labelledby="investigation-title"><div className="landing-container landing-investigation-grid">
-          <div className="landing-investigation-intro"><h2 id="investigation-title">Designed to investigate.<br />Without training on your data.</h2><p className="landing-muted">The intended architecture processes approved records for one case, without training on them or building a persistent cross-customer agent memory.</p><img className="landing-architecture" src="/causality/access-architecture-compact.svg" width="480" height="340" loading="lazy" alt="Planned access architecture: company records pass through a policy gate into a fresh context containing evidence and tools. Company policy and the audit log remain outside the investigator’s context." /></div>
+          <div className="landing-investigation-intro"><h2 id="investigation-title">Find the records<br />behind the charge.</h2><p className="landing-muted">Start with an order. Follow its payment, database records, and email trail into one reviewable case.</p>
+            <div className="landing-query-diagram">
+              <svg viewBox="0 0 480 330" role="img" aria-labelledby="lookup-title lookup-desc">
+                <title id="lookup-title">From database records to a cited report</title>
+                <desc id="lookup-desc">Example: orders, tickets and message_log feed a read-only lookup scoped to order 1048. Only matched records pass into the evidence used for a cited report.</desc>
+                <defs><linearGradient id="lookup-fill" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#fffaf4"/><stop offset="1" stopColor="#fff"/></linearGradient></defs>
+                <text x="4" y="28" className="lookup-label">Selected tables</text><text x="476" y="28" textAnchor="end" className="lookup-label">Example</text>
+                <g className="lookup-routes"><path d="M128 88H144Q152 88 152 96V147Q152 157 168 157"/><path d="M128 157H168"/><path d="M128 226H144Q152 226 152 218V167Q152 157 168 157"/><path d="M312 157H350"/></g>
+                <g className="lookup-flow" aria-hidden="true"><path d="M128 88H144Q152 88 152 96V147Q152 157 168 157"/><path d="M128 157H168"/><path d="M128 226H144Q152 226 152 218V167Q152 157 168 157"/><path d="M312 157H350"/></g>
+                <g className="lookup-table"><rect x="1" y="62" width="127" height="52" rx="8"/><path d="M15 78h14v19H15z M15 84h14 M21 84v13"/><text x="40" y="94">orders</text></g>
+                <g className="lookup-table"><rect x="1" y="131" width="127" height="52" rx="8"/><path d="M15 147h14v19H15z M15 153h14 M21 153v13"/><text x="40" y="163">tickets</text></g>
+                <g className="lookup-table"><rect x="1" y="200" width="127" height="52" rx="8"/><text x="14" y="232">message_log</text></g>
+                <g className="lookup-match"><rect x="168" y="93" width="144" height="128" rx="12" fill="url(#lookup-fill)"/><text x="240" y="123" textAnchor="middle">Match order</text><rect x="184" y="139" width="112" height="36" rx="5" className="lookup-key"/><text x="240" y="163" textAnchor="middle" className="lookup-key-text">#1048</text><text x="240" y="201" textAnchor="middle" className="lookup-label">Read-only</text></g>
+                <g className="lookup-output"><rect x="350" y="111" width="129" height="92" rx="10"/><path d="M367 131h15 M367 137h22 M367 143h18"/><text x="414" y="169" textAnchor="middle">Evidence</text><text x="414" y="191" textAnchor="middle" className="lookup-label">Cited report</text></g>
+                <path className="lookup-bracket" d="M168 240v12h311v-12"/><text x="324" y="282" textAnchor="middle" className="lookup-label">Only matched records</text>
+              </svg>
+            </div>
+            <p className="landing-query-note landing-muted">Schema review identifies the fields. Row searches require a configured evidence connector.</p>
+          </div>
           <div className="landing-principles">{principles.map(({ icon: Icon, title, description }) => <article className="landing-principle" key={title}><Icon className="landing-principle-icon" size={28} strokeWidth={1.5} aria-hidden="true" /><div><h3>{title}</h3><p>{description}</p></div></article>)}</div>
         </div></section>
         <section className="landing-controls landing-container" id="access-control" aria-labelledby="control-title">
           <div className="landing-control-panel"><div className="landing-caption-row"><p className="landing-eyebrow">Access &amp; control</p><p className="landing-muted">Design preview</p></div><div className="landing-control-grid">
-            <div className="landing-control-copy"><h2 id="control-title">Your data.<br />Your boundaries.</h2><p className="landing-muted">Choose the records an investigation may use. Additional access requires independent approval.</p><p className="landing-medium">Scoped results. External enforcement.<br />An activity trail you can inspect.</p></div>
+            <div className="landing-control-copy"><h2 id="control-title">Access you can<br />inspect.</h2><p className="landing-muted">Choose the records an investigation may use. Additional access requires independent approval.</p><p className="landing-medium">Scoped results. External enforcement.<br />An activity trail you can inspect.</p></div>
             <dl className="landing-scope-list"><div><dt>Order #1048<span>Payment, fulfilment, relevant policy</span></dt><dd>Allowed</dd></div><div><dt>Other customer records<span>Unrelated emails and transactions</span></dt><dd>Excluded</dd></div><div><dt>More delivery evidence<span>A new scope request</span></dt><dd>Approval required</dd></div></dl>
           </div><p className="landing-control-note landing-muted">The investigator cannot approve its own access. Controls shown reflect the planned access model.</p></div>
           <div className="landing-outcome-band"><h2>Protect revenue. Reduce investigation costs.</h2><p>Prepared by Causality. Approved by you.</p></div>

@@ -50,13 +50,12 @@ async function main() {
     if (process.env.CAUSALITY_EXPECT_SAVED_RESEND === '1') {
       stage = 'saved Resend preview';
       const resend = page.getByRole('article', { name: 'Resend email evidence' });
-      await resend.getByRole('button', { name: 'Import email evidence' }).click();
       await resend.getByLabel('Resend evidence case').selectOption(caseId);
       await expect(resend.getByRole('heading', { name: 'Saved case evidence, not reverified' })).toBeVisible({ timeout: 30000 });
       await expect(resend.getByRole('alert')).toHaveCount(0);
-      await expect(resend.getByRole('button', { name: 'Attach to case' })).toHaveCount(0);
+      await expect(resend.getByRole('button', { name: 'Attach to report' })).toHaveCount(0);
       await expect(resend).toContainText('Already attached.');
-      await expect(collector).toContainText('The live Resend record could not be reverified.');
+      await expect(collector).toContainText('Live record not reverified.');
       await resend.screenshot({ path: '.aws-build/resend-retained-mobile.png' });
       savedResendVerified = true;
     }

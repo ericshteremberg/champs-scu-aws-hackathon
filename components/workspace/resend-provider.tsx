@@ -1,57 +1,151 @@
 "use client";
+
 import { useEffect, useState } from 'react';
+import { Mail, RefreshCw } from 'lucide-react';
+import type { DisputeCase, WorkspaceState } from '../../lib/domain';
+import './provider-connectors.css';
+
 type Status = { configured: boolean; verifiedAt: string | null; domains: string[] };
-type Case = { id: string; customerName: string; orderRef: string; source: string; status: string; email: string };
-type Preview = { content: string; emailId: string; orderRef: string; savedEvidence?: boolean; liveVerified?: boolean; notice?: string; truncated?: boolean };
-type Candidate = { emailId: string; subject: string; createdAt?: string; source: string };
-type Search = { candidates: Candidate[]; moreAvailable: boolean; nextCursor?: string; searchedEmail: string; orderRef: string; linkedTruncated?: boolean };
-async function api<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(path, { method: body ? 'POST' : 'GET', headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined, cache: 'no-store' });
-  const value = await response.json() as T & { error?: string }; if (!response.ok) throw new Error(value.error || 'Resend request failed.'); return value;
+type Preview = { content: string; emailId: string; orderRef: string; subject: string; lastEvent: string; eventCount: number; evidenceId?: string; savedLog?: boolean; logStatus?: string; notice?: string; savedEvidence?: boolean; truncated?: boolean };
+type Search = { candidates: { emailId: string; subject: string; source: string }[]; moreAvailable: boolean; nextCursor?: string; searchedEmail: string; orderRef: string };
+type SavedEmail = { evidenceId: string; emailId: string | null; subject: string; logStatus: string; occurredAt: string | null };
+type Props = {
+  cases: DisputeCase[];
+  caseId?: string;
+  disabled?: boolean;
+  designPreview?: boolean;
+  onBusyChange?: (busy: boolean) => void;
+  onImported: (state: WorkspaceState, caseId: string) => void;
+};
+async function api<T>(body?: unknown): Promise<T> {
+  const response = await fetch('/api/providers/resend', {
+    method: body ? 'POST' : 'GET', headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    body: body ? JSON.stringify(body) : undefined, cache: 'no-store',
+  });
+  const value = await response.json() as T & { error?: string; code?: string };
+  if (!response.ok) throw new Error(response.status === 404 && !value.error
+    ? 'Resend controls need the current AWS backend. Deploy the matching backend, then retry.'
+    : value.code === 'aws_required' ? 'Live email access requires the deployed workspace.'
+    : value.error || 'Could not reach Resend. Try again.');
+  return value;
 }
-export function ResendConnector() {
-  const [status,setStatus] = useState<Status | null>(null), [cases,setCases] = useState<Case[]>([]);
-  const [caseId,setCaseId] = useState(''), [emailId,setEmailId] = useState(''), [preview,setPreview] = useState<Preview | null>(null), [search,setSearch] = useState<Search | null>(null);
-  const [busy,setBusy] = useState(false), [error,setError] = useState(''), [notice,setNotice] = useState('');
-  useEffect(() => { let alive=true; api<Status>('/api/providers/resend').then(s=>{if(alive)setStatus(s);}).catch(e=>{if(alive)setError(e.message);}); return ()=>{alive=false;}; },[]);
-  const run = async (action: ()=>Promise<void>) => {setBusy(true);setError('');setNotice('');try{await action();}catch(e){setError(e instanceof Error?e.message:'Request failed.');}finally{setBusy(false);}};
-  const showPreview = async (id: string, selectedCase = caseId) => { setPreview(null); const r=await api<{preview:Preview}>('/api/providers/resend',{action:'preview',caseId:selectedCase,emailId:id});setEmailId(id);setPreview(r.preview);if(r.preview.savedEvidence)setNotice(r.preview.notice || 'Showing saved case evidence. Live Resend verification is unavailable.'); };
-  const find = async (selectedCase: string, recent = false, after?: string) => {
-    setPreview(null); setSearch(null); setEmailId('');
-    const result = await api<Search>('/api/providers/resend', { action: 'find', caseId: selectedCase, ...(recent ? { recent: true } : {}), ...(after ? { after } : {}) });
-    setSearch(result);
-    setNotice(result.candidates.length ? `Found ${result.candidates.length} candidate emails for ${result.searchedEmail}. Recipient, sender and exact order are checked before preview.` : `No matching emails in this page for ${result.searchedEmail}.${result.moreAvailable ? ' Search older emails below.' : ' No more records were returned.'} This does not prove an email was never sent.`);
-    if (result.candidates.length === 1 && result.candidates[0].source === 'case_reference') await showPreview(result.candidates[0].emailId, selectedCase);
+const validId = /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i;
+
+export function ResendConnector({ cases, caseId: fixedCaseId, disabled = false, designPreview = false, onBusyChange, onImported }: Props) {
+  const [expanded, setExpanded] = useState(!fixedCaseId);
+  const [status, setStatus] = useState<Status | null>(null);
+  const [selectedCase, setSelectedCase] = useState(fixedCaseId || '');
+  const [emailId, setEmailId] = useState('');
+  const [search, setSearch] = useState<Search | null>(null);
+  const [searchNote, setSearchNote] = useState('');
+  const [savedEmails, setSavedEmails] = useState<SavedEmail[]>([]);
+  const [discoveryNote, setDiscoveryNote] = useState('');
+  const [preview, setPreview] = useState<Preview | null>(null);
+  const [loading, setLoading] = useState(false), [busy, setBusy] = useState(false);
+  const [error, setError] = useState(''), [notice, setNotice] = useState('');
+  const caseId = fixedCaseId || selectedCase;
+  const current = cases.find(c => c.id === caseId);
+  const eligible = cases.filter(c => c.source !== 'demo' && !['investigating', 'submitting', 'submitted', 'won', 'lost'].includes(c.status));
+  const sample = current?.source === 'demo' || designPreview;
+  const locked = disabled || busy || loading;
+  const imported = current?.evidence.filter(e => e.provenance?.fields.provider === 'Resend') || [];
+  useEffect(() => {
+    if (!expanded || sample) return;
+    let alive = true;
+    setLoading(true); setError('');
+    api<Status>().then(s => { if (alive) setStatus(s); }).catch(e => { if (alive) setError(e.message); }).finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [expanded, sample]);
+  useEffect(() => {
+    let alive = true; setSavedEmails([]); setPreview(null); setDiscoveryNote('');
+    if (!expanded || !caseId || sample) return;
+    api<{ records: SavedEmail[] }>({ action: 'discover', caseId }).then(r => {
+      if (alive) { setSavedEmails(r.records); setDiscoveryNote(r.records.length ? 'Saved order emails are included.' : 'No saved order emails.'); }
+    }).catch(e => { if (alive) setDiscoveryNote(e.message); });
+    return () => { alive = false; };
+  }, [expanded, caseId, sample, current?.orderRef, current?.evidence]);
+  useEffect(() => {
+    let alive = true; setSearch(null); setSearchNote('');
+    if (!expanded || !caseId || sample || !status?.configured) return;
+    api<Search>({ action: 'find', caseId }).then(async result => {
+      if (!alive) return;
+      setSearch(result);
+      if (result.candidates.length === 1 && result.candidates[0].source === 'case_reference') {
+        const response = await api<{ preview: Preview }>({ action: 'preview', caseId, emailId: result.candidates[0].emailId });
+        if (alive) setPreview(response.preview);
+      }
+    }).catch(e => { if (alive) setSearchNote(e.message); });
+    return () => { alive = false; };
+  }, [expanded, caseId, sample, status?.configured]);
+  useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true); setError(''); setNotice('');
+    try { await action(); } catch (e) { setError(e instanceof Error ? e.message : 'Request failed.'); } finally { setBusy(false); }
   };
-  return <article id="resend-connection" className="cw-provider-card" aria-label="Resend email evidence">
-    <h3>Resend <span className={`cw-pill${status?.verifiedAt ? ' green' : ''}`}>{status?.verifiedAt?'Read access verified':status?.configured?'Configured':'Not configured'}</span></h3>
-    <p>Choose a case to find its sent emails automatically. We use Resend references already linked to the case, including imported message-log records, then search sent-email metadata by recipient when needed.</p>
-    <p className="cw-provider-note">Delivery means mail-server acceptance, not reading or attendance. No sending access is used.</p>
-    {error && <p role="alert" className="cw-banner error">{error}</p>}{notice && <p role="status" className="cw-banner neutral">{notice}</p>}
-    {status?.configured && <>
-      <p className="cw-provider-note">Allowed senders: {status.domains.join(', ')}</p>
-      <div className="cw-actions"><button className="cw-button" disabled={busy} onClick={()=>void run(async()=>{await api('/api/providers/resend',{action:'verify'});setStatus(await api<Status>('/api/providers/resend'));setNotice('Read access verified. No email was sent.');})}>Verify access</button><button className="cw-button" disabled={busy} onClick={()=>void run(async()=>{const s=await api<{cases:Case[]}>('/api/workspace');setCases(s.cases.filter(c=>c.source!=='demo' && ['needs_review','investigating','ready'].includes(c.status)));setCaseId('');setPreview(null);setSearch(null);setEmailId('');setNotice('Choose a case. Its email references and recipient are looked up automatically.');})}>Import email evidence</button></div>
-      {!!cases.length && <div className="cw-provider-project">
-        <label className="cw-field"><span>Resend evidence case</span><select value={caseId} disabled={busy} onChange={e=>{const id=e.target.value;setCaseId(id);setPreview(null);setSearch(null);setEmailId('');if(id)void run(()=>find(id));}}><option value="">Choose a case</option>{cases.map(c=><option key={c.id} value={c.id}>{c.customerName} · {c.orderRef}</option>)}</select></label>
-        {search && <>
-          <p>Recipient: <strong>{search.searchedEmail}</strong>. Order: {search.orderRef}.</p>
-          {search.linkedTruncated && <p>Only the first 20 linked references are shown.</p>}
-          <ul className="cw-gmail-results">{search.candidates.map(candidate=><li key={candidate.emailId}><div><strong>{candidate.subject || '(No subject)'}</strong><p>{candidate.source==='case_reference'?'Linked from case evidence':'Recipient match, order not yet verified'}{candidate.createdAt && ` · ${new Date(candidate.createdAt).toLocaleString()}`}</p></div><button className="cw-button" disabled={busy} onClick={()=>void run(()=>showPreview(candidate.emailId))}>Preview email <span className="sr-only">{candidate.emailId}</span></button></li>)}</ul>
-          {search.moreAvailable && <button className="cw-button" disabled={busy} onClick={()=>void run(()=>find(caseId,true,search.nextCursor))}>Search older Resend emails</button>}
+  const refreshStatus = () => run(async () => setStatus(await api<Status>()));
+  const reset = () => { setPreview(null); setNotice(''); setError(''); };
+  return <article className={`cw-provider-card cw-resend${fixedCaseId ? ' cw-resend-inline' : ''}`} aria-label="Resend email evidence">
+    <div className="cw-resend-heading">
+      <div><h3><Mail size={18} aria-hidden="true" />Resend{imported.length > 0 && <span className="cw-pill green">{imported.length} linked</span>}</h3><p>Order emails and delivery records.</p></div>
+      {fixedCaseId && <button className="cw-button" aria-expanded={expanded} disabled={busy} onClick={() => setExpanded(!expanded)}>{expanded ? 'Close' : 'Add email evidence'}</button>}
+    </div>
+    {expanded && <div className="cw-resend-body">
+      {sample ? <p className="cw-provider-note">Live email imports are available on real cases. Sample evidence stays separate.</p> : <>
+        {error && <p role="alert" className="cw-banner error">{error}</p>}
+        {notice && <p role="status" className="cw-banner neutral">{notice}</p>}
+        <div className="cw-resend-status"><span className="cw-pill">{loading ? 'Checking connection…' : !status ? 'Connection unavailable' : status.verifiedAt ? 'Read access verified' : status.configured ? 'Ready to verify' : 'Setup required'}</span>
+          <button className="cw-button" disabled={locked} onClick={() => void (status?.configured ? run(async () => { await api({ action: 'verify' }); setStatus(await api<Status>()); setNotice('Read access verified.'); }) : refreshStatus())}><RefreshCw size={15} aria-hidden="true" />{status?.configured ? 'Verify access' : 'Retry connection'}</button>
+        </div>
+        {status && !status.configured && <p className="cw-provider-note">Resend setup required.</p>}
+        {status && <>
+          {disabled && <p className="cw-provider-note">Save your edits before importing. Closed cases are read-only.</p>}
+          <p className="cw-provider-note">Senders: {status.domains.join(', ') || 'No approved domains'}</p>
+          {!fixedCaseId && <label className="cw-field"><span>Resend evidence case</span><select value={selectedCase} disabled={locked} onChange={e => { setSelectedCase(e.target.value); setEmailId(''); reset(); }}><option value="">Choose a case</option>{eligible.map(c => <option key={c.id} value={c.id}>{c.customerName} · {c.orderRef || c.title}</option>)}</select></label>}
+          {!fixedCaseId && !eligible.length && <p className="cw-provider-note">Create or import a real case to attach email evidence.</p>}
+          {discoveryNote && <p className="cw-provider-note" role="status">{discoveryNote}</p>}
+          {savedEmails.map(log => <div className="cw-resend-heading" key={log.evidenceId}>
+            <div><strong>{log.subject.replaceAll('_', ' ')}</strong><p>Order log: {log.logStatus}{log.occurredAt ? ` · ${log.occurredAt}` : ''}</p></div>
+            <button className="cw-button" disabled={locked} onClick={() => void run(async () => {
+              setPreview(null); const r = await api<{ preview: Preview }>({ action: 'preview_log', caseId, evidenceId: log.evidenceId }); setPreview(r.preview);
+            })}>View email record</button>
+          </div>)}
+          {searchNote && <p className="cw-provider-note">{searchNote}</p>}
+          {search && <section aria-label="Discovered Resend emails">
+            <p>{search.candidates.length} candidates · {search.searchedEmail}</p>
+            {search.candidates.map(candidate => <div className="cw-resend-heading" key={candidate.emailId}>
+              <strong>{candidate.subject || '(No subject)'}</strong>
+              <button className="cw-button" disabled={locked} onClick={() => void run(async () => {
+                setPreview(null); const result = await api<{ preview: Preview }>({ action:'preview', caseId, emailId:candidate.emailId }); setPreview(result.preview);
+              })}>Preview email <span className="sr-only">{candidate.emailId}</span></button>
+            </div>)}
+            {!search.candidates.length && <p>No matches on this page.</p>}
+          </section>}
+          {status.configured && caseId && <div className="cw-actions">
+            <button className="cw-button" disabled={locked} onClick={() => void run(async () => { setPreview(null); setSearch(await api<Search>({ action:'find', caseId, recent:true })); })}>Search recent Resend emails</button>
+            {search?.moreAvailable && <button className="cw-button" disabled={locked} onClick={() => void run(async () => { setPreview(null); setSearch(await api<Search>({ action:'find', caseId, recent:true, after:search.nextCursor })); })}>Search older Resend emails</button>}
+          </div>}
+          <details><summary>Look up another email</summary>
+          <div className="cw-resend-input"><label className="cw-field"><span>Resend email ID</span><input value={emailId} disabled={locked || !current} placeholder="Email ID from Resend" autoComplete="off" spellCheck={false} onChange={e => { setEmailId(e.target.value.trim()); reset(); }} /></label>
+            <button className="cw-button" disabled={locked || !current || !validId.test(emailId)} onClick={() => void run(async () => { setPreview(null); const r = await api<{ preview: Preview }>({ action: 'preview', caseId, emailId }); setPreview(r.preview); })}>{busy ? 'Checking…' : 'Preview email'}</button>
+          </div>
+          <p className="cw-provider-note">Recipient, order and sender must match.</p></details>
+          {preview && <section className="cw-resend-preview" aria-label="Matched Resend record"><div className="cw-resend-heading"><h4>{preview.savedEvidence ? "Saved case evidence, not reverified" : preview.subject}</h4><span className="cw-pill">{preview.savedLog ? `Order log: ${preview.logStatus}` : preview.lastEvent.replace(/^email\./, '').replaceAll('_', ' ')}</span></div>
+            {preview.notice && <p>{preview.notice}</p>}
+            {preview.truncated && <p>Preview excerpt only. Review the full source on the case.</p>}
+            <p>Matched to {preview.orderRef} · {preview.eventCount} captured events</p>
+            <details><summary>Inspect source record</summary><pre>{preview.content}</pre></details>
+            <p className="cw-provider-note">Delivered ≠ read or attended.</p>
+            {preview.savedEvidence ? <p>Already attached · live delivery not reverified.</p> : <button className="cw-button primary" disabled={locked} onClick={() => void run(async () => {
+              await api(preview.evidenceId ? { action: 'import_log', caseId, evidenceId: preview.evidenceId, confirmed: true } : { action: 'import', caseId, emailId: preview.emailId, confirmed: true });
+              setPreview(null); setNotice(preview.savedLog ? 'Saved email log is included in the next compilation. Delivery remains unverified.' : 'Email attached. It will be included in the next compilation.');
+              const response = await fetch('/api/workspace', { cache: 'no-store' });
+              if (!response.ok) throw new Error('Email saved. Reload the workspace to see the updated evidence before compiling.');
+              onImported(await response.json() as WorkspaceState, caseId);
+            })}>{busy ? 'Checking…' : preview.savedLog ? 'Use saved email log' : 'Attach to report'}</button>}
+          </section>}
+          {imported.length > 0 && <details className="cw-resend-linked"><summary>Linked Resend records ({imported.length})</summary>{imported.map(e => <div key={e.id}><span>{e.title}</span><button className="cw-button" disabled={locked} onClick={() => { setEmailId(String(e.provenance?.fields.emailId || '')); reset(); }}>Check latest status</button></div>)}</details>}
         </>}
-        {!!caseId && <button className="cw-button" disabled={busy} onClick={()=>void run(()=>find(caseId,true))}>Search recent Resend emails</button>}
-        <details><summary>Advanced: use a known Resend email ID</summary>
-          <label className="cw-field"><span>Resend email ID</span><input value={emailId} disabled={busy} placeholder="Optional manual fallback" onChange={e=>{setEmailId(e.target.value.trim());setPreview(null);}}/></label>
-          <button className="cw-button" disabled={busy||!caseId||!emailId} onClick={()=>void run(()=>showPreview(emailId))}>Preview matched record</button>
-        </details>
-      </div>}
-      {busy && <p role="status">Finding and checking email records…</p>}
-      {preview && <section aria-label="Resend evidence preview"><h4>{preview.savedEvidence ? 'Saved case evidence, not reverified' : 'Live Resend record'}</h4>
-        {preview.savedEvidence && <p>This evidence is already attached to the case and remains available to the investigation. It does not establish fresh provider verification or confirmed delivery.</p>}
-        {preview.truncated && <p>Only part of the saved evidence is shown here. Review the full original on the case.</p>}
-        <pre style={{whiteSpace:'pre-wrap',overflowWrap:'anywhere',font:'inherit',lineHeight:1.6}}>{preview.content}</pre>
-        {preview.savedEvidence ? <p>Already attached. The original evidence and report were not changed.</p> : <button className="cw-button primary" disabled={busy} onClick={()=>void run(async()=>{await api('/api/providers/resend',{action:'import',caseId,emailId:preview.emailId,confirmed:true});setPreview(null);setNotice('Evidence saved to the case. Run the investigation again to include it.');})}>Attach to case</button>}
-      </section>}
-    </>}
+      </>}
+    </div>}
   </article>;
 }

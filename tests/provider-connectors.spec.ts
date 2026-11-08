@@ -307,16 +307,16 @@ test('choosing a Resend case finds its saved reference and previews without UUID
   await page.route('**/api/providers/resend', async route => {
     if (route.request().method() === 'GET') return route.fulfill({ json: { configured: true, verifiedAt: null, domains: ['send.example.com'] } });
     const body = route.request().postDataJSON(); calls.push(body);
+    if (body.action === 'discover') return route.fulfill({ json: { records: [] } });
     if (body.action === 'find') return route.fulfill({ json: { candidates: [{ emailId, subject: 'Linked receipt', source: 'case_reference' }], moreAvailable: false, searchedEmail: 'old@example.com', orderRef: 'ORDER-LOOKUP' } });
-    return route.fulfill({ json: { preview: { emailId, orderRef: 'ORDER-LOOKUP', content: 'Verified recipient and order. Delivered is not proof of reading.' } } });
+    return route.fulfill({ json: { preview: { emailId, subject: 'Linked receipt', lastEvent: 'delivered', eventCount: 0, orderRef: 'ORDER-LOOKUP', content: 'Verified recipient and order. Delivered is not proof of reading.' } } });
   });
   await page.goto('/workspace?view=integrations');
   const card = page.getByRole('article', { name: 'Resend email evidence' });
-  await card.getByRole('button', { name: 'Import email evidence' }).click();
   await card.getByLabel('Resend evidence case').selectOption(caseId);
   await expect(card.locator('pre')).toContainText('Verified recipient and order');
   await expect(card.getByLabel('Resend email ID')).toBeHidden();
-  expect(calls).toEqual([{ action: 'find', caseId }, { action: 'preview', caseId, emailId }]);
+  expect(calls.filter(c => c.action !== 'discover')).toEqual([{ action: 'find', caseId }, { action: 'preview', caseId, emailId }]);
   expect(calls.some(c => c.action === 'import')).toBe(false);
 });
 
@@ -356,22 +356,22 @@ test('unavailable Resend email shows saved evidence without offering a duplicate
   await page.route('**/api/providers/resend', async route => {
     if (route.request().method() === 'GET') return route.fulfill({ json: { configured: true, verifiedAt: '2026-11-01', domains: ['send.example.com'] } });
     const body = route.request().postDataJSON(); calls.push(body.action);
+    if (body.action === 'discover') return route.fulfill({ json: { records: [] } });
     if (body.action === 'find') return route.fulfill({ json: { candidates: [{ emailId, subject: 'Email referenced by this case', source: 'case_reference' }], moreAvailable: false, searchedEmail: 'old@example.com', orderRef: 'ORDER-LOOKUP' } });
-    return route.fulfill({ json: { preview: { emailId, subject: 'Saved email evidence', orderRef: 'ORDER-LOOKUP', savedEvidence: true, liveVerified: false, notice: 'Resend could not return the live record. Showing evidence already saved on this case.', content: '<script>not executed</script> Original captured evidence.' } } });
+    return route.fulfill({ json: { preview: { emailId, subject: 'Saved email evidence', lastEvent: 'unavailable', eventCount: 0, orderRef: 'ORDER-LOOKUP', savedEvidence: true, liveVerified: false, notice: 'Resend could not return the live record. Showing evidence already saved on this case.', content: '<script>not executed</script> Original captured evidence.' } } });
   });
   await page.goto('/workspace?view=integrations');
   const card = page.getByRole('article', { name: 'Resend email evidence' });
-  await card.getByRole('button', { name: 'Import email evidence' }).click();
   await card.getByLabel('Resend evidence case').selectOption(caseId);
   await expect(card.getByRole('heading', { name: 'Saved case evidence, not reverified' })).toBeVisible();
   await expect(card.getByRole('alert')).toHaveCount(0);
-  await expect(card.getByRole('button', { name: 'Attach to case' })).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Attach to report' })).toHaveCount(0);
   await expect(card.locator('pre')).toContainText('<script>not executed</script>');
   await expect(card).toContainText('Already attached.');
   const collector = page.getByRole('article', { name: 'Get evidence from all providers' });
   await collector.getByLabel('Case to collect evidence for').selectOption(caseId);
   await collector.getByRole('button', { name: 'Get evidence', exact: true }).click();
-  await expect(collector).toContainText('Saved case evidence is available. The live Resend record could not be reverified.');
+  await expect(collector).toContainText('Saved evidence available. Live record not reverified.');
   await expect(collector).not.toContainText('Found and verified the email');
   expect(calls).not.toContain('import');
 });

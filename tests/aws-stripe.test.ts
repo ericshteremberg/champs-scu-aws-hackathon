@@ -38,7 +38,7 @@ function fixture(overrides: Partial<Stripe.Dispute> = {}): Stripe.Dispute {
 }
 const caseId = `stripe_${workspace}_dp_ticket_1042`;
 
-function harness() {
+function harness(sdk?: Stripe) {
   const records = new Map<string, Stored<unknown>>();
   const mapKey = (wid: string, key: string) => `${wid}/${key}`;
   let beforeCommit: ((changes: StoreChange[]) => void) | undefined;
@@ -84,6 +84,7 @@ function harness() {
     STRIPE_WORKSPACE_ID: workspace,
     STRIPE_WEBHOOK_SECRET: "whsec_synthetic",
     STRIPE_ENABLE_SUBMISSION: "true",
+    STRIPE_ENABLE_DRAFT_WRITES: "true",
     STRIPE_ALLOW_LIVE: "false",
   };
   const current = fixture();
@@ -116,7 +117,7 @@ function harness() {
     queryItems,
     commit,
     settings: () => env,
-    client,
+    client: sdk ? () => sdk : client,
   });
   const connection: StripeConnection = {
     accountId: account.id,
@@ -336,5 +337,23 @@ describe("AWS Stripe webhook verification and replay protection", () => {
     );
     expect(h.retrieve).not.toHaveBeenCalled();
     expect(h.commit).not.toHaveBeenCalled();
+  });
+});
+
+const saveDraft = (h: ReturnType<typeof harness>, overrides = {}) =>
+  h.service.saveStripeDraft(workspace, 'Reviewer', { caseId, confirmed: true, draftRevision: 3, autoSubmitAcknowledged: true, ...overrides });
+
+describe('Review-only Stripe draft boundary', () => {
+  it.each(['true', 'false'])('blocks draft writes even with legacy flag %s', async flag => {
+    const h = harness(); await h.ready();
+    h.env.STRIPE_ENABLE_DRAFT_WRITES = flag;
+    const before = structuredClone([...h.records]);
+    h.commit.mockClear(); h.client.mockClear();
+    expect(h.service.configuration(workspace).draftWritesEnabled).toBe(false);
+    await expect(saveDraft(h)).rejects.toMatchObject({ status: 409, code: 'submission_disabled' });
+    expect(h.update).not.toHaveBeenCalled();
+    expect(h.client).not.toHaveBeenCalled();
+    expect(h.commit).not.toHaveBeenCalled();
+    expect([...h.records]).toEqual(before);
   });
 });

@@ -23,6 +23,9 @@ describe('evidence packet', () => {
     expect(categoryDiagnostics(item)).toEqual([]);
     expect(packetClaim({ ...item, reason: 'Stripe reason: product_unacceptable (Mastercard 4853). Review original charge only.' })).toBe('product_unacceptable (Mastercard 4853)');
     expect(item.draft!.content).toContain('No order records');
+    item.draft!.analysis = { gaps: ['No attached records are classified under order. Related facts may appear elsewhere.', 'No records were returned from the order classification. Review related evidence.', 'A delivery receipt is missing.'] } as NonNullable<NonNullable<DisputeCase['draft']>['analysis']>;
+    expect(categoryDiagnostics(item)).toHaveLength(2);
+    expect(packetNotes(item)).toContain('A delivery receipt is missing.');
     item.draft!.content += '\n\nAn organizer edit after the legacy notes.';
     expect(packetResponse(item)).toContain('An organizer edit after the legacy notes.');
   });

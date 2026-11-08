@@ -33,6 +33,17 @@ describe('read-only Stripe corroboration', () => {
   it('fails closed on unavailable credentials or mode configuration', async () => {
     const s = setup(); await expect(s.verify({ ...grant, livemode: true }, new AbortController().signal)).rejects.toThrow(); expect(s.request).not.toHaveBeenCalled();
   });
+  it('corroborates py payment objects through the charges endpoint', async () => {
+    const s = setup(); s.dispute.charge = 'py_fictional'; s.charge.id = 'py_fictional';
+    const result = await s.verify(grant, new AbortController().signal);
+    expect(result.chargeId).toBe('py_fictional');
+    expect(s.request.mock.calls[1][0]).toBe('https://api.stripe.com/v1/charges/py_fictional');
+  });
+  it.each(['pi_fictional', 'py_fictional/other', 'py_'])('rejects unsupported charge reference %s before reading it', async id => {
+    const s = setup(); s.dispute.charge = id;
+    await expect(s.verify(grant, new AbortController().signal)).rejects.toThrow('Dispute scope mismatch');
+    expect(s.request).toHaveBeenCalledTimes(1);
+  });
   it('does not expose provider error bodies', async () => {
     const s = setup(); s.request.mockResolvedValue(new Response('private upstream information', { status: 403 }));
     await expect(s.verify(grant, new AbortController().signal)).rejects.toThrow('Stripe read failed');

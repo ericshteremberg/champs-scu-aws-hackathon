@@ -58,7 +58,7 @@ export function ProviderEvidence({ status, cases, onImported }: { status: Provid
   const mappingChanged = JSON.stringify(mapping) !== JSON.stringify(saved.mapping);
   return <article className="cw-provider-card cw-evidence-card" aria-label="Disputes and linked evidence">
     <h3><FileSearch size={20} />Disputes and linked evidence</h3>
-    <p>Import a Stripe dispute, then find only the order and related records attached to its verified payment. Review the records before adding them to the case.</p>
+    <p>Match a Stripe dispute to its order records.</p>
     {error && <p className="cw-banner error" role="alert">{error}</p>}
     {notice && <p className="cw-banner neutral" role="status">{notice}</p>}
     <fieldset className="cw-provider-scope" disabled={!!busy || !stripeReady}><legend>1. Choose a Stripe dispute</legend>
@@ -72,13 +72,13 @@ export function ProviderEvidence({ status, cases, onImported }: { status: Provid
     </fieldset>
     <fieldset className="cw-provider-scope" disabled={!!busy || !stripeReady || !supabaseReady}><legend>2. Map your approved evidence tables</legend>
       {!supabaseReady && <p>Select your Supabase project and approve columns above first.</p>}
-      <p className="cw-provider-note">Set this once for these accounts and this scope. Choose the order ID and the column storing its Stripe charge or PaymentIntent. Related tables must link directly to that unique order ID. Up to eight fields per table and three related tables.</p>
+      <p className="cw-provider-note">Map the order ID and Stripe payment ID. Related tables must link to that order.</p>
       <label className="cw-field"><span>Order table</span><select value={mapping.order.table} onChange={e => setOrder({ table: e.target.value, idColumn: '', paymentColumn: '', customerEmailColumn: undefined, columns: [] })}><option value="">Choose table</option>{tables.map(t => <option key={t.name}>{t.name}</option>)}</select></label>
       {orderTable && <>
         <div className="cw-evidence-fields"><ColumnSelect label="Order ID column" table={orderTable} value={mapping.order.idColumn} onChange={idColumn => setOrder({ idColumn })} /><ColumnSelect label="Stripe payment column" table={orderTable} value={mapping.order.paymentColumn} onChange={paymentColumn => setOrder({ paymentColumn })} />
           <label className="cw-field"><span>Stored Stripe ID type</span><select value={mapping.order.paymentKind} onChange={e => setOrder({ paymentKind: e.target.value as 'charge' | 'payment_intent' })}><option value="payment_intent">PaymentIntent (pi_…)</option><option value="charge">Charge (ch_… or py_…)</option></select></label></div>
         <ColumnSelect label="Customer email column (optional)" table={orderTable} value={mapping.order.customerEmailColumn || ''} onChange={column => setOrder({ customerEmailColumn: column || undefined })} />
-        <p className="cw-provider-note">When Stripe has no customer email, a reviewed order email can fill it for mailbox searches. Include that column in the fields below. An existing case email is preserved.</p>
+        <p className="cw-provider-note">Fills a missing case email from the reviewed order. Existing emails stay unchanged.</p>
         <p>Order fields to include, including both ID columns:</p><Columns table={orderTable} value={mapping.order.columns} onChange={columns => setOrder({ columns })} />
         {mapping.related.map((relation, index) => <fieldset className="cw-provider-scope" key={index}><legend>Related table {index + 1}</legend>
           <label className="cw-field"><span>Related table {index + 1}</span><select value={relation.table} onChange={e => setRelated(index, { table: e.target.value, orderColumn: '', columns: [] })}><option value="">Choose table</option>{tables.filter(t => t.name !== mapping.order.table && !mapping.related.some((r, i) => i !== index && r.table === t.name)).map(t => <option key={t.name}>{t.name}</option>)}</select></label>

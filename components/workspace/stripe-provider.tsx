@@ -24,14 +24,14 @@ export function StripeAccountConnector({ status, onChange }: { status: ProviderS
       }
       onChange(result.connection || null);
       setConfirmDisconnect(false);
-      setNotice(action === 'disconnect' ? 'Stripe access stopped in Causality. Uninstall Causality in Stripe Installed Apps to revoke its authorization there.' : result.chargeReadVerified ? 'Dispute and linked payment read access verified. No customer record contents were saved.' : 'Dispute read access verified. There was no linked charge available to test payment access.');
+      setNotice(action === 'disconnect' ? 'Stripe access stopped in Causality. Uninstall Causality in Stripe Installed Apps to revoke its authorization there.' : result.chargeReadVerified ? 'Dispute and payment access verified.' : 'Disputes verified. Payment access not yet checked.');
     } catch (e) { setError(e instanceof Error ? e.message : 'The Stripe request failed.'); }
     finally { setBusy(''); }
   };
   return <article className="cw-provider-card" aria-label="Stripe account authorization">
     <h3>Stripe <span className={`cw-pill${active ? ' green' : ''}`}>{active ? 'Authorized' : connection?.status === 'reconnect_required' ? 'Reconnect required' : 'Not connected'}</span></h3>
-    <p>Read disputes, payments and refunds. This connection cannot refund or submit evidence.</p>
-    <p className="cw-provider-note">External test app · Not reviewed by Stripe. Install only if you trust the developer.</p>
+    <p>Disputes and payments. Read-only.</p>
+    <p className="cw-provider-note">External test app · Not reviewed by Stripe.</p>
     {error && <p className="cw-banner error" role="alert">{error}</p>}
     {notice && <p className="cw-banner neutral" role="status">{notice}</p>}
     {connection?.accountId && <p>Account: <strong>{connection.accountId}</strong><br />Environment: {connection.mode === 'live' ? 'Live' : 'Test'}</p>}
@@ -41,6 +41,6 @@ export function StripeAccountConnector({ status, onChange }: { status: ProviderS
       {connection?.uninstallRequired && <p className="cw-provider-note">Uninstall Causality in Stripe before reconnecting if Stripe reports that the app is already installed.</p>}
       <button className="cw-button primary" disabled={!!busy || !status?.configured} onClick={() => void call('connect')}>{busy === 'connect' ? <LoaderCircle size={16} /> : <Link2 size={16} />}{status?.configured ? 'Connect Stripe' : 'Stripe setup unavailable'}</button>
     </> : confirmDisconnect ? <div className="cw-provider-disconnect"><p>Stop Causality access and delete its saved Stripe tokens? To revoke the app grant, also uninstall Causality in Stripe.</p><div className="cw-actions"><button className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(false)}>Keep Stripe connection</button><button className="cw-button danger" disabled={!!busy} onClick={() => void call('disconnect')}>Confirm disconnect Stripe</button></div></div> : <button className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(true)}><Unplug size={16} />Disconnect Stripe</button>}
-    <p className="cw-provider-note"><a href="https://dashboard.stripe.com/settings/apps" target="_blank" rel="noopener noreferrer">Manage installed apps in Stripe</a></p>
+    <p className="cw-provider-note"><a href="https://dashboard.stripe.com/settings/apps" target="_blank" rel="noopener noreferrer">Manage in Stripe</a></p>
   </article>;
 }

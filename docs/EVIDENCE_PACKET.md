@@ -35,7 +35,7 @@ The response reflects the saved case revision. Export requires a saved, current 
 
 ## Disabled submissions
 
-`aws/stripe.ts` and `lib/stripe/service.ts` unconditionally reject submission with HTTP 409 and `submission_disabled`. Both report `submissionEnabled: false`. The old environment flag cannot override the restriction. Stripe update calls were removed from both services. Read/sync and webhook ingestion remain available.
+`aws/stripe.ts` and `lib/stripe/service.ts` unconditionally reject submission with HTTP 409 and `submission_disabled`. Both report `submissionEnabled: false`. The AWS draft endpoint also rejects writes and reports `draftWritesEnabled: false`, because Stripe can automatically submit saved drafts later. The old environment flag cannot override the restriction. Stripe update calls were removed from both services. Read/sync and webhook ingestion remain available.
 
 ## Verification
 
@@ -87,3 +87,8 @@ Demo button deployed November 8, 2026 from source `7307978` to Worker `13f51efd-
 The Bedrock draft and correction instructions now prioritize a firm first-person merchant rebuttal, strongest contradiction first, precise dates/amounts/order links, short relevant quotations, and an explicit explanation after each fact table. Independent corroboration supports the argument; duplicate exports do not count as independent sources. The closing synthesizes the strongest supported grounds for reversal. Generic caveats are consolidated, while material uncertainty and counterevidence remain. No unsupported accusations, inferred agreement from silence, or stronger factual claims are introduced. This changes newly generated responses only. Testing remains with the team as requested.
 
 Deployed November 8, 2026 from source `cd60a59` to the AWS functions and Worker `87fe64e0-5688-4718-b2f1-742653f3cfee`. No existing customer report was regenerated during deployment.
+
+
+## Main merge verification
+
+Merged with main’s concise workspace copy, case-level Resend controls, historical email context and production sample-data exclusion. Both final submission and draft writes are disabled; legacy enable flags cannot restore them. Empty attached topic buckets are excluded from report notes, while unavailable live sources remain explicit. The combined local checks passed 613 tests, typechecks, frontend build and AWS build. A synthetic design preview downloaded a five-page PDF, and all pages were rendered and inspected. No live customer case, provider write or deployment was part of this merge verification.
