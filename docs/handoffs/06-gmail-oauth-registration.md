@@ -1,8 +1,12 @@
 # Gmail developer registration and customer test
 
-Gmail's AWS runtime and Connections UI are implemented. No Google registration existed in the hackathon AWS account when checked. This is a one-time Causality developer setup, not work each customer performs. Customers will click Connect Gmail and consent through Google.
+Gmail's AWS runtime, Connections UI and one-time Google developer registration are complete. The AWS deployment has been updated with the secret ARN. Customers click Connect Gmail and consent through Google; real customer consent, token exchange and mailbox reads are still untested.
 
-## Eric: complete the developer registration
+Registration uses the personal Google account selected by Aiden, project `Causality Gmail` (`fifth-liberty-514107-c3`, project number `766596255060`). The Gmail API is enabled. The Web client is `Causality Gmail Dev`; audience is External / Testing, with only `gmail.readonly`. Credentials are stored in AWS Secrets Manager at `causality/dev/oauth/gmail` in account `156129572861`, `us-east-1`. The exact ARN and callback are in `integrations/oauth/gmail-registration.json`. No client secret is committed.
+
+Aiden's selected personal Google account is a saved test user. Google rejected Eric's supplied business address as not associated with an active Google account, so it was not added. A Network Solutions-hosted mailbox cannot authorize through this Gmail connector. It requires a separate IMAP integration, which is not implemented. Network Solutions documents the mailbox username/password and domain-specific incoming-server settings in its [IMAP setup guide](https://www.networksolutions.com/help/article/how-do-i-get-started-with-pop3-and-imap). Keep any mailbox credentials out of chat and Git.
+
+## Operator reference: recreate or rotate the registration
 
 1. In a Google Cloud project owned by the business that should own Causality, enable the **Gmail API**. Configure Google Auth Platform branding, audience and data access. For the hackathon use External / Testing and explicitly add the intended Gmail test users, including the mailbox that will be tested. Supply accurate app/support information.
 2. Request exactly `https://www.googleapis.com/auth/gmail.readonly`. Do not request send, modify, full-mailbox write or domain-wide delegation scopes. Google grants mailbox-wide reads; Causality's case search and review restrictions are application controls, not narrower Google permissions.
@@ -21,6 +25,8 @@ Gmail's AWS runtime and Connections UI are implemented. No Google registration e
 5. Run `npm run deploy:aws` to grant the Lambda role access to that exact secret ARN and enable the runtime. The frontend is already wired to runtime status. Commit and push the nonsecret registration metadata to the working branch. Give Aiden the commit and test result, never secrets.
 
 AWS secret JSON contract, field names only: `clientId`, `clientSecret`, `redirectUri`, `scopes` (the single read-only Gmail scope). The deployment uses `GMAIL_OAUTH_SECRET_ARN`, or the committed metadata ARN. An existing configured stack value is preserved if neither is supplied.
+
+The hosted start/cancel smoke test passed with `node scripts/smoke-provider-oauth.mjs gmail`, including PKCE, secure cookie, denial/replay handling and rejection of reads while disconnected. It intercepts Google navigation and does not test Google consent or token exchange.
 
 ## Customer test, through the website
 

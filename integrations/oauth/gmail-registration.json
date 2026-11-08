@@ -1,10 +1,18 @@
 {
   "provider": "gmail",
-  "registrationStatus": "not_registered",
+  "registrationStatus": "credentials_stored_customer_oauth_untested",
   "secretName": "causality/dev/oauth/gmail",
-  "secretArn": "",
+  "secretArn": "arn:aws:secretsmanager:us-east-1:156129572861:secret:causality/dev/oauth/gmail-nPM99u",
   "region": "us-east-1",
   "accountId": "156129572861",
   "redirectUri": "https://causality-hackathon-dev.slidah60.workers.dev/api/providers/gmail/callback",
-  "scopes": ["https://www.googleapis.com/auth/gmail.readonly"]
+  "scopes": [
+    "https://www.googleapis.com/auth/gmail.readonly"
+  ],
+  "googleProjectId": "fifth-liberty-514107-c3",
+  "googleProjectNumber": "766596255060",
+  "googleProjectName": "Causality Gmail",
+  "appName": "Causality",
+  "audience": "external",
+  "publishingStatus": "testing"
 }

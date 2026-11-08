@@ -132,4 +132,4 @@ The older recording under `docs/demo/` documents standalone Casework, not this d
 
 GitHub is the cross-computer handoff. Share the actual pushed repository, branch, and commit from the final implementation report. The source checkpoint hashes in [BRANCH_COMPARISON.md](BRANCH_COMPARISON.md) are historical inputs, not the final merged revision.
 
-Gmail now has an AWS OAuth lifecycle and reviewed case-email import UI. Its Google developer registration is not yet present; follow [the setup handoff](handoffs/06-gmail-oauth-registration.md). See [OAuth connector architecture](OAUTH_CONNECTORS.md#gmail-runtime-and-selected-evidence) for scope, temporary preview storage, token handling and untested live boundaries.
+Gmail now has an AWS OAuth lifecycle and reviewed case-email import UI. Its Google developer registration is complete and deployed in External / Testing mode. Real customer consent and mailbox reads remain untested; follow [the setup handoff](handoffs/06-gmail-oauth-registration.md). See [OAuth connector architecture](OAUTH_CONNECTORS.md#gmail-runtime-and-selected-evidence) for scope, temporary preview storage, token handling and untested live boundaries.
