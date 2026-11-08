@@ -8,6 +8,8 @@ import { listEvidenceConnections, executeConnectorAction, getConnectorInstallati
 import { listManagedConnections, executeManagedConnectorAction, parseLiveImport } from './managed-connectors.ts';
 import { providerStatus, startSupabase, finishSupabase, supabaseAction } from './providers.ts';
 import { startStripeProvider, finishStripeProvider, stripeProviderAction } from './stripe-provider.ts';
+import { resendAction, resendStatus } from './resend.ts';
+export { resendWebhookHandler } from './resend.ts';
 
 const userSchema=z.object({userId:z.string().min(1).max(200),email:z.string().max(320),displayName:z.string().max(320),fullName:z.string().max(320).nullable().optional()});
 const id=z.string().min(1).max(200);
@@ -35,6 +37,7 @@ async function route(raw:unknown) {
   if(path==='/api/stripe/webhook' && event.method==='POST')return {status:200,body:await handleStripeWebhook(event.rawBody||'',event.stripeSignature||'')};
   if(!event.user)throw new ApiError(401,'Sign in to continue.','unauthenticated');
   const user=event.user as TrustedUser;
+  if(path==='/api/providers/resend')return {status:200,body:event.method==='GET'?await resendStatus(user):await resendAction(user,event.body)};
   if(path==='/api/providers' && event.method==='GET')return {status:200,body:await providerStatus(user)};
   if(path==='/api/providers/stripe/start' && event.method==='POST')return {status:200,body:await startStripeProvider(user,event.oauthBinding)};
   if(path==='/api/providers/stripe/callback' && event.method==='GET')return {status:302,redirect:await finishStripeProvider(user,url,event.oauthBinding)};

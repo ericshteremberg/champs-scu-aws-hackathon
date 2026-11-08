@@ -5,6 +5,7 @@ import { Database, Link2, LoaderCircle, ShieldCheck, Unplug } from 'lucide-react
 import type { ProviderStatus, SchemaTable, SupabaseConnection, SupabaseProject } from '../../lib/providers/types';
 import './provider-connectors.css';
 import { StripeAccountConnector } from './stripe-provider';
+import { ResendConnector } from './resend-provider';
 
 const outcomes: Record<string, string> = {
   authorized: 'Supabase authorized. Choose the project you want to connect.',
@@ -115,6 +116,7 @@ export function ProviderConnectors() {
         </>}
       </article>
       <StripeAccountConnector status={status?.stripe} onChange={connection => setStatus(current => current ? { ...current, stripe: { ...current.stripe, connection } } : current)} />
+      <ResendConnector />
     </div>
   </section>;
 }
