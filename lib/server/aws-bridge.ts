@@ -43,7 +43,18 @@ export async function proxyAwsApi(request: Request, env: AwsBridgeEnvironment): 
    body:JSON.stringify({kind:'api',method:request.method,path:url.pathname+url.search,user:{userId,email,fullName,displayName:fullName||email},body,oauthBinding,rawBody:url.pathname==='/api/stripe/webhook'?text:undefined,stripeSignature:request.headers.get('stripe-signature')||undefined}),
    signal:AbortSignal.any([request.signal,AbortSignal.timeout(28000)]),
   });
-  if(!response.ok || response.headers.has('X-Amz-Function-Error')) return reply({error:'The AWS backend could not complete the request. Check its deployment and workshop session.',code:'aws_backend_failed'},502);
+  if(!response.ok) {
+   // Inspect only the provider's error type. Never expose its message, payload or credentials.
+   const failure=await response.json().catch(()=>null) as {__type?:unknown;code?:unknown}|null;
+   const rawType=response.headers.get('x-amzn-errortype') || failure?.__type || failure?.code;
+   const errorType=typeof rawType==='string'?rawType.split('#').pop()?.split(':')[0]:undefined;
+   if(errorType==='ExpiredTokenException' || errorType==='ExpiredToken') {
+    return reply({error:'The demo’s temporary AWS session has expired. The team needs to refresh Workshop Studio credentials and sync them to the deployed site. This request did not reach the backend.',code:'aws_session_expired'},503);
+   }
+   if(errorType==='AccessDeniedException') return reply({error:'AWS denied the site permission to call its backend. The team needs to check the bridge’s AWS permissions.',code:'aws_backend_access_denied'},503);
+   return reply({error:'AWS rejected the backend connection. The team needs to check the deployed bridge configuration and AWS availability.',code:'aws_backend_failed'},502);
+  }
+  if(response.headers.has('X-Amz-Function-Error')) return reply({error:'The AWS backend encountered an internal error. The team needs to check its Lambda logs.',code:'aws_backend_function_error'},502);
   const result=await response.json() as {status:number;body?:unknown;redirect?:string};
   if(!Number.isInteger(result.status)||result.status<200||result.status>599)throw new Error('Invalid backend response');
   if(result.redirect){const target=new URL(result.redirect);if(target.protocol!=='https:' || (oauthCallback && (target.origin!==url.origin || target.pathname!=='/workspace')))throw new Error('Invalid redirect URL');return finish(new Response(null,{status:302,headers:{Location:target.toString(),'Cache-Control':'private, no-store'}}));}

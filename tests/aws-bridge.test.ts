@@ -14,6 +14,25 @@ describe('private AWS API bridge',()=>{
  it('forwards only the server-authenticated identity, exact route, and JSON body',async()=>{const value=request('/api/workspace',{action:'seedDemo',user:{userId:'spoof'}});const response=await proxyAwsApi(value,env);expect(response.status).toBe(200);const payload=JSON.parse(mocks.send.mock.calls[0][1].body);expect(payload.user.userId).toBe('trusted-reviewer');expect(payload.path).toBe('/api/workspace');expect(payload.body.action).toBe('seedDemo');expect(payload).not.toHaveProperty('AWS_SECRET_ACCESS_KEY');});
  it('bounds request size before invoking AWS',async()=>{expect((await proxyAwsApi(request('/api/workspace',{content:'x'.repeat(70000)}),env)).status).toBe(413);expect(mocks.send).not.toHaveBeenCalled();});
  it('hides AWS exception details and expired credentials',async()=>{mocks.send.mockRejectedValue(new Error('synthetic backend secret detail'));const response=await proxyAwsApi(request(),env);expect(response.status).toBe(502);expect(await response.text()).not.toContain('secret detail');});
+ it.each(['ExpiredTokenException','ExpiredToken'])('identifies %s without exposing provider details',async(errorType)=>{
+  mocks.send.mockResolvedValue(Response.json({__type:errorType,message:'synthetic secret detail'},{status:403}));
+  const response=await proxyAwsApi(request(),env);expect(response.status).toBe(503);
+  const body=await response.json() as {code:string;error:string};expect(body.code).toBe('aws_session_expired');expect(body.error).toContain('did not reach');expect(JSON.stringify(body)).not.toContain('secret detail');
+ });
+ it('recognizes namespaced expiry headers even when the upstream body is not JSON',async()=>{
+  mocks.send.mockResolvedValue(new Response('private upstream content',{status:403,headers:{'x-amzn-errortype':'aws.auth#ExpiredTokenException:detail'}}));
+  expect((await (await proxyAwsApi(request(),env)).json() as {code:string}).code).toBe('aws_session_expired');
+ });
+ it('distinguishes denied invocation from a function execution error',async()=>{
+  mocks.send.mockResolvedValue(Response.json({__type:'AccessDeniedException'},{status:403}));
+  expect((await (await proxyAwsApi(request(),env)).json() as {code:string}).code).toBe('aws_backend_access_denied');
+  mocks.send.mockResolvedValue(Response.json({errorMessage:'private detail'},{headers:{'X-Amz-Function-Error':'Unhandled'}}));
+  const response=await proxyAwsApi(request(),env);expect(response.status).toBe(502);expect((await response.json() as {code:string}).code).toBe('aws_backend_function_error');
+ });
+ it('does not mislabel unknown failures as expired sessions',async()=>{
+  mocks.send.mockResolvedValue(Response.json({__type:'ServiceException',message:'private detail'},{status:500}));
+  const response=await proxyAwsApi(request(),env);expect(response.status).toBe(502);const body=await response.json() as {code:string;error:string};expect(body.code).toBe('aws_backend_failed');expect(body.error).not.toContain('expired');
+ });
  it('allows only HTTPS signed download redirects and never caches API responses',async()=>{mocks.send.mockResolvedValue(Response.json({status:302,redirect:'https://bucket.s3.us-east-1.amazonaws.com/private'}));const response=await proxyAwsApi(request('/api/evidence/evidence_fixture'),env);expect(response.status).toBe(302);expect(response.headers.get('Cache-Control')).toContain('no-store');mocks.send.mockResolvedValue(Response.json({status:302,redirect:'javascript:alert(1)'}));expect((await proxyAwsApi(request(),env)).status).toBe(502);});
  it('advertises S3 uploads without invoking business APIs',async()=>{const response=await proxyAwsApi(request('/api/runtime'),env);expect(await response.json()).toEqual({storage:'aws',uploads:'presigned'});expect(mocks.send).not.toHaveBeenCalled();});
  it('issues a secure browser binding only after an authenticated same-origin OAuth start',async()=>{
