@@ -3,7 +3,7 @@ import { PDFDocument, rgb, pushGraphicsState, popGraphicsState, rectangle, clip,
 import fontkit from '@pdf-lib/fontkit';
 import type { DisputeCase } from '../domain.ts';
 import { formatMoney } from '../money.ts';
-import { assertPacketReady, citationText, packetNotes, packetResponse, packetSources } from './packet.ts';
+import { assertPacketReady, packetClaim, packetIncludedSources, packetResponse, packetSources } from './packet.ts';
 
 type Fonts = { regular: Uint8Array; bold: Uint8Array };
 const ink = rgb(0.09, 0.14, 0.21), muted = rgb(0.35, 0.39, 0.44), accent = rgb(0.91, 0.36, 0.07), rule = rgb(0.85, 0.87, 0.89);
@@ -69,46 +69,37 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
     y = height - 106;
   };
   const ensure = (space: number) => { if (y - space < 62) newPage(); };
-  const write = (text: string, size = 10.5, font = regular, color = ink, after = 10) => {
+  const write = (text: string, size = 10.5, font = regular, color = ink, after = 10, leading = 1.45) => {
     for (const line of lines(text, font, size)) {
-      ensure(size * 1.45);
+      ensure(size * leading);
       if (line) page.drawText(line, { x: margin, y, size, font, color });
-      y -= size * 1.45;
+      y -= size * leading;
     }
     y -= after;
   };
   const heading = (text: string) => { ensure(65); write(text, 15, bold, ink, 11); };
   const sources = packetSources(item);
-  const render = (text: string) => citationText(text, sources);
   newPage();
-  write('Dispute evidence packet', 27, bold, ink, 9);
-  write(item.source === 'demo' ? 'SYNTHETIC SAMPLE | NOT FOR SUBMISSION' : item.draft!.status === 'approved' ? 'REVIEWED COPY | NOT SUBMITTED' : 'DRAFT FOR REVIEW | NOT SUBMITTED', 9, bold, accent, 17);
-  write(item.title, 15, bold, ink, 14);
-  write(`Customer: ${item.customerName}\nOrder: ${item.orderRef || 'Not recorded'}\nAmount disputed: ${formatMoney(item.amount, item.currency)}\nResponse due: ${stamp(item.dueAt)}`, 10.5);
-  if (item.stripeDisputeId) write(`Dispute reference: ${item.stripeDisputeId}`, 9, regular, muted);
-  write(`Prepared ${stamp(generatedAt.toISOString())} | Revision ${item.draft!.revision} | ${sources.length} source records`, 9, regular, muted, 14);
-  write(item.draft!.status === 'approved' ? `Reviewed ${stamp(item.draft!.approvedAt ?? item.draft!.generatedAt)} by ${item.draft!.approvedBy || 'workspace reviewer'}.` : 'Prepared for merchant review. Downloading does not approve or submit this response.', 9, regular, muted);
-  heading('Dispute context');
-  write(item.reason);
+  write('Response to chargeback', 22, bold, ink, 8);
+  write(item.source === 'demo' ? 'SYNTHETIC SAMPLE | NOT FOR SUBMISSION' : item.draft!.status === 'approved' ? 'REVIEWED COPY | NOT SUBMITTED' : 'DRAFT FOR REVIEW | NOT SUBMITTED', 8, bold, accent, 12);
+  write(`${item.customerName} | ${formatMoney(item.amount, item.currency)} | Order ${item.orderRef || 'Not recorded'}`, 11, bold, ink, 5);
+  if (item.stripeDisputeId) write(`Dispute ${item.stripeDisputeId}`, 8.5, regular, muted, 4);
+  write(`Prepared ${stamp(generatedAt.toISOString())}`, 8.5, regular, muted, 12);
+  write(`Disputed claim: ${packetClaim(item)}`, 10, regular, ink, 14);
   heading('Merchant response');
-  write(packetResponse(item));
+  // Do not truncate or strip adverse statements from the saved factual narrative.
+  write(packetResponse(item), 10.5);
 
-  section = 'Evidence register'; y -= 18; ensure(160); heading('Evidence register');
-  write(`References [E1], [E2], and onward identify the source records. ${exhibits.length} original file(s) are reproduced as visual exhibits. Original bytes are also embedded as file attachments. Text-only records are identified separately. File fingerprints detect changes; they do not establish authenticity.`, 10, regular, muted, 18);
-  for (const [index, record] of sources.entries()) {
-    ensure(70); write(`[E${index + 1}] ${record.title}`, 11, bold, ink, 3);
-    write(`${stamp(record.occurredAt)} | ${record.source}${record.provenance ? ` | ${record.provenance.sourceMode}` : ' | saved case record'}`, 9, regular, muted, 5);
-    write(`Reference: ${record.reference || record.id}`, 9, regular, muted, 5);
-    write(exhibits.some(e => e.evidenceId === record.id) ? record.originalEmail ? 'Visual exhibit: rendered original provider email' : record.originalRows ? 'Visual exhibit: original database query result' : record.originalDocument ? 'Visual exhibit: original Stripe receipt PDF' : 'Visual exhibit: original uploaded file' : 'Saved text record; no original visual attached', 9, regular, muted, 12);
+  const included = packetIncludedSources(item);
+  section = 'Evidence index'; ensure(65); heading('Supporting records');
+  for (const record of included) {
+    const index = sources.findIndex(source => source.id === record.id);
+    ensure(44);
+    write(`[E${index + 1}] ${record.title}`, 9, bold, ink, 2);
+    write(`${stamp(record.occurredAt)} | ${record.reference || record.id}`, 8, regular, muted, 2);
+    write(exhibits.some(e => e.evidenceId === record.id) ? 'Original exhibit attached.' : 'Saved source record.', 8, regular, muted, 6);
   }
-  if (!sources.length) write('No source records are attached. This draft cannot substantiate a dispute response.');
-
-  const notes = packetNotes(item);
-  if (notes.length) {
-    section = 'Review notes'; newPage(); heading('Material limitations and review notes');
-    write('These notes qualify the response and remain part of this review packet.', 10, regular, muted, 16);
-    for (const note of notes) write(`- ${render(note)}`, 10);
-  }
+  if (!included.length) write('No supporting records are cited in this response.', 9);
   let visualPages = 0;
   for (const exhibit of exhibits) {
     const index = sources.findIndex(record => record.id === exhibit.evidenceId), record = sources[index];
@@ -129,13 +120,13 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
       if (originalDoc.getPageCount() > 50 || !originalDoc.getPageCount()) throw new Error('Each original PDF must contain between 1 and 50 pages.');
       if (originalDoc.getForm().getFields().length) throw new Error('A fillable original PDF needs a flattened visual copy before it can be included. Keep its original attached.');
       const embedded = await doc.embedPdf(originalDoc, originalDoc.getPageIndices());
-      exhibitHeader(`Original PDF | ${embedded.length} page(s)`);
-      write('The original document pages follow at readable page scale. Page content is reproduced; interactive annotations are not rendered. Inspect the embedded original for annotations.', 10, regular, muted);
       for (const [number, originalPage] of embedded.entries()) {
         if (++visualPages > 100) throw new Error('Visual exhibits exceed 100 pages. Narrow the case files.');
         page = doc.addPage([width, height]);
         page.drawText(`[E${index + 1}] Original document | Page ${number + 1} of ${embedded.length}`, { x: margin, y: height - 22, size: 8, font: bold, color: muted });
-        const scale = Math.min((width - 32) / originalPage.width, (height - 84) / originalPage.height);
+        page.drawText(`Source SHA-256: ${exhibit.sha256}`, { x: margin, y: height - 35, size: 6.5, font: regular, color: muted });
+        page.drawText(`Collected: ${record.capturedAt ? stamp(record.capturedAt) : 'Not recorded'} | Original file embedded`, { x: margin, y: height - 47, size: 7, font: regular, color: muted });
+        const scale = Math.min((width - 32) / originalPage.width, (height - 108) / originalPage.height);
         page.drawPage(originalPage, { x: (width - originalPage.width * scale) / 2, y: 52, width: originalPage.width * scale, height: originalPage.height * scale });
       }
     } else {
@@ -158,17 +149,20 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
       }
     }
   }
-  section = 'Source appendix'; newPage();
-  for (const [index, record] of sources.entries()) {
-    ensure(150);
-    heading(`[E${index + 1}] ${record.title}`);
-    write(`${stamp(record.occurredAt)} | ${record.source}`, 9, regular, muted, 5);
-    write(`Reference: ${record.reference || record.id}`, 9, regular, muted, 5);
-    write(`Record ID: ${record.id}`, 8, regular, muted, 15);
-    write(record.content || 'No extracted text is available. Inspect the original attachment.', 10);
-    if (record.fileName || record.downloadUrl) write(`Original attachment: ${record.fileName || 'Attached file'}. ${exhibits.some(e => e.evidenceId === record.id) ? 'Included as a visual exhibit and embedded original file.' : 'Available in the case; this format is not a visual exhibit.'}`, 9, regular, muted);
-    for (const limitation of record.provenance?.limitations ?? []) write(`Source qualification: ${limitation}`, 9, regular, muted);
-    y -= 18;
+  // Preserve all retained source text that is not already reproduced as an original exhibit.
+  // Keep a compact appendix, without repeating provenance checklists or internal review notes.
+  const textSources = included.filter(record => !exhibits.some(exhibit => exhibit.evidenceId === record.id));
+  if (textSources.length) {
+    section = 'Supporting source records'; newPage();
+    write('Supporting source records', 18, bold, ink, 12);
+    write('Saved source text is reproduced below. Original files, where retained, appear in the preceding exhibits.', 9, regular, muted, 12);
+    for (const record of textSources) {
+      const index = sources.findIndex(source => source.id === record.id);
+      ensure(85);
+      write(`[E${index + 1}] ${record.title}`, 11, bold, ink, 3);
+      write(`${stamp(record.occurredAt)} | ${record.reference || record.id}`, 8, regular, muted, 7);
+      write(record.content || 'No extracted text is available. Inspect the source record in the case.', 9.5, regular, ink, 12, 1.3);
+    }
   }
   if (encodedFallback) write('Typography note: characters outside the embedded font are represented by their Unicode code points, such as [U+1F600]. Original source text remains available in the case.', 9, regular, muted);
   const pages = doc.getPages();

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
 import { createEvidencePdf } from '../lib/report/pdf.ts';
-import { assertPacketReady, categoryDiagnostics, citationText, packetNotes, packetResponse, packetSources } from '../lib/report/packet.ts';
+import { assertPacketReady, categoryDiagnostics, citationText, packetNotes, packetResponse, packetSources, packetIncludedSources, packetClaim } from '../lib/report/packet.ts';
 import { evidenceSections } from '../lib/investigation/sections.ts';
 import { loadVisualExhibits, hashBytes, type Exhibit } from '../lib/report/exhibits.ts';
 import { responseStyleFeedback } from '../lib/investigation/report.ts';
@@ -21,6 +21,7 @@ describe('evidence packet', () => {
     expect(packetNotes(item)).toEqual(['Policy acceptance is not recorded.']);
     expect(citationText('An unsupported reference [ev_other]', packetSources(item))).toContain('[ev_other]');
     expect(categoryDiagnostics(item)).toEqual([]);
+    expect(packetClaim({ ...item, reason: 'Stripe reason: product_unacceptable (Mastercard 4853). Review original charge only.' })).toBe('product_unacceptable (Mastercard 4853)');
     expect(item.draft!.content).toContain('No order records');
     item.draft!.content += '\n\nAn organizer edit after the legacy notes.';
     expect(packetResponse(item)).toContain('An organizer edit after the legacy notes.');
@@ -29,6 +30,23 @@ describe('evidence packet', () => {
     expect(responseStyleFeedback('The merchant must prove receipt or risk losing the dispute.')).toContain('Do not strengthen');
     expect(responseStyleFeedback('**Gaps and Recommendations**\nNo scan records.')).toBeTruthy();
     expect(responseStyleFeedback('The confirmation was sent, but the source does not establish delivery. The reminder and confirmation list different venues. [E1] [E2]')).toBeUndefined();
+  });
+  it('includes uncited factual records and originals, keeping explicitly labeled analyst notes internal', () => {
+    const item = fixture();
+    item.draft!.content = 'The confirmation was sent, but the venue differs from the reminder. [ev_order]';
+    item.evidence.push({ ...record, id: 'ev_internal', source: 'manual', title: 'Internal collection diagnostics', reference: 'Analyst review - not primary proof', content: 'Connection unavailable' });
+    item.evidence.push({ ...record, id: 'ev_original', title: 'Receipt', fileName: 'receipt.pdf', downloadUrl: '/api/evidence/ev_original' });
+    item.evidence.push({ ...record, id: 'ev_extra', title: 'Additional source record' });
+    expect(packetIncludedSources(item).map(record => record.id)).toEqual(['ev_order', 'ev_original', 'ev_extra']);
+    expect(packetResponse(item)).toContain('but the venue differs from the reminder');
+    expect(item.evidence).toHaveLength(4);
+  });
+  it('allows additional pages instead of truncating evidence or imposing a two-page limit', async () => {
+    const item = fixture();
+    item.draft!.content = 'Supported transaction fact with qualification. '.repeat(1000) + '[ev_order]';
+    const pdf = await PDFDocument.load(await createEvidencePdf(item, fonts));
+    expect(pdf.getPageCount()).toBeGreaterThan(2);
+    expect(item.draft!.content).toContain('[ev_order]');
   });
   it('allows a review draft and rejects stale, running and missing-source exports', () => {
     const item = fixture();
@@ -41,7 +59,7 @@ describe('evidence packet', () => {
     item.investigation = { id: 'run_test', caseId: item.id, status: 'running', mode: 'bedrock', startedAt: record.occurredAt, events: [] };
     expect(() => assertPacketReady(item)).toThrow('finish');
   });
-  it('paginates long source text, Unicode and unbroken references without mutating the case', async () => {
+  it('preserves full source text, Unicode and long references without mutating the case', async () => {
     const item = fixture();
     item.evidence[0].content += '\n' + 'Long source line with accented names Zoë Müller. '.repeat(400) + '🙂';
     item.evidence[0].reference = 'x'.repeat(300);
@@ -49,7 +67,7 @@ describe('evidence packet', () => {
     const bytes = await createEvidencePdf(item, fonts, new Date('2026-11-08T12:00:00Z'));
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe('%PDF-');
     const pdf = await PDFDocument.load(bytes);
-    expect(pdf.getPageCount()).toBeGreaterThan(5);
+    expect(pdf.getPageCount()).toBeGreaterThan(2);
     expect(pdf.getTitle()).toBe('Evidence packet | DEMO-1042');
     expect(pdf.getPages().every(page => page.getWidth() === 612 && page.getHeight() === 792)).toBe(true);
     expect(JSON.stringify(item)).toBe(before);
@@ -96,7 +114,7 @@ describe('original visual exhibits', () => {
     const bytes = await original.save(), sha256 = await hashBytes(bytes), item = fixture();
     item.evidence[0] = { ...item.evidence[0], fileName: 'receipt.pdf', mimeType: 'application/pdf', downloadUrl: '/api/evidence/ev_order', fileSha256: sha256 };
     const pdf = await PDFDocument.load(await createEvidencePdf(item, fonts, new Date(), [{ evidenceId: record.id, bytes, mimeType: 'application/pdf', sha256, fetchedAt: record.occurredAt }]));
-    expect(pdf.getPageCount()).toBeGreaterThanOrEqual(5);
+    expect(pdf.getPageCount()).toBe(3);
   });
   it('loads only authorized originals and fails on retrieval, format or fingerprint mismatch', async () => {
     const { item } = await visualCase();

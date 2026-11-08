@@ -49,7 +49,7 @@ describe('portable investigation engine', () => {
   });
 
   it('does not interpret brackets in quoted source text as fabricated citations', async () => {
-    const options = input({ readEvidence: async section => { const value = envelope(section); if (value.records[0]) value.records[0].detail = 'The email contains [image attached] in its body.'; return value; } });
+    const options = input({ readEvidence: async section => { const value = envelope(section); if (value.records[0]) value.records[0].title = 'Email record [image attached]'; return value; } });
     const result = await runInvestigation(options);
     expect(result.content).toContain('\\[image attached\\]');
     expect(result.evidenceIds).not.toContain('image attached');

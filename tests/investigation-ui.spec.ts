@@ -812,7 +812,7 @@ for (const longEmail of [false, true]) test(`retained original ${longEmail ? 'lo
   expect(outbound).toEqual([]);
   expect(await page.evaluate(() => '__emailExecuted' in window)).toBe(false);
   expect(page.frames()).toHaveLength(1);
-  expect(pdf.getPageCount()).toBeGreaterThanOrEqual(longEmail ? 5 : 3);
+  expect(pdf.getPageCount()).toBeGreaterThanOrEqual(longEmail ? 4 : 2);
   await downloaded.saveAs(`.aws-build/original-email-${longEmail ? 'long' : 'short'}-synthetic.pdf`);
 });
 

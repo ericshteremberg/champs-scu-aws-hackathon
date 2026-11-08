@@ -23,8 +23,8 @@ export function reportFormatFeedback(input: unknown): string {
 
 /** Keep internal investigation advice separate from the merchant response. */
 export function responseStyleFeedback(content: string): string | undefined {
-  if (content.trim().split(/\s+/).length > 400 || /(?:^|\n)\s*(?:\*\*|#{1,3}\s*)?(?:gaps and recommendations|key missing evidence|critical evidence is missing)|\bmerchant (?:must|should)\b|\brisk losing\b|\bsuccessfully defended\b/i.test(content)) {
-    return 'Rewrite only the presentation of the response, preserving facts and counterevidence. content must be a concise merchant statement of at most 400 words, with citations and material qualifications. Put internal advice and actionable missing-evidence questions in recommendation and gaps. Remove the missing-evidence checklist, bank requirements and outcome predictions from content. Do not strengthen or invent evidence. Return the complete corrected report through finish_report.';
+  if (/(?:^|\n)\s*(?:\*\*|#{1,3}\s*)?(?:gaps and recommendations|key missing evidence|critical evidence is missing|recommended next steps|internal review notes|evidence collection checklist|win probability|internal risk assessments)|\bmerchant (?:must|should)\b|\brisk losing\b|\bsuccessfully defended\b/i.test(content)) {
+    return 'Rewrite only the presentation of the response, preserving facts and counterevidence. content must be a concise merchant statement covering all materially distinct relevant evidence without a fixed word count, with the strongest relevant evidence first, citations and material qualifications beside the affected claims. Do not invent admissions, quotes or evidence. Put internal advice and actionable missing-evidence questions in recommendation and gaps. Remove the missing-evidence checklist, bank requirements and outcome predictions from content. Do not strengthen or invent evidence. Return the complete corrected report through finish_report.';
   }
 }
 
@@ -114,10 +114,13 @@ export function buildSampleReport(item: InvestigationInput['case'], evidence: Ev
     kind: ['bounced', 'undelivered', 'failed'].includes(String(record.fields.providerStatus)) ? 'conflict' : 'supported',
     title: record.title, detail: record.detail.length > 5800 ? `${record.detail.slice(0,5800)}\nExcerpt only. The full source remains available in the case.` : record.detail, evidenceIds: [record.id],
   }));
-  const lines = [...records].sort((a,b) => a.occurredAt.localeCompare(b.occurredAt)).slice(0, 30).map(record => `${record.occurredAt} | ${quoteSource(record.title)}\n${quoteSource(record.detail.slice(0,900))}${record.detail.length > 900 ? '\nExcerpt only. Review the complete source in the case.' : ''}\nSource: ${quoteSource(record.source)} / ${quoteSource(record.sourceId)} [${record.id}]`);
-  if (records.length > 30) gaps.push(`This sample draft includes excerpts from 30 of ${records.length} retrieved records. Review the remaining records in the case.`);
+  // Sample mode is a complete source inventory, never an invented merchant argument.
+  // Full source records stay in the case; structured findings retain their existing bounds.
+  const priority = (record: typeof records[number]) => ['bounced', 'undelivered', 'failed'].includes(String(record.fields.providerStatus)) ? 0 : record.fields.customerAcknowledgedReceipt === true ? 1 : 2;
+  const selected = [...records].sort((a, b) => priority(a) - priority(b) || a.occurredAt.localeCompare(b.occurredAt));
+  const lines = selected.map(record => `Saved record: ${quoteSource(record.title)}. [${record.id}]`);
   return {
-    content: ['MERCHANT REVIEW DRAFT', quoteSource(item.title), `Order: ${quoteSource(item.orderRef) || 'Not provided'} | Amount: ${formatMoney(item.amount, item.currency)}`, `Claim: ${quoteSource(item.reason)}`, 'This sample investigation is assembled from the retrieved records using explicit rules. It was not analyzed by a language model.', 'SOURCE TIMELINE', ...lines, 'Review each statement and its source before approval. This draft has not been submitted to the payment provider.'].join('\n\n'),
+    content: [`Order ${quoteSource(item.orderRef) || 'not provided'} | Amount ${formatMoney(item.amount, item.currency)}`, 'Sample source inventory, not analyzed by a language model. No independent factual conclusion is made.', ...lines, 'The listed records require review against the original sources before use as a merchant response.'].join('\n\n'),
     findings, summary, assessment: acknowledgement ? 'supported' : failed ? 'mixed' : 'insufficient',
     recommendation: acknowledgement ? 'Review the acknowledgement and the original conversation, then use only supported facts in the response.' : 'Review the source records and obtain any missing delivery or correspondence evidence before asserting receipt.',
     gaps,
@@ -126,6 +129,6 @@ export function buildSampleReport(item: InvestigationInput['case'], evidence: Ev
 
 export function completeReport(input: unknown, evidence: EvidenceEnvelope[], metrics: InvestigationResult['metrics'], modelId?: string): InvestigationResult {
   const report = validateReport(input, evidence);
-  // Review notes are structured metadata, rendered once in the packet's review section.
+  // Review notes are structured metadata retained in the workspace, separate from the external response.
   return { ...report, metrics, ...(modelId ? { modelId } : {}) };
 }
