@@ -5,7 +5,7 @@ import { ArrowRight, Check, ChevronRight, Clock3, CreditCard, FileText, Folder, 
 import "./product-demo.css";
 
 const duration = 24400;
-const playbackRate = 1.55;
+const playbackRate = 2.3;
 const chapters = [
   { id: "open", label: "Open case", short: "Open", start: 0, preview: 1200, title: "Start with the dispute.", description: "One case, with the payment and the customer in context.", camera: [1, 0, 0] },
   { id: "inspect", label: "Inspect evidence", short: "Inspect", start: 3600, preview: 6000, title: "Read the original evidence.", description: "Inspect the customer’s own words, not just a summary.", camera: [1.22, -238, -85] },
@@ -191,7 +191,7 @@ export function ProductDemo() {
   }, [reduced]);
 
   const [zoom, x, y] = reduced ? [1, 0, 0] : scene.camera;
-  return <section className="product-demo" ref={rootRef} data-scene={scene.id} data-beat={beat} data-playing={running} data-manual={manual} aria-label="Causality product walkthrough" onKeyDown={event => {
+  return <section className="product-demo" ref={rootRef} tabIndex={0} data-scene={scene.id} data-beat={beat} data-playing={running} data-manual={manual} aria-label="Causality product walkthrough. Use arrow keys to explore scenes." onKeyDown={event => {
     if (event.key === "ArrowRight" || event.key === "ArrowLeft") { event.preventDefault(); seek(chapters[Math.min(4, Math.max(0, chapter + (event.key === "ArrowRight" ? 1 : -1)))].preview); }
     if (event.key === "Home") { event.preventDefault(); seek(0); }
   }}>
@@ -205,9 +205,7 @@ export function ProductDemo() {
         <div className="pd-view" data-active={chapter === 4}><SubmitScene submitting={time >= 20700 || (reduced && chapter === 4)} received={time >= 22200 || (reduced && chapter === 4)} /></div>
       </div></div></div>
       <div className="pd-pointer" style={{ transform: `translate3d(${pointer.x}px,${pointer.y}px,0)`, opacity: time >= 22200 || reduced ? 0 : 1 }}><svg width="17" height="22" viewBox="0 0 25 31"><path d="M2 2V24L8 18L13 29L18 26L13 16H22Z" fill="#181818" stroke="white" strokeWidth="2" strokeLinejoin="round" /></svg>{beats[beat].click && <span className="pd-pointer-click" key={beat} />}</div>
-    </div></div>
-    <div className="pd-player-progress"><div ref={progressRef} /></div>
-    <div className="pd-player-bottom"><div className="pd-narration"><strong>{scene.title}</strong><p>{scene.description}</p></div><div className="pd-playback-controls"><button type="button" className="pd-play-button" aria-label={playing ? "Pause walkthrough" : "Play walkthrough"} onClick={() => { setManual(false); if (elapsed.current >= duration) seek(0, true); else setPlaying(value => !value); }}>{playing ? <Pause size={18} /> : <Play size={18} />}<span>{playing ? "Pause" : "Play"}</span></button><button type="button" aria-label="Replay walkthrough" onClick={() => seek(0, true)}><RotateCcw size={18} /><span>Replay</span></button></div></div>
-    <nav className="pd-chapters" aria-label="Walkthrough chapters">{chapters.map((item, index) => <button type="button" key={item.id} onClick={() => seek(item.preview)} aria-label={`Show ${item.label} scene`} aria-current={chapter === index ? "step" : undefined}><span>{String(index + 1).padStart(2, "0")}</span><strong>{item.short}</strong><span className="pd-chapter-line" /></button>)}</nav>
+    </div><div className="pd-overlay-controls"><button type="button" className="pd-play-button" aria-label={playing ? "Pause walkthrough" : "Play walkthrough"} onClick={() => { setManual(false); if (elapsed.current >= duration) seek(0, true); else setPlaying(value => !value); }}>{playing ? <Pause size={16} /> : <Play size={16} />}</button><button type="button" aria-label="Replay walkthrough" onClick={() => seek(0, true)}><RotateCcw size={16} /></button><button type="button" className="pd-reduced-next" aria-label="Next walkthrough scene" onClick={() => seek(chapters[(chapter + 1) % chapters.length].preview)}><ArrowRight size={16} /></button></div><div className="pd-player-progress"><div ref={progressRef} /></div></div>
+    <p className="pd-accessible-description">{scene.title} {scene.description}</p>
   </section>;
 }

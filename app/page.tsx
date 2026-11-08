@@ -31,7 +31,6 @@ export default function Home() {
         <section className="landing-showcase landing-container" id="sample-report" aria-labelledby="showcase-title">
           <h2 id="showcase-title">The payment is one record.<br />The case is the whole story.</h2>
           <ProductDemo />
-          <div className="landing-caption-row landing-muted"><p>Every finding stays connected to its source.</p><p>Scripted walkthrough · Synthetic records</p></div>
         </section>
         <section className="landing-investigation" id="investigation" aria-labelledby="investigation-title"><div className="landing-container landing-investigation-grid">
           <div className="landing-investigation-intro"><h2 id="investigation-title">Designed to investigate.<br />Without training on your data.</h2><p className="landing-muted">The intended architecture processes approved records for one case, without training on them or building a persistent cross-customer agent memory.</p><img className="landing-architecture" src="/causality/access-architecture-compact.svg" width="480" height="340" loading="lazy" alt="Planned access architecture: company records pass through a policy gate into a fresh context containing evidence and tools. Company policy and the audit log remain outside the investigator’s context." /></div>
