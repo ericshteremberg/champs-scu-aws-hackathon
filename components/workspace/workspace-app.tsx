@@ -2436,7 +2436,7 @@ function CaseDetail({
       // Load the PDF engine and same-origin fonts only when requested.
       const [module, ...fonts] = await Promise.all([
         import('@/lib/report/pdf'),
-        ...['Ubuntu-Regular.ttf', 'Ubuntu-Bold.ttf'].map(async name => {
+        ...['LiberationSans-Regular.ttf', 'LiberationSans-Bold.ttf'].map(async name => {
           const response = await fetch(`/fonts/${name}`);
           if (!response.ok) throw new Error('The PDF fonts could not be loaded. Please retry.');
           return new Uint8Array(await response.arrayBuffer());

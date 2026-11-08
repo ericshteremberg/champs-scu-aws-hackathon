@@ -27,7 +27,7 @@ export async function renderOriginalRows(bytes: Uint8Array, record: Evidence): P
   canvas.height = 56 + lines.length * 24;
   if (canvas.height > 12000) throw new Error('The database result exceeds the visual page limit. Inspect the retained original JSON.');
   const ctx = canvas.getContext('2d')!; ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-  lines.forEach((line, i) => { ctx.fillStyle = line.heading ? '#bb4b0c' : '#172333'; ctx.font = '16px monospace'; ctx.fillText(line.text, 32, 36 + i * 24); });
+  lines.forEach((line, i) => { ctx.fillStyle = '#111111'; ctx.font = line.heading ? 'bold 16px monospace' : '16px monospace'; ctx.fillText(line.text, 32, 36 + i * 24); });
   const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(value => value ? resolve(value) : reject(new Error('Database visual export failed.')), 'image/png'));
   return new Uint8Array(await blob.arrayBuffer());
 }

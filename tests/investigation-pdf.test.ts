@@ -12,7 +12,7 @@ import type { EvidenceEnvelope } from '../lib/investigation/types.ts';
 
 const record: Evidence = { id: 'ev_order', caseId: 'case_test', source: 'database', title: 'Order, ticket and policy snapshot', content: 'Order recorded. Ticket invalidated. No scan records. Nonrefundable policy snapshot; acceptance is not recorded.', occurredAt: '2026-08-21T18:30:00Z', reference: 'synthetic-order' };
 const fixture = (): DisputeCase => ({ id: 'case_test', title: 'Synthetic ticket dispute', customerName: 'Zoë Müller', email: 'customer@example.test', amount: 2936, currency: 'usd', status: 'needs_review', reason: 'product_unacceptable', orderRef: 'DEMO-1042', dueAt: '2026-12-13T00:00:00Z', source: 'demo', createdAt: record.occurredAt, updatedAt: record.occurredAt, evidence: [structuredClone(record)], findings: [{ kind: 'supported', title: 'Order record', detail: 'The order is recorded. [ev_order]', evidenceIds: ['ev_order'] }], draft: { revision: 1, status: 'draft', generatedAt: record.occurredAt, method: 'bedrock', content: 'The order is recorded. [ev_order]\n\nSOURCE LIMITATIONS\n- No order records are attached to this case. This does not establish that an event did not occur.\n- Policy acceptance is not recorded.' } });
-const fonts = { regular: new Uint8Array(readFileSync('public/fonts/Ubuntu-Regular.ttf')), bold: new Uint8Array(readFileSync('public/fonts/Ubuntu-Bold.ttf')) };
+const fonts = { regular: new Uint8Array(readFileSync('public/fonts/LiberationSans-Regular.ttf')), bold: new Uint8Array(readFileSync('public/fonts/LiberationSans-Bold.ttf')) };
 
 describe('evidence packet', () => {
   it('uses readable citations, separates legacy diagnostics, and preserves material qualifications', () => {

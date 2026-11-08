@@ -6,7 +6,7 @@ import { formatMoney } from '../money.ts';
 import { assertPacketReady, packetClaim, packetIncludedSources, packetResponse, packetSources } from './packet.ts';
 
 type Fonts = { regular: Uint8Array; bold: Uint8Array };
-const ink = rgb(0.09, 0.14, 0.21), muted = rgb(0.35, 0.39, 0.44), accent = rgb(0.91, 0.36, 0.07), rule = rgb(0.85, 0.87, 0.89);
+const ink = rgb(0.07, 0.07, 0.07), muted = rgb(0.35, 0.35, 0.35), rule = rgb(0.82, 0.82, 0.82), panel = rgb(0.96, 0.96, 0.96);
 const stamp = (value: string) => {
   const parsed = new Date(value);
   return Number.isNaN(parsed.valueOf()) ? value : `${parsed.toISOString().slice(0, 10)} ${parsed.toISOString().slice(11, 16)} UTC`;
@@ -34,25 +34,26 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
   doc.setTitle(`Evidence packet | ${item.orderRef || item.id}`);
   doc.setAuthor('Causality'); doc.setCreator('Causality evidence packet'); doc.setCreationDate(generatedAt);
   const width = 612, height = 792, margin = 48, usable = width - margin * 2;
-  let page: PDFPage, y = 0, section = 'Dispute evidence', encodedFallback = false;
+  let page!: PDFPage;
+  let y = 0, section = 'Dispute evidence', encodedFallback = false;
   const glyphs = new Set(regular.getCharacterSet());
   const safe = (text: string) => [...text.normalize('NFC').replace(/[\u2010-\u2015]/g, '-').replace(/\t/g, '  ').replace(/[\x00-\x08\x0b-\x1f\x7f]/g, '')].map(char => {
     if (char === '\n' || glyphs.has(char.codePointAt(0)!)) return char;
     encodedFallback = true;
     return `[U+${char.codePointAt(0)!.toString(16).toUpperCase()}]`;
   }).join('');
-  const lines = (text: string, font: PDFFont, size: number): string[] => {
+  const lines = (text: string, font: PDFFont, size: number, available = usable): string[] => {
     const result: string[] = [];
     for (const paragraph of safe(text).split('\n')) {
       if (!paragraph.trim()) { result.push(''); continue; }
       let line = '';
       for (const word of paragraph.trim().split(/\s+/)) {
         const next = line ? `${line} ${word}` : word;
-        if (font.widthOfTextAtSize(next, size) <= usable) { line = next; continue; }
+        if (font.widthOfTextAtSize(next, size) <= available) { line = next; continue; }
         if (line) result.push(line);
         line = '';
         for (const char of word) {
-          if (font.widthOfTextAtSize(line + char, size) > usable) { result.push(line); line = ''; }
+          if (font.widthOfTextAtSize(line + char, size) > available) { result.push(line); line = ''; }
           line += char;
         }
       }
@@ -62,11 +63,9 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
   };
   const newPage = () => {
     page = doc.addPage([width, height]);
-    page.drawRectangle({ x: margin, y: height - 43, width: 18, height: 4, color: accent });
-    page.drawText('CAUSALITY', { x: margin + 27, y: height - 44, size: 10, font: bold, color: ink });
-    page.drawText(section, { x: margin, y: height - 67, size: 9, font: regular, color: muted });
-    page.drawLine({ start: { x: margin, y: height - 79 }, end: { x: width - margin, y: height - 79 }, color: rule, thickness: 0.6 });
-    y = height - 106;
+    page.drawText(`CAUSALITY / ${section.toUpperCase()}`, { x: margin, y: height - 35, size: 8, font: regular, color: muted });
+    page.drawLine({ start: { x: margin, y: height - 44 }, end: { x: width - margin, y: height - 44 }, color: rule, thickness: 0.5 });
+    y = height - 69;
   };
   const ensure = (space: number) => { if (y - space < 62) newPage(); };
   const write = (text: string, size = 10.5, font = regular, color = ink, after = 10, leading = 1.45) => {
@@ -77,21 +76,41 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
     }
     y -= after;
   };
-  const heading = (text: string) => { ensure(65); write(text, 15, bold, ink, 11); };
+  const heading = (text: string, number?: number) => {
+    ensure(60);
+    if (number) {
+      page.drawCircle({ x: margin + 7, y: y + 3, size: 7, color: ink });
+      const label = String(number);
+      page.drawText(label, { x: margin + 7 - bold.widthOfTextAtSize(label, 8) / 2, y, size: 8, font: bold, color: rgb(1, 1, 1) });
+      page.drawText(text.toUpperCase(), { x: margin + 22, y, size: 11, font: bold, color: ink });
+      y -= 10;
+      page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, color: rule, thickness: 0.6 });
+      y -= 20;
+    } else write(text, 12, bold, ink, 10);
+  };
   const sources = packetSources(item);
   newPage();
-  write('Response to chargeback', 22, bold, ink, 8);
-  write(item.source === 'demo' ? 'SYNTHETIC SAMPLE | NOT FOR SUBMISSION' : item.draft!.status === 'approved' ? 'REVIEWED COPY | NOT SUBMITTED' : 'DRAFT FOR REVIEW | NOT SUBMITTED', 8, bold, accent, 12);
+  write('Response to chargeback', 19, bold, ink, 8);
+  write(item.source === 'demo' ? 'SYNTHETIC SAMPLE | NOT FOR SUBMISSION' : item.draft!.status === 'approved' ? 'REVIEWED COPY | NOT SUBMITTED' : 'DRAFT FOR REVIEW | NOT SUBMITTED', 8, bold, ink, 12);
   write(`${item.customerName} | ${formatMoney(item.amount, item.currency)} | Order ${item.orderRef || 'Not recorded'}`, 11, bold, ink, 5);
   if (item.stripeDisputeId) write(`Dispute ${item.stripeDisputeId}`, 8.5, regular, muted, 4);
   write(`Prepared ${stamp(generatedAt.toISOString())}`, 8.5, regular, muted, 12);
-  write(`Disputed claim: ${packetClaim(item)}`, 10, regular, ink, 14);
-  heading('Merchant response');
+  page.drawLine({ start: { x: margin, y: y + 5 }, end: { x: width - margin, y: y + 5 }, color: ink, thickness: 1.6 });
+  y -= 14;
+  for (const line of lines(`The claim: ${packetClaim(item)}`, regular, 10, usable - 24)) {
+    ensure(20);
+    page.drawRectangle({ x: margin, y: y - 7, width: usable, height: 20, color: panel });
+    page.drawRectangle({ x: margin, y: y - 7, width: 2, height: 20, color: muted });
+    page.drawText(line, { x: margin + 12, y, size: 10, font: regular, color: ink });
+    y -= 20;
+  }
+  y -= 16;
+  heading('Merchant response', 1);
   // Do not truncate or strip adverse statements from the saved factual narrative.
   write(packetResponse(item), 10.5);
 
   const included = packetIncludedSources(item);
-  section = 'Evidence index'; ensure(65); heading('Supporting records');
+  section = 'Evidence index'; ensure(65); heading('Supporting records', 2);
   for (const record of included) {
     const index = sources.findIndex(source => source.id === record.id);
     ensure(44);
@@ -109,7 +128,7 @@ export async function createEvidencePdf(item: DisputeCase, fonts: Fonts, generat
       if (++visualPages > 100) throw new Error('Visual exhibits exceed 100 pages. Narrow the case files.');
       section = 'Visual exhibits'; newPage();
       heading(`[E${index + 1}] ${record.title}`);
-      write(`${exhibit.renderedEmail ? 'Rendered original Resend email' : exhibit.renderedRows ? 'Original Supabase query result' : record.originalDocument ? 'Original Stripe receipt PDF' : 'Original uploaded file'} | ${part}`, 9, bold, accent, 5);
+      write(`${exhibit.renderedEmail ? 'Rendered original Resend email' : exhibit.renderedRows ? 'Original Supabase query result' : record.originalDocument ? 'Original Stripe receipt PDF' : 'Original uploaded file'} | ${part}`, 9, bold, ink, 5);
       write(`Collected: ${record.capturedAt ? stamp(record.capturedAt) : 'Not recorded'} | Retrieved for export: ${stamp(exhibit.fetchedAt)}`, 8, regular, muted, 4);
       write(`Source SHA-256: ${exhibit.original?.sha256 ?? exhibit.sha256}`, 7.5, regular, muted, 4);
       write(exhibit.renderedEmail ? 'Captured provider body, not a provider-dashboard screenshot. Remote images, stylesheets and active content omitted.' : exhibit.renderedRows ? 'Visual export of original returned rows. The original JSON, query and parameters are embedded. This is not a database dashboard screenshot.' : record.originalDocument ? 'Original provider-generated PDF retrieved through the connected Stripe charge. The unmodified file is embedded.' : 'Reproduction of the attached original. Uploader-supplied content is not independently authenticated.', 8, regular, muted, 8);
