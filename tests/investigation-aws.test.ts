@@ -31,8 +31,12 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({ getSignedUrl: vi.fn(async () =
 
 import { commit, getItem, keys, workspaceIdForUser } from '../aws/store.ts';
 import { executeAction, getWorkspaceState } from '../aws/workspace.ts';
-import { cancelInvestigation, getLatestInvestigation, importMerchantCase, processInvestigation, startInvestigation, type RunDoc } from '../aws/investigations.ts';
+import { cancelInvestigation, getLatestInvestigation, importMerchantCase, importManagedMerchantCase, processInvestigation, startInvestigation, type RunDoc } from '../aws/investigations.ts';
 import { archiveApprovedCase, completeUpload, getDownload, prepareUpload } from '../aws/files.ts';
+import { executeManagedConnectorAction } from '../aws/managed-connectors.ts';
+import * as network from '../aws/merchant-network.ts';
+import { normalizeMerchantSection } from '../lib/investigation/merchant.ts';
+import type { EvidenceSection } from '../lib/investigation/types.ts';
 
 const user: TrustedUser = { userId: 'owner-one', email: 'owner@example.test', displayName: 'Owner' };
 const other: TrustedUser = { userId: 'owner-two', email: 'other@example.test', displayName: 'Other' };
@@ -48,6 +52,108 @@ beforeEach(async () => {
   await executeAction(other, { action: 'createWorkspace', name: 'Other workspace' });
   const workspace = await getWorkspaceState(user);
   caseId = workspace.cases.find(item => item.orderRef === 'ATM-1042')!.id;
+});
+
+describe('managed live connections used by the AWS harness', () => {
+  const token = 'test-case-token-with-at-least-32-characters';
+  const externalCaseId = 'approved-case';
+  const timestamp = '2026-11-07T10:00:00Z';
+  let connectionId: string;
+  function section(name: EvidenceSection = 'summary', paymentRef = 'PAYMENT-1') {
+    return normalizeMerchantSection({
+      case_id: externalCaseId, section: name, source_mode: 'live', fetched_at: timestamp, status: 'available',
+      records: [{ evidence_id: `${name}-record`, source: 'Test merchant', source_id: `${name}-source`, occurred_at: timestamp,
+        data: { title: `${name} record`, detail: 'Fictional integration-test evidence.', fields: { paymentRef, orderRef: 'ORDER-1' } } }], limitations: [],
+      ...(name === 'summary' ? { mapping_verified: true, case: { id: externalCaseId, merchantId: 'merchant-1', merchantName: 'Fictional merchant', customerLabel: 'Test customer', claim: 'Ticket not received', reason: 'Ticket not received', amount: 5000, currency: 'USD', eventName: 'Test event', purchasedAt: timestamp, openedAt: timestamp, dueAt: timestamp, sourceMode: 'live', summary: 'Test summary', orderRef: 'ORDER-1', paymentRef, tags: [] } } : {}),
+    }, externalCaseId, name);
+  }
+  async function connect(owner = user) {
+    return (await executeManagedConnectorAction(owner, { action: 'connect', name: 'Test connector', baseUrl: 'https://merchant.example.com', token, externalCaseId })).connection.id;
+  }
+  async function disconnect() { await executeManagedConnectorAction(user, { action: 'disconnect', connectionId }); }
+  function model() {
+    return vi.spyOn(BedrockRuntimeClient.prototype, 'send')
+      .mockResolvedValueOnce({ output: { message: { role: 'assistant', content: ['order', 'tickets', 'delivery', 'support'].map(name => ({ toolUse: { toolUseId: name, name: 'get_evidence', input: { section: name } } })) } }, stopReason: 'tool_use' } as never)
+      .mockResolvedValueOnce({ output: { message: { role: 'assistant', content: [{ toolUse: { toolUseId: 'finish', name: 'finish_report', input: { content: 'The approved payment maps to this order. [E1]', summary: 'Review the available evidence.', assessment: 'mixed', recommendation: 'Review before submitting.', findings: [{ kind: 'supported', title: 'Payment mapping', detail: 'The summary identifies the approved payment and order.', evidenceIds: ['E1'] }], gaps: ['Cardholder receipt remains unverified.'] } } }] } }, stopReason: 'tool_use' } as never);
+  }
+  beforeEach(async () => {
+    vi.stubEnv('MERCHANT_EVIDENCE_URL', ''); vi.stubEnv('MERCHANT_EVIDENCE_TOKEN', ''); vi.stubEnv('MERCHANT_WORKSPACE_ID', '');
+    vi.spyOn(network, 'verifyPublicMerchantConnection').mockResolvedValue(section());
+    vi.spyOn(network, 'fetchPublicMerchantSection').mockImplementation(async (_config, _id, name) => section(name));
+    connectionId = await connect();
+  });
+  it('imports only its approved case without operator environment settings and preserves existing edits on repeat import', async () => {
+    caseId = await importManagedMerchantCase(user, connectionId);
+    expect(network.fetchPublicMerchantSection).toHaveBeenCalledWith({ baseUrl: 'https://merchant.example.com', token }, externalCaseId, 'summary', expect.any(AbortSignal));
+    expect((await getItem<CaseDoc>(wid, keys.case(caseId)))?.data.merchantConnectionId).toBe(connectionId);
+    await executeAction(user, { action: 'updateCase', caseId, title: 'Human title' });
+    expect(await importManagedMerchantCase(user, connectionId)).toBe(caseId);
+    expect((await getWorkspaceState(user)).cases.find(item => item.id === caseId)?.title).toBe('Human title');
+    expect(network.fetchPublicMerchantSection).toHaveBeenCalledTimes(1);
+    await expect(importManagedMerchantCase(other, connectionId)).rejects.toMatchObject({ status: 404 });
+    const anotherId = await connect();
+    expect(await importManagedMerchantCase(user, anotherId)).not.toBe(caseId);
+    expect(JSON.stringify(await getWorkspaceState(user))).not.toContain(token);
+  });
+  it('runs the actual harness with case-scoped retrieval and never puts the token in model input or public state', async () => {
+    caseId = await importManagedMerchantCase(user, connectionId);
+    const invoke = model();
+    const run = await startInvestigation(user, caseId, 'bedrock'); await job(run.id);
+    expect((await getLatestInvestigation(user, caseId))?.status).toBe('completed');
+    expect((await draft())?.data.content).toContain('approved payment');
+    expect(network.fetchPublicMerchantSection).toHaveBeenCalledTimes(6);
+    expect(vi.mocked(network.fetchPublicMerchantSection).mock.calls.every(([, approved]) => approved === externalCaseId)).toBe(true);
+    expect(JSON.stringify(invoke.mock.calls)).not.toContain(token);
+    expect(JSON.stringify(await getWorkspaceState(user))).not.toContain(token);
+    expect(JSON.stringify(await getLatestInvestigation(user, caseId))).not.toContain(token);
+  });
+  it('blocks changed payment mapping before import and before any model request', async () => {
+    vi.mocked(network.fetchPublicMerchantSection).mockResolvedValueOnce(section('summary', 'OTHER-PAYMENT'));
+    await expect(importManagedMerchantCase(user, connectionId)).rejects.toMatchObject({ code: 'merchant_mapping_changed' });
+    caseId = await importManagedMerchantCase(user, connectionId);
+    vi.mocked(network.fetchPublicMerchantSection).mockResolvedValueOnce(section('summary', 'OTHER-PAYMENT'));
+    const invoke = model();
+    const run = await startInvestigation(user, caseId, 'bedrock'); await job(run.id);
+    expect((await getLatestInvestigation(user, caseId))?.status).toBe('failed');
+    expect(invoke).not.toHaveBeenCalled(); expect(await draft()).toBeNull();
+  });
+  it('does not import if disconnect happens while evidence is in flight', async () => {
+    vi.mocked(network.fetchPublicMerchantSection).mockImplementationOnce(async () => { await disconnect(); return section(); });
+    await expect(importManagedMerchantCase(user, connectionId)).rejects.toMatchObject({ code: 'connector_disconnected' });
+    expect((await getWorkspaceState(user)).cases.some(item => item.source === 'merchant')).toBe(false);
+  });
+  it('blocks queued and future investigations after disconnect without falling back to an operator endpoint', async () => {
+    caseId = await importManagedMerchantCase(user, connectionId);
+    const run = await startInvestigation(user, caseId, 'bedrock');
+    vi.stubEnv('MERCHANT_EVIDENCE_URL', 'https://legacy.example.com'); vi.stubEnv('MERCHANT_EVIDENCE_TOKEN', 'other-token'); vi.stubEnv('MERCHANT_WORKSPACE_ID', wid);
+    await disconnect();
+    const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher); const invoke = model();
+    await job(run.id);
+    await expect(startInvestigation(user, caseId, 'bedrock')).rejects.toMatchObject({ code: 'connector_disconnected' });
+    await expect(importManagedMerchantCase(user, connectionId)).rejects.toMatchObject({ code: 'connector_disconnected' });
+    expect(fetcher).not.toHaveBeenCalled(); expect(invoke).not.toHaveBeenCalled(); expect(await draft()).toBeNull();
+  });
+  it('discards evidence that returns after disconnection', async () => {
+    caseId = await importManagedMerchantCase(user, connectionId);
+    vi.mocked(network.fetchPublicMerchantSection).mockImplementationOnce(async () => { await disconnect(); return section(); });
+    const invoke = model(); const run = await startInvestigation(user, caseId, 'bedrock'); await job(run.id);
+    expect((await getLatestInvestigation(user, caseId))?.status).toBe('failed');
+    expect(invoke).not.toHaveBeenCalled(); expect(await draft()).toBeNull();
+  });
+  it('conditionally blocks publication when disconnect races with the final draft transaction', async () => {
+    caseId = await importManagedMerchantCase(user, connectionId);
+    model(); const run = await startInvestigation(user, caseId, 'bedrock');
+    const apply = vi.mocked(commit).getMockImplementation()!;
+    vi.mocked(commit).mockImplementation(async (workspaceId, changes) => {
+      if (changes.some(change => change.key === keys.draft(caseId) && 'data' in change)) await disconnect();
+      return apply(workspaceId, changes);
+    });
+    try {
+      await job(run.id);
+      expect((await getLatestInvestigation(user, caseId))?.status).toBe('stale');
+      expect(await draft()).toBeNull();
+    } finally { vi.mocked(commit).mockImplementation(apply); }
+  });
 });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 

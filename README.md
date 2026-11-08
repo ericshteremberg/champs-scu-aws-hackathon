@@ -34,7 +34,8 @@ There are no D1 or R2 bindings in the development deployment. The temporary deve
 - **Sample investigation** is deterministic, is labeled as such, and runs only on sample cases. **AWS investigation** uses Bedrock Converse tool calls. An AWS failure never becomes a sample result under an AWS label.
 - A merchant-owned API returns only selected records linked to an approved case. The model cannot choose another case, database query, or arbitrary endpoint.
 - Connections now includes a guided evidence setup: choose a ticketing or rental example, confirm table relationships and shared fields, preview allowed records and rejected case access, then save the configuration in DynamoDB. Both examples are explicitly fictional schemas and data. A saved mapping does not claim a live database connection.
-- Downloaded mapping and read-role files configure the same packaged merchant connector. It creates the HTTP endpoint without customer-written service code, verifies Stripe payment scope, and runs bounded read-only PostgreSQL queries. Database permission review, a real case grant, HTTPS hosting, and Lambda configuration remain required. See [the guided connector setup](docs/CONNECTOR_SETUP.md).
+- Downloaded mapping and read-role files configure the same packaged merchant connector. It creates the HTTP endpoint without customer-written service code, verifies Stripe payment scope, and runs bounded read-only PostgreSQL queries. Database permission review, a real case grant, and public HTTPS hosting remain required. See [the guided connector setup](docs/CONNECTOR_SETUP.md).
+- A deployed evidence API can be connected, rechecked, imported, and disconnected in Connections without editing Lambda settings. Each connection requests one configured case after checking its live summary and a random unrelated-case rejection. That rejection is a smoke check, not proof of the token's complete access scope; the merchant service must enforce the case grant. Credentials use separate private DynamoDB items, protected by table encryption at rest, and are omitted from public metadata, workspace state, and audit details. Disconnect deletes the saved credential and blocks later reads and publication while retaining imported evidence. Revoke the merchant's grant too to invalidate copies of the token elsewhere.
 - Each saved configuration can import its sample once into the existing AWS investigation and review workflow. Revoking that configuration prevents further imports and installation-file downloads while retaining imported evidence. It does not disable a separately deployed merchant service.
 - Investigations run asynchronously in Lambda. The browser polls persisted progress, and cancellation prevents later tool/model steps and draft publication.
 - DynamoDB conditional transactions protect case data, active runs, draft revisions, approval state, and Stripe submission claims. A stale result cannot replace newer source records or a reviewer's edits.
@@ -90,14 +91,15 @@ The bridge's temporary workshop credentials expire. Refresh them before the demo
 | Frontend Worker public configuration | `DATA_BACKEND=aws`, `DEPLOYMENT_MODE=standalone-dev`, `AWS_REGION`, `AWS_BACKEND_FUNCTION`, `EVIDENCE_BUCKET_ORIGIN` |
 | Frontend Worker secrets | `DEV_ACCESS_PASSWORD`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` |
 | Lambda, provisioned by CloudFormation | `CAUSALITY_TABLE`, `EVIDENCE_BUCKET`, `BEDROCK_MODEL_ID`, `FUNCTION_NAME` |
-| Lambda, optional merchant connection | `MERCHANT_EVIDENCE_URL`, `MERCHANT_EVIDENCE_TOKEN`, `MERCHANT_WORKSPACE_ID` |
+| App Connections, live evidence API | Public HTTPS base URL, approved external case ID, case-scoped API token; stored in the owning AWS workspace |
+| Lambda, optional legacy merchant connection | `MERCHANT_EVIDENCE_URL`, `MERCHANT_EVIDENCE_TOKEN`, `MERCHANT_WORKSPACE_ID` |
 | Lambda, optional Stripe connection | `STRIPE_RESTRICTED_KEY`, `STRIPE_WORKSPACE_ID`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_ALLOW_LIVE`, `STRIPE_ENABLE_SUBMISSION` |
 
-Configure merchant and Stripe credentials on Lambda, preserving the infrastructure-provided environment values. Bind each connection to the exact workspace ID shown in the interface. They are not browser credentials. The Connections screen indicates configuration; only a successful operation verifies current access.
+Use Connections for new merchant evidence connections. The app sends the entered case token to AWS once for verification and storage; list responses never return it. Configure optional legacy merchant and Stripe credentials on Lambda, preserving infrastructure-provided values and binding them to the exact workspace ID shown in the interface. A successful connection check establishes access at that time; recheck or an actual operation verifies continued access.
 
 ## Limits and current boundaries
 
-The AWS implementation supports 90 evidence records per case, 300 KB per DynamoDB item, 3 MB per database transaction, 1 MB of normalized investigator context, and 10 MB per uploaded file. Reads are paginated and fail explicitly at their configured bounds instead of silently returning incomplete evidence. Run time and tool/model rounds are bounded.
+The AWS implementation supports 30 saved live connections per workspace, each for one approved case, 90 evidence records per case, 300 KB per DynamoDB item, 3 MB per database transaction, 1 MB of normalized investigator context, and 10 MB per uploaded file. Disconnected connection records count toward the saved limit. Reads are paginated and fail explicitly at their configured bounds instead of silently returning incomplete evidence. Run time and tool/model rounds are bounded. Supabase OAuth, automatic schema discovery, and automatic merchant-service hosting are not implemented.
 
 PDF and image contents are not extracted automatically. The operator can inspect the originals; the model is told when relevant content is unavailable. Gmail OAuth, independent reviewer membership, automatic retention deletion, refunds, and outbound customer messages are not implemented. Saved policies and access requests do not grant broader permissions.
 
@@ -144,6 +146,7 @@ Those local regression tests use D1/R2 emulation and trusted test headers bound 
 | `aws/handler.ts`, `aws/workspace.ts`, `aws/store.ts` | AWS API, business actions, DynamoDB conditional persistence |
 | `aws/investigations.ts` | Background jobs, trace persistence, scoped evidence, cancellation and final publication |
 | `aws/connectors.ts`, `lib/evidence-connectors/` | DynamoDB setup configurations, validated mappings, bounded query plans, fictional access previews and sample imports |
+| `aws/managed-connectors.ts`, `aws/merchant-network.ts` | Workspace-owned live connection registry, separate private credentials, public HTTPS verification and guarded merchant requests |
 | `components/workspace/connector-setup.tsx` | Guided mapping, case preview and installation downloads in Connections |
 | `integrations/evidence-connector/` | Shared merchant-hosted PostgreSQL runtime, guided installer, private grants and live payment verification |
 | `aws/files.ts` | Signed S3 uploads, validation, private downloads and approved archives |

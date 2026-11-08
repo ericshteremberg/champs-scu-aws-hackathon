@@ -41,7 +41,9 @@ export function buildConnectorInstallFiles(manifest: ConnectorManifest): Connect
     'Create an approved case grant using the generated example, then rerun setup in a NEW private output directory with --grant /absolute/path/approved-case.json. The private case token is saved to case-token.secret.',
     'Set EVIDENCE_DATABASE_URL and EVIDENCE_STRIPE_READ_KEY in the NEW private connector.env file. Keep all credentials outside chat and version control.',
     'Run npm run connector:check -- --env-file /absolute/path/private-connector/connector.env, then npm run connector:start with the same --env-file.',
-    'Deploy this packaged service behind HTTPS. The Causality operator must set MERCHANT_EVIDENCE_URL, MERCHANT_EVIDENCE_TOKEN, and MERCHANT_WORKSPACE_ID on BOTH AWS Lambda functions, then verify the approved case import. Saving a mapping in the wizard does not activate this live connection.',
+    'Deploy this packaged service behind public HTTPS. In Causality Connections, add a live evidence connection with its base URL, approved external case ID, and credential from case-token.secret. Causality verifies the approved case and runs an unrelated-case rejection smoke check before saving. The smoke check does not prove the token cannot access other existing cases; the merchant service must enforce its grant. No Lambda environment change is required.',
+    'Import the approved case from the saved live connection and inspect its evidence before investigating. Saving a mapping alone does not activate a live connection. Each live connection requests only its configured approved case.',
+    'To disconnect, use Connections to delete the saved credential and block further reads and publication. Previously imported evidence remains available. Also revoke the merchant grant to invalidate copies of the credential elsewhere.',
   ];
   return {
     files: [
@@ -62,6 +64,7 @@ export function buildConnectorInstallFiles(manifest: ConnectorManifest): Connect
         'Repository: https://github.com/ericshteremberg/champs-scu-aws-hackathon', '',
         'Read docs/CONNECTOR_SETUP.md for the full setup and revocation procedure. The supplied templates describe example schemas, not a guarantee that the production ATMSPHR or Rentul database has those fields.', '',
         'OAuth deployment is not included in this guided installer. Setup permissions are separate from the restricted credential used during investigations.', '',
+        'Live connection tokens are stored in separate private DynamoDB items with table encryption at rest. They are never returned in public connection metadata, workspace state, or audit details. Keep them out of chat and version control.', '',
       ].join('\n') },
     ],
     instructions,

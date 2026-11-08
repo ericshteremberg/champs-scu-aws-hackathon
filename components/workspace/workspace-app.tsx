@@ -67,6 +67,7 @@ import {
 } from "./workspace-extra";
 import type { ScreenPreview } from "@/lib/design/fixtures";
 import { EvidenceConnectors } from "./connector-setup";
+import { LiveEvidenceConnectors } from "./live-connectors";
 import "./workspace.css";
 
 type View =
@@ -3654,7 +3655,10 @@ function Integrations({
           Workspace-scoped
         </span>
       </div>
-      {!isDesignPreview && <EvidenceConnectors onImported={onConnectorImported} />}
+      {!isDesignPreview && <>
+        <LiveEvidenceConnectors onImported={onConnectorImported} />
+        <EvidenceConnectors onImported={onConnectorImported} />
+      </>}
       <div className="cw-integration-grid">
         <section className="cw-panel cw-integration">
           <div className="cw-integration-head">
@@ -3867,7 +3871,7 @@ function Integrations({
             >
               {investigationConfig?.merchantConfigured
                 ? "Configured"
-                : "Not connected"}
+                : "Guided setup available"}
             </span>
           </div>
           <p>
@@ -3883,8 +3887,8 @@ function Integrations({
           {!investigationConfig?.merchantConfigured && (
             <p className="cw-caption">
               Start with guided setup above to review your mapping and get
-              installation files. Live import becomes available after your
-              deployed connector is configured on the server.
+              installation files. Add your installed endpoint in Your workspace
+              connections to verify access and import its approved case.
             </p>
           )}
           <div className="cw-actions">

@@ -1,8 +1,8 @@
 # Reusable evidence connector: guided setup
 
-Causality's Connections wizard saves a reviewed mapping, previews fictional evidence, and downloads the installation files. The packaged connector creates the evidence endpoint; a business does not write an HTTP handler or case query. The AWS investigator uses the same evidence contract for ticketing and rentals.
+Causality's Connections wizard saves a reviewed mapping, previews fictional evidence, and downloads the installation files. The packaged connector creates the evidence endpoint; a business does not write an HTTP handler or case query. After deployment, the business connects and manages its approved case in the app. The AWS investigator uses the same evidence contract for ticketing and rentals.
 
-This release provides a guided installer. Supabase OAuth authorization, schema discovery, automatic hosting, and a production connection registry are not implemented. Saving or previewing a mapping does not connect a live database. The wizard examples describe fictional schemas and records, not the production ATMSPHR or Rentul database. The specialized production-schema adapter remains in `integrations/atmsphr/`.
+This release provides a guided installer and an AWS-backed live connection registry. Supabase OAuth authorization, schema discovery, and automatic hosting are not implemented. Saving or previewing a mapping does not connect a live database. The wizard examples describe fictional schemas and records, not the production ATMSPHR or Rentul database. The specialized production-schema adapter remains in `integrations/atmsphr/`.
 
 ## 1. Download and install the connector
 
@@ -70,27 +70,34 @@ The check command reads metadata and uses zero-row schema probes, without printi
 
 Host this service in the merchant's environment behind HTTPS. The packaged service supplies `GET /v1/cases/{caseId}/evidence?section=summary|order|tickets|delivery|history|support|attendance|policy`. A bearer credential authorizes one approved case; a different case, expired credential, or revoked credential is denied. Responses use no-store caching and bounded payloads. Do not expose the local plaintext listener directly to the internet.
 
-## 5. Connect the deployed service to AWS
+## 5. Connect the deployed service in the app
 
-The current live connection is configured by the Causality operator, separately from the wizard's saved mapping. Preserve existing settings while adding these private environment variables to **both** `causality-hackathon-backend` and `causality-hackathon-investigator`:
+Open Connections and add a live evidence connection. Enter a display name, the deployed public HTTPS base URL, the approved external case ID, and its credential from the private `case-token.secret` file. This credential is for the case evidence API, not a database login or Supabase administrative key.
 
-- `MERCHANT_EVIDENCE_URL`: deployed HTTPS base URL.
-- `MERCHANT_EVIDENCE_TOKEN`: credential from the private `case-token.secret` file.
-- `MERCHANT_WORKSPACE_ID`: the exact Causality workspace allowed to import the case.
+Causality verifies the live summary and payment/order mapping, then sends a random unrelated case ID and requires HTTP 401, 403, or 404. This is an access-scope smoke check: a missing-case response cannot prove that the token cannot access other existing cases. Causality only requests the configured approved case; the merchant service must enforce its case grant. The connection is saved only after the summary and smoke check pass. The AWS transport rejects private or local destinations and redirects, validates DNS, and bounds request time and response size. The app can recheck access, import the approved case, or disconnect. Recheck refuses a changed merchant, order, or payment identity.
 
-Use the existing AWS deployment/configuration process. Do not paste keys into a shell command, Git, screenshots, or this document. The current configuration supports one case-bound merchant credential per workspace connection; a managed multi-case credential registry is future work.
+`GET /api/connectors/live` lists the owning workspace's public connection metadata. POST actions are `connect`, `recheck`, `import`, and `disconnect`. Each live connection is configured to request one approved case; a workspace supports up to 30 saved connections, including disconnected records. The token is stored in a separate private DynamoDB item under `connector-credential#`, while public metadata uses `live-connection#`. DynamoDB encrypts the table at rest. This is not application-level encryption or Secrets Manager storage. Tokens never appear in returned connection metadata, workspace state, or audit details.
 
-Verify that the approved case imports through the workspace, that another case is denied, and that a Bedrock investigation preserves source citations. A saved onboarding mapping remains a draft and does not change these live settings. No production database, Stripe account, permission, or external deployment is changed by the installer itself.
+This flow requires no Lambda environment change. The legacy operator-managed `MERCHANT_EVIDENCE_URL`, `MERCHANT_EVIDENCE_TOKEN`, and `MERCHANT_WORKSPACE_ID` configuration remains optional on both Lambdas for older connections. Keep credentials out of chat, Git, screenshots, and shell command history.
+
+Import the approved case, inspect its summary mapping, and verify that a Bedrock investigation preserves source citations. A saved onboarding mapping remains a draft until a deployed service is connected separately. No production database, Stripe account, permission, or external deployment is changed by the installer itself. The development deployment still uses the shared team login; it is not production multi-user authentication.
 
 ## Revocation and updates
 
-Set a grant's `revoked` field to `true` or remove its entry from the private grant file. Use an atomic replacement with mode `0600` for operational updates. The server reloads this file on every request and again before releasing evidence, so a change during a read blocks the response. Remove the corresponding AWS connection credential when disconnecting the service. Mapping changes require a reviewed manifest update and service restart.
+Disconnect in Connections to atomically disable the saved connection and delete its private credential. Later managed reads and result publication are blocked, including publication that races with disconnection. Previously imported evidence remains available. Disconnecting Causality does not invalidate other copies of the same token.
+
+Also set the merchant grant's `revoked` field to `true` or remove its entry from the private grant file to invalidate those copies at the source. Use an atomic replacement with mode `0600` for operational updates. The server reloads this file on every request and again before releasing evidence, so a change during a read blocks the response. Mapping changes require a reviewed manifest update and service restart.
 
 ## Verification
 
 ```sh
 npm --prefix integrations/evidence-connector test
 npm --prefix integrations/evidence-connector run typecheck
+npx vitest run --config vitest.config.ts tests/aws-managed-connectors.test.ts tests/aws-merchant-network.test.ts
 ```
 
 Tests cover the existing merchant wire contract, partial dispute amounts, Stripe mismatch rejection, tenant/order scope, expiry/revocation, private setup output, read-only permissions, and the actual HTTP boundary. Embedded PostgreSQL tests execute the generated SQL against both example schemas with unrelated orders and colliding merchant IDs. The generated role denies unmapped private columns and writes. All test records are fictional.
+
+The AWS registry tests cover credential separation, workspace isolation, strict inputs, sanitized failures, changed case identity, atomic disconnection, and concurrent update conflicts. Transport tests exercise public destination checks and bounded requests. These tests do not establish that a customer's real endpoint or database is connected.
+
+With the development AWS deployment and Wrangler credentials available, `npm run test:connectors:live` deploys a temporary HTTPS fixture containing only fictional evidence. It verifies the real AWS connection, import, Bedrock investigation, citations, and disconnect flow, then deletes the fixture and its two isolated test workspaces. The fixture stores no Cloudflare database records. Use `npm run test:connectors:live -- --dry-run` for local fixture and bundle checks only. Smoke results are written to ignored `.aws-build/managed-connector-smoke.json`.

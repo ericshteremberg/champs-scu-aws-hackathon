@@ -31,7 +31,7 @@ npm run sync:dev-secrets
 
 Run those commands from a terminal containing the current workshop credential exports. The helper preserves other `.dev.vars` settings and does not print secrets. The saved session overrides stale inherited AWS credentials; partial saved sessions fail explicitly. `sync:dev-secrets` reads `.dev.vars` and the existing private access file, then updates the Worker secret store. Editing `.dev.vars` or redeploying alone does not refresh hosted credentials.
 
-Lambda accesses DynamoDB, S3, Bedrock, and its background worker using its execution role. Do not copy workshop credentials into Lambda environment variables. Optional merchant and Stripe credentials belong on Lambda, with an exact workspace binding.
+Lambda accesses DynamoDB, S3, Bedrock, and its background worker using its execution role. Do not copy workshop credentials into Lambda environment variables. New merchant connections are managed in Connections and stored in the owning AWS workspace. Optional legacy merchant and Stripe environment credentials still require an exact workspace binding.
 
 ## Build and deploy
 
@@ -59,6 +59,7 @@ Frontend changes must preserve same-origin `/api/` requests through `worker/inde
 | Load and edit workspace | `GET /api/workspace` returns workspace state; `POST` sends a supported `action` and returns updated state |
 | Investigate | `POST /api/investigations` with `action: start`, local `caseId` and `mode: bedrock` returns HTTP 202 and `{run}`; poll `GET ?caseId=...`, then reload workspace state |
 | Cancel or import | Investigation actions are `cancel` with `runId`, or `import` with `externalCaseId`; import returns `{caseId,state}` |
+| Manage a live evidence connection | `GET /api/connectors/live` returns `{connections,storage:'aws'}`. POST supports `connect` with `name`, `baseUrl`, `externalCaseId`, `token`; `recheck`, `disconnect`, and `import` use `connectionId` |
 | Original files | Read `/api/runtime`; AWS uses prepare-upload, signed S3 form POST, then finalize-upload. Downloads go through the authenticated evidence route |
 | Approve and archive | Approval includes the saved draft revision. `/api/investigations/archive` accepts `caseId` and that approved `revision` |
 
@@ -81,7 +82,13 @@ Use ATM-1044 to show that missing delivery history does not justify claiming rec
 
 The Connections screen also supports a reusable guided setup. Its ATMSPHR and Rentul templates use explicitly fictional schemas to demonstrate the same query and evidence contract across two businesses. Reviewed mappings persist in DynamoDB under `evidence-connection#<id>` in the owner workspace. `GET /api/connectors` lists templates and configurations; POST actions are `preview`, `save`, `import_demo`, and `revoke`. `GET /api/connectors/install?connectionId=...` downloads public configuration files. No database credentials or case tokens enter these setup APIs.
 
-The shared runtime and installer live in `integrations/evidence-connector/`; [CONNECTOR_SETUP.md](CONNECTOR_SETUP.md) explains deployment and permissions. Customers configure that packaged service instead of implementing an endpoint. OAuth installation, automatic discovery of arbitrary schemas, and a multi-case connection registry are not implemented. The live runtime still uses approved case grants and the existing environment-based Lambda merchant connection. Template previews are not live connectivity tests, and revoking a saved setup is not revocation of an independently deployed service.
+The shared runtime and installer live in `integrations/evidence-connector/`; [CONNECTOR_SETUP.md](CONNECTOR_SETUP.md) explains deployment and permissions. Customers configure that packaged service instead of implementing an endpoint. OAuth installation, automatic discovery of arbitrary schemas, and automatic hosting are not implemented. Template previews are not live connectivity tests, and revoking a saved setup is not revocation of an independently deployed service.
+
+The live registry in `aws/managed-connectors.ts` supports in-app connect, recheck, import, and disconnect for a deployed public HTTPS evidence API. A connection requires one approved external case ID and its case-scoped token. Before saving, AWS checks the live summary and rejection of a random unrelated case through `aws/merchant-network.ts`. The rejection is an access-scope smoke check, not proof that the token cannot access other existing cases. Causality only requests the configured case; the merchant service must enforce its grant. The transport rejects private destinations and redirects and bounds response size and request duration. Recheck requires the merchant, order, and payment identity to remain the same. No Lambda environment changes are required for this flow. Legacy `MERCHANT_*` settings remain optional.
+
+Public metadata uses `live-connection#<id>` in the owning workspace; credentials use separate private `connector-credential#<id>` items. DynamoDB table encryption protects storage at rest. The implementation does not use Secrets Manager or application-level encryption. Tokens never appear in returned metadata, workspace state, or audit details. Each connection covers one case, with up to 30 saved connections per workspace including disconnected entries. This uses the existing shared development login, not production multi-user authentication.
+
+Disconnect atomically disables the connection and deletes its credential. Reads and result publication check connection ownership, status, and versions, so disconnection also blocks a concurrent publication. Existing imported evidence remains available. Revoke the merchant's source grant too to invalidate copies of the same token outside Causality.
 
 Run `npm run install:connectors` after root `npm ci`. `npm run check` includes both merchant packages. `npm run test:connectors:aws` writes fictional configurations and cases to isolated AWS workspaces, verifies owner isolation and revocation, and runs real Bedrock investigations for both mappings. Browser onboarding tests use mocked connector responses against the local preview; those mocks do not establish a deployed AWS connection.
 
@@ -91,7 +98,7 @@ The merchant evidence service is implemented locally with verified schema mappin
 
 Eric needs to deploy and verify the merchant-owned endpoint described in [EVIDENCE_API.md](EVIDENCE_API.md). Causality does not deploy it automatically or obtain database credentials.
 
-Verify the actual organizer, Stripe account and mode, payment, order, and selected support thread. Do not join solely on an email address. Configure `MERCHANT_EVIDENCE_URL`, `MERCHANT_EVIDENCE_TOKEN`, and `MERCHANT_WORKSPACE_ID` on Lambda. Import the approved external case ID, inspect the verified summary mapping, then investigate and review the result.
+Verify the actual organizer, Stripe account and mode, payment, order, and selected support thread. Do not join solely on an email address. In Connections, enter the deployed public HTTPS base URL, approved external case ID, and its token. After verification succeeds, import from the saved connection, inspect the summary mapping, then investigate and review the result. Keep the token and customer data off shared demo screens.
 
 A merchant-imported case does not automatically become a Stripe-submittable case. Keep production account connections and submissions as separate decisions. Black Label Creators LLC is not connected by this handoff.
 

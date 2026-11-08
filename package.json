@@ -26,6 +26,7 @@
     "connector:start": "npm --prefix integrations/evidence-connector run start --",
     "test:connectors:aws": "node scripts/smoke-connectors.mjs",
     "test:connectors:browser": "node scripts/smoke-connector-ui.mjs",
+    "test:connectors:live": "node scripts/smoke-managed-connectors.mjs",
     "db:migrate:local": "node scripts/migrate-local.mjs",
     "test:api:investigation": "node tests/investigation-api.mjs",
     "deploy:dev": "npm run build && node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js deploy --config wrangler.dev.jsonc",
