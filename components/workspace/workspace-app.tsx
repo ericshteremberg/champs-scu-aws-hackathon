@@ -2832,6 +2832,9 @@ function CaseDetail({
                   <ArrowDownToLine size={18} />
                   {pdfBusy ? 'Preparing PDF…' : 'Download evidence PDF'}
                 </Button>
+                <button type="button" className="cw-button" title="Demo only. No data is sent to Stripe.">
+                  Send to Stripe
+                </button>
                 <Button onClick={collectOriginals} disabled={busy || frozen || investigating || dirty || current.source === 'demo'}>
                   Collect original evidence
                 </Button>
@@ -3076,6 +3079,9 @@ function CaseDetail({
             <Button primary disabled={!canDownloadPdf} onClick={() => void downloadPdf()}>
               <ArrowDownToLine size={18} />{pdfBusy ? 'Preparing PDF…' : 'Download evidence PDF'}
             </Button>
+            <button type="button" className="cw-button" title="Demo only. No data is sent to Stripe.">
+              Send to Stripe
+            </button>
             <EvidencePacket current={current} content={draft} />
           </div>
         )}

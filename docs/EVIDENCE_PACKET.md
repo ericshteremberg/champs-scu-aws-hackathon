@@ -73,3 +73,8 @@ Bedrock’s system instructions, finish-report tool and correction feedback now 
 The user requested direct redeployment and will perform testing. No test suite or functional smoke check was run for this prompt-only update.
 
 Deployed November 8, 2026 from source commit `649bc5a` to the AWS API, investigator and webhook functions, and Worker version `c4d004e7-f0f0-4988-ac35-85dfe68afb93`. Build and deployment commands completed successfully. No customer investigation was started or existing draft changed during deployment.
+
+
+## Demo submission button
+
+The Report and Review package action areas include an enabled “Send to Stripe” button for presentation only. It is a plain `type="button"` element with no event handler, form submission, navigation or API call. Its tooltip identifies it as demo-only. It does not show a success state or change case status. Real Stripe submissions remain disabled on the backend. Testing is left to the team as requested.
