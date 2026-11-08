@@ -142,3 +142,24 @@ Those local regression tests use D1/R2 emulation and trusted test headers bound 
 | `tests/` | Unit, API and browser verification |
 
 See [handoff](docs/HANDOFF.md), [merchant API](docs/EVIDENCE_API.md), [demo](docs/DEMO.md), [business validation](docs/BUSINESS.md), and [branch comparison](docs/BRANCH_COMPARISON.md). The retained `docs/demo/` video shows the older standalone Casework interface. Record a fresh Causality demonstration for submission.
+
+## Desktop screen library
+
+Open `/design/screens` for the complete catalog of **53 desktop screens and meaningful states**. Each individual screen is available at `/design/screens?screen=<id>`; the catalog is defined in `lib/design/screens.ts`. Marketing uses the live landing page. Sign-in, onboarding, workspace, cases, evidence, policies, reports, submission states, connections, governance, settings, and recovery have individual entries.
+
+The design library renders the **same components as the product**, with isolated synthetic fixtures from `lib/design/fixtures.ts`. It does not fetch the workspace API, read a connected account, mutate workspace data, upload files, or invoke Stripe. Every screen is labeled as a synthetic preview; the populated overview exercises manual-case metrics, while submission lifecycle examples remain sample cases. None can be submitted. It is a read-only review surface, separate from authenticated `/workspace`.
+
+The completed desktop flow includes:
+
+- A setup checklist based on actual business details, policies, cases, and evidence readiness.
+- Case, report-tab, evidence-record, source-detail, access-request, and settings deep links. Search and status filters are reflected in the URL.
+- Clickable finding citations, an original evidence inspector, and policy attachment that copies a versioned policy snapshot through the existing evidence API. Adding evidence invalidates prior approval.
+- A structured report preview and TXT export. Unsaved working copies are explicitly unapproved; approval applies only to a saved revision. Leaving an edited report warns before discarding changes, including browser history navigation.
+- Explicit submission readiness, verification, submitted, won, and lost views. These reflect stored status and known timestamps; they do not invent receipt IDs, bank decisions, or recovered revenue. Submission still requires separate confirmation and supported server configuration.
+- Dedicated Stripe, selected-email, and company-record setup screens. Stripe stays disconnected until explicitly configured. Gmail OAuth and the separately developed database gateway are not connected by this UI.
+- A **browser-local, unenforced data-scope draft** and illustrative disclosure preview. The draft contains proposed fields and rules only; saving it does not grant access, execute queries, redact data, or schedule deletion. Automatic retention enforcement remains unimplemented.
+- Access request details, separate business/account settings, branded missing-page and unavailable-case recovery, session-expiry recovery, and meaningful loading/error states.
+
+Event timestamps use explicit UTC formatting so server-rendered screens and browser previews agree. Original-file uploads do not extract text from PDF or image files; record event dates are entered separately from upload time.
+
+The editable design workspace is [Causality , Product screens & explorations in Paper](https://app.paper.design/file/01M6W064D6MP5J2SSBARYR50AB/p-5-0). Numbered pages organize the desktop flow; earlier landing explorations remain in the same file.

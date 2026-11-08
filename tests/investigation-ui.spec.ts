@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import type { WorkspaceState } from "../lib/domain";
+import { screenManifest } from "../lib/design/screens";
 
 const base = process.env.CAUSALITY_UI_TEST_BASEURL || "http://127.0.0.1:8788";
 if (!/^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(base)) {
@@ -32,17 +33,13 @@ async function setup(page: Page) {
   // Browser tests deliberately exercise sample mode even when a local AWS session exists.
   await page.route("**/api/investigations", async (route) => {
     if (route.request().method() !== "GET") return route.continue();
-    const response = await route.fetch();
-    const body = await response.json();
     await route.fulfill({
-      response,
       json: {
-        ...body,
         config: {
-          ...body.config,
           bedrockConfigured: false,
           merchantConfigured: false,
           archiveConfigured: false,
+          region: "us-east-1",
         },
       },
     });
@@ -634,4 +631,137 @@ test.describe("AWS attachment upload controls", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
     expect(uploaded).toBe(true);
   });
+});
+
+test("upstream search filters, case recovery, and setup routes remain available", async ({
+  page,
+}) => {
+  const { state } = await setup(page);
+  await page.goto(
+    "/workspace?view=cases&search=nonexistent-order&status=needs_review",
+  );
+  await expect(
+    page.getByRole("heading", {
+      name: "No cases match that search.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Search cases", exact: true }),
+  ).toHaveValue("nonexistent-order");
+  await page.reload();
+  await expect(
+    page.getByRole("combobox", { name: "Filter case status", exact: true }),
+  ).toHaveValue("needs_review");
+  await page
+    .getByRole("button", { name: "Clear search & filters", exact: true })
+    .click();
+  await expect(page).not.toHaveURL(/search=|status=/);
+  await expect(
+    page.getByRole("textbox", { name: "Search cases", exact: true }),
+  ).toHaveValue("");
+  await page.goto("/workspace?view=cases&case=unavailable-case");
+  await expect(
+    page.getByRole("heading", {
+      name: "This case isn’t available.",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Back to cases", exact: true })
+    .click();
+  await expect(page.getByRole("table")).toBeVisible();
+  await page.getByRole("button", { name: "Overview", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Setup checklist", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "A considered start.", exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect(state.cases.length).toBeGreaterThan(0);
+});
+
+test("unsaved navigation protection and report preview preserve reviewed export gates", async ({
+  page,
+}) => {
+  const { state } = await setup(page);
+  const item = await openTicket(page, state, "ATM-1042");
+  await runSample(page);
+  const draft = page.getByRole("textbox", { name: /Merchant response draft/ });
+  const original = await draft.inputValue();
+  await draft.fill(`${original}\nUnsaved organizer note.`);
+  await page.getByRole("tab", { name: "Report preview", exact: true }).click();
+  await expect(page).toHaveURL(/tab=preview/);
+  await expect(
+    page.getByRole("heading", { name: "The complete record.", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Export TXT", exact: true }),
+  ).toBeDisabled();
+  page.once("dialog", (dialog) => {
+    expect(dialog.message()).toContain("without saving");
+    return dialog.dismiss();
+  });
+  await page.getByRole("button", { name: "Overview", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(encodeURIComponent(item.id)));
+  await expect(
+    page.getByRole("heading", { name: "The complete record.", exact: true }),
+  ).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Overview", exact: true }).click();
+  await expect(page).toHaveURL(/view=overview/);
+});
+
+test("all upstream synthetic design screens render without reading or writing workspace APIs", async ({
+  page,
+}) => {
+  test.setTimeout(90000);
+  const apiRequests: string[] = [];
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.route("**/api/**", (route) => {
+    apiRequests.push(route.request().url());
+    return route.abort();
+  });
+  for (const screen of screenManifest.filter((item) => item.id !== "landing")) {
+    const response = await page.goto(screen.path);
+    expect(response?.status(), screen.id).toBe(200);
+    await expect(
+      page.locator(`[data-design-screen="${screen.id}"]`),
+      screen.id,
+    ).toBeVisible();
+    await expect(page.locator(".cw-design-note"), screen.id).toBeVisible();
+  }
+  await page.goto("/design/screens?screen=overview-demo");
+  await page
+    .getByRole("button", { name: "Load sample cases", exact: true })
+    .click();
+  await expect(
+    page.getByText("Design preview only. No workspace data was changed.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.goto("/design/screens?screen=report-approved");
+  await page.getByRole("tab", { name: "Investigation", exact: true }).click();
+  const sampleAction = page.getByRole("button", {
+    name: "Run sample investigation",
+    exact: true,
+  });
+  if (await sampleAction.count()) {
+    await sampleAction.click();
+    await expect(
+      page.getByText(
+        "Design preview only. No investigation or storage action was performed.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+  }
+  expect(apiRequests).toEqual([]);
+  expect(errors).toEqual([]);
 });

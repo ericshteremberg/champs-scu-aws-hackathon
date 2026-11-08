@@ -39,7 +39,6 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
-  Trash2,
   TriangleAlert,
   Upload,
   X,
@@ -47,7 +46,6 @@ import {
 import type {
   AccessRequest,
   DisputeCase,
-  Evidence,
   EvidenceSource,
   InvestigationRun,
   InvestigationConfig,
@@ -55,12 +53,40 @@ import type {
   WorkspaceState,
 } from "@/lib/domain";
 import { formatMoney as money } from "@/lib/money";
+import {
+  AccountSettings,
+  AccessRequestDetail,
+  AttachPolicy,
+  ConnectionDetail,
+  PolicyLibrary,
+  ReportPreview,
+  ScopeConfiguration,
+  SetupChecklist,
+  SubmissionOutcome,
+  SubmissionReadiness,
+} from "./workspace-extra";
+import type { ScreenPreview } from "@/lib/design/fixtures";
 import "./workspace.css";
 
 type View =
-  "overview" | "cases" | "evidence" | "integrations" | "access" | "settings";
+  | "overview"
+  | "cases"
+  | "evidence"
+  | "integrations"
+  | "access"
+  | "settings"
+  | "setup"
+  | "policies"
+  | "scope";
 type ModalType =
-  "case" | "evidence" | "policy" | "access" | "submit" | "import" | null;
+  | "case"
+  | "evidence"
+  | "policy"
+  | "access"
+  | "submit"
+  | "attach-policy"
+  | "import"
+  | null;
 type InvestigationResult = {
   run: InvestigationRun | null;
   state?: WorkspaceState;
@@ -103,10 +129,10 @@ function date(value?: string, options?: Intl.DateTimeFormatOptions) {
   const d = new Date(value);
   return Number.isNaN(d.getTime())
     ? "Not available"
-    : d.toLocaleDateString(
-        "en-US",
-        options ?? { month: "short", day: "numeric" },
-      );
+    : d.toLocaleDateString("en-US", {
+        timeZone: "UTC",
+        ...(options ?? { month: "short", day: "numeric" }),
+      });
 }
 function calendarDate(value?: string, options?: Intl.DateTimeFormatOptions) {
   return date(value, {
@@ -122,6 +148,7 @@ function dateTime(value?: string) {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    timeZoneName: "short",
   });
 }
 function deadline(value: string) {
@@ -327,21 +354,38 @@ function Modal({
 export default function WorkspaceApp({
   user,
   signOutPath,
+  preview,
 }: {
   user: Identity;
   signOutPath: string;
+  preview?: ScreenPreview;
 }) {
-  const [state, setState] = useState<WorkspaceState | null>(null);
-  const [loading, setLoading] = useState(true),
+  const [state, setState] = useState<WorkspaceState | null>(
+    preview?.state ?? null,
+  );
+  const [loading, setLoading] = useState(
+      preview ? preview.mode === "loading" : true,
+    ),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const [view, setView] = useState<View>("overview"),
-    [caseId, setCaseId] = useState<string | null>(null),
-    [modal, setModal] = useState<ModalType>(null);
-  const [search, setSearch] = useState(""),
+    [error, setError] = useState(preview?.error ?? "");
+  const [sessionExpired, setSessionExpired] = useState(
+      preview?.mode === "session",
+    ),
+    [dirtyReport, setDirtyReport] = useState(false);
+  const [view, setView] = useState<View>((preview?.view as View) ?? "overview"),
+    [caseId, setCaseId] = useState<string | null>(preview?.caseId ?? null),
+    [modal, setModal] = useState<ModalType>(
+      (preview?.modal as ModalType) ?? null,
+    );
+  const [detail, setDetail] = useState<Record<string, string>>(
+    preview?.detail ?? {},
+  );
+  const [search, setSearch] = useState(preview?.search ?? ""),
     [filter, setFilter] = useState("all"),
     [toast, setToast] = useState("");
-  const [stripe, setStripe] = useState<StripeStatus | null>(null);
+  const [stripe, setStripe] = useState<StripeStatus | null>(
+    preview?.stripe ?? null,
+  );
   const [investigationConfig, setInvestigationConfig] =
     useState<InvestigationConfig | null>(null);
   const [runs, setRuns] = useState<Record<string, InvestigationRun | null>>({});
@@ -353,69 +397,162 @@ export default function WorkspaceApp({
   const runStatuses = useRef<Record<string, string>>({});
   const closeModal = useCallback(() => setModal(null), []);
   const routeFromUrl = useCallback(() => {
+    if (preview) return;
     const q = new URLSearchParams(window.location.search);
     const v = q.get("view") as View;
-    setView(views.some((x) => x.id === v) ? v : "overview");
-    setCaseId(q.get("case"));
-  }, []);
-  useEffect(() => {
-    routeFromUrl();
-    window.addEventListener("popstate", routeFromUrl);
-    return () => window.removeEventListener("popstate", routeFromUrl);
-  }, [routeFromUrl]);
-  const navigate = useCallback((next: View, id?: string) => {
-    setView(next);
-    setCaseId(id ?? null);
-    setSearch("");
-    setFilter("all");
-    setError("");
-    window.history.pushState(
-      {},
-      "",
-      `/workspace?view=${next}${id ? `&case=${encodeURIComponent(id)}` : ""}`,
+    setView(
+      [...views.map((x) => x.id), "setup", "policies", "scope"].includes(v)
+        ? v
+        : "overview",
     );
-    window.scrollTo({ top: 0, behavior: "instant" });
-  }, []);
-  const load = useCallback(async (clearError = true) => {
-    if (clearError) setError("");
-    try {
-      const r = await fetch("/api/workspace", { cache: "no-store" });
-      const data = (await r.json()) as WorkspaceState & {
-        error?: string;
-        message?: string;
-        url?: string;
-        redirectUrl?: string;
-        imported?: number;
-        hasMore?: boolean;
-      };
-      if (!r.ok)
-        throw new Error(data.error ?? "Could not open your workspace.");
-      setState(data);
-    } catch (e) {
-      setError(
-        e instanceof Error ? e.message : "Could not open your workspace.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    setCaseId(q.get("case"));
+    setSearch(q.get("search") ?? "");
+    setFilter(q.get("status") ?? "all");
+    setDetail(
+      Object.fromEntries(
+        ["tab", "evidence", "source", "request"].flatMap((k) =>
+          q.has(k) ? [[k, q.get(k)!]] : [],
+        ),
+      ),
+    );
+  }, [preview]);
+  // Synchronize the initial route and browser history with this client workspace.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    routeFromUrl();
+  }, [routeFromUrl]);
+  useEffect(() => {
+    if (preview) return;
+    const onHistoryChange = () => {
+      if (
+        dirtyReport &&
+        !window.confirm("Leave this report without saving your changes?")
+      ) {
+        const q = new URLSearchParams({
+          view,
+          ...(caseId ? { case: caseId } : {}),
+          ...detail,
+          ...(search ? { search } : {}),
+          ...(filter !== "all" ? { status: filter } : {}),
+        });
+        window.history.pushState({}, "", `/workspace?${q}`);
+        return;
+      }
+      setDirtyReport(false);
+      routeFromUrl();
+    };
+    window.addEventListener("popstate", onHistoryChange);
+    return () => window.removeEventListener("popstate", onHistoryChange);
+  }, [
+    preview,
+    dirtyReport,
+    view,
+    caseId,
+    detail,
+    search,
+    filter,
+    routeFromUrl,
+  ]);
+  const navigate = useCallback(
+    (next: string, id?: string, more: Record<string, string> = {}) => {
+      if (
+        dirtyReport &&
+        !window.confirm("Leave this report without saving your changes?")
+      )
+        return;
+      setDirtyReport(false);
+      setView(next as View);
+      setCaseId(id ?? null);
+      setDetail(more);
+      setSearch("");
+      setFilter("all");
+      setError("");
+      if (!preview) {
+        const q = new URLSearchParams({
+          view: next,
+          ...(id ? { case: id } : {}),
+          ...more,
+        });
+        window.history.pushState({}, "", `/workspace?${q}`);
+      }
+      window.scrollTo({ top: 0, behavior: "instant" });
+    },
+    [preview, dirtyReport],
+  );
+  const updateDetail = (key: string, value: string) => {
+    setDetail((old) => ({ ...old, [key]: value }));
+    if (!preview) {
+      const q = new URLSearchParams(window.location.search);
+      q.set(key, value);
+      window.history.replaceState({}, "", `/workspace?${q}`);
+    }
+  };
+  const updateSearch = (value: string) => {
+    setSearch(value);
+    if (!preview) {
+      const q = new URLSearchParams(window.location.search);
+      if (value) q.set("search", value);
+      else q.delete("search");
+      window.history.replaceState({}, "", `/workspace?${q}`);
+    }
+  };
+  const updateFilter = (value: string) => {
+    setFilter(value);
+    if (!preview) {
+      const q = new URLSearchParams(window.location.search);
+      if (value !== "all") q.set("status", value);
+      else q.delete("status");
+      window.history.replaceState({}, "", `/workspace?${q}`);
+    }
+  };
+  const load = useCallback(
+    async (clearError = true) => {
+      if (preview) return;
+      if (clearError) setError("");
+      try {
+        const r = await fetch("/api/workspace", { cache: "no-store" });
+        const data = (await r.json()) as WorkspaceState & {
+          error?: string;
+          message?: string;
+          url?: string;
+          redirectUrl?: string;
+          imported?: number;
+          hasMore?: boolean;
+        };
+        if (r.status === 401) setSessionExpired(true);
+        if (!r.ok)
+          throw new Error(data.error ?? "Could not open your workspace.");
+        setState(data);
+      } catch (e) {
+        setError(
+          e instanceof Error ? e.message : "Could not open your workspace.",
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [preview],
+  );
+  // Load the owner-scoped external store after hydration.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
   }, [load]);
+  const workspaceId = state?.workspace?.id;
   useEffect(() => {
-    if (state?.workspace)
+    if (!preview && workspaceId)
       void fetch("/api/stripe/status", { cache: "no-store" })
         .then(async (r) => (await r.json()) as StripeStatus)
         .then(setStripe)
         .catch(() => setStripe(null));
-  }, [view, state?.workspace?.id]);
+  }, [view, workspaceId, preview]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 5500);
     return () => clearTimeout(timer);
   }, [toast]);
   useEffect(() => {
-    if (!state?.workspace) return;
+    if (preview || !workspaceId) return;
     let cancelled = false;
     fetch("/api/investigations", { cache: "no-store" })
       .then(async (response) => {
@@ -432,15 +569,17 @@ export default function WorkspaceApp({
     return () => {
       cancelled = true;
     };
-  }, [state?.workspace?.id, view]);
+  }, [workspaceId, view, preview]);
 
   const loadRun = useCallback(
     async (id: string, signal?: AbortSignal) => {
+      if (preview) return null;
       const response = await fetch(
         `/api/investigations?caseId=${encodeURIComponent(id)}`,
         { cache: "no-store", signal },
       );
       const data = (await response.json()) as InvestigationResult;
+      if (response.status === 401) setSessionExpired(true);
       if (!response.ok)
         throw new Error(
           data.error || "Investigation progress could not be loaded.",
@@ -454,12 +593,14 @@ export default function WorkspaceApp({
       }
       return data.run;
     },
-    [load],
+    [load, preview],
   );
 
   useEffect(() => {
-    if (!caseId || !state?.workspace) return;
+    if (preview || !caseId || !workspaceId) return;
     const controller = new AbortController();
+    // Load the selected case from its external investigation store.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadRun(caseId, controller.signal).catch((error) => {
       if (!controller.signal.aborted)
         setError(
@@ -469,7 +610,7 @@ export default function WorkspaceApp({
         );
     });
     return () => controller.abort();
-  }, [caseId, state?.workspace?.id, loadRun]);
+  }, [caseId, workspaceId, loadRun, preview]);
 
   const visibleRun = caseId
     ? Object.hasOwn(runs, caseId)
@@ -477,6 +618,7 @@ export default function WorkspaceApp({
       : state?.cases.find((item) => item.id === caseId)?.investigation
     : null;
   useEffect(() => {
+    if (preview) return;
     const target =
       pendingInvestigation ||
       (visibleRun?.status === "running" ? caseId : null);
@@ -503,11 +645,17 @@ export default function WorkspaceApp({
       clearInterval(timer);
       controller.abort();
     };
-  }, [pendingInvestigation, visibleRun?.status, caseId, loadRun]);
+  }, [pendingInvestigation, visibleRun?.status, caseId, loadRun, preview]);
 
   useEffect(() => () => investigationController.current?.abort(), []);
 
   const startInvestigation = async (id: string, mode: "sample" | "bedrock") => {
+    if (preview) {
+      setToast(
+        "Design preview only. No investigation or storage action was performed.",
+      );
+      return;
+    }
     if (pendingInvestigation) return;
     setError("");
     setPendingInvestigation(id);
@@ -522,6 +670,7 @@ export default function WorkspaceApp({
         signal: controller.signal,
       });
       const data = (await response.json()) as InvestigationResult;
+      if (response.status === 401) setSessionExpired(true);
       if (!response.ok)
         throw new Error(data.error || "The investigation could not start.");
       if (data.state) setState(data.state);
@@ -557,6 +706,12 @@ export default function WorkspaceApp({
   };
 
   const cancelInvestigation = async (run: InvestigationRun) => {
+    if (preview) {
+      setToast(
+        "Design preview only. No investigation or storage action was performed.",
+      );
+      return;
+    }
     setCancelling(true);
     setError("");
     try {
@@ -566,6 +721,7 @@ export default function WorkspaceApp({
         body: JSON.stringify({ action: "cancel", runId: run.id }),
       });
       const data = (await response.json()) as InvestigationResult;
+      if (response.status === 401) setSessionExpired(true);
       if (!response.ok)
         throw new Error(
           data.error || "The investigation could not be cancelled. Try again.",
@@ -588,6 +744,12 @@ export default function WorkspaceApp({
   };
 
   const archiveCase = async (id: string, revision: number) => {
+    if (preview) {
+      setToast(
+        "Design preview only. No investigation or storage action was performed.",
+      );
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -618,6 +780,10 @@ export default function WorkspaceApp({
 
   const importApprovedCase = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (preview) {
+      setToast("Design preview only. No case was imported.");
+      return;
+    }
     const externalCaseId = formText(
       new FormData(event.currentTarget),
       "externalCaseId",
@@ -631,6 +797,7 @@ export default function WorkspaceApp({
         body: JSON.stringify({ action: "import", externalCaseId }),
       });
       const data = (await response.json()) as InvestigationResult;
+      if (response.status === 401) setSessionExpired(true);
       if (!response.ok)
         throw new Error(
           data.error || "The approved case could not be imported.",
@@ -648,6 +815,10 @@ export default function WorkspaceApp({
 
   const mutate = useCallback(
     async (action: WorkspaceAction, message?: string): Promise<boolean> => {
+      if (preview) {
+        setToast("Design preview only. No workspace data was changed.");
+        return false;
+      }
       setBusy(true);
       setError("");
       try {
@@ -664,9 +835,14 @@ export default function WorkspaceApp({
           imported?: number;
           hasMore?: boolean;
         };
+        if (r.status === 401) setSessionExpired(true);
         if (!r.ok)
           throw new Error(data.error ?? "This action could not be completed.");
         setState(data);
+        if (action.action === "createWorkspace") {
+          setView("setup");
+          window.history.replaceState({}, "", "/workspace?view=setup");
+        }
         if (message) setToast(message);
         return true;
       } catch (e) {
@@ -680,12 +856,16 @@ export default function WorkspaceApp({
         setBusy(false);
       }
     },
-    [],
+    [preview],
   );
   const stripeAction = async (
     action: "connect" | "sync" | "disconnect" | "submit",
     body?: object,
   ) => {
+    if (preview) {
+      setToast("Design preview only. No Stripe action was performed.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -702,6 +882,7 @@ export default function WorkspaceApp({
         imported?: number;
         hasMore?: boolean;
       };
+      if (r.status === 401) setSessionExpired(true);
       if (!r.ok)
         throw new Error(
           data.error ?? data.message ?? "Stripe connection needs attention.",
@@ -736,6 +917,10 @@ export default function WorkspaceApp({
   };
   const upload = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (preview) {
+      setToast("Design preview only. No file was uploaded.");
+      return;
+    }
     const form = new FormData(e.currentTarget);
     setBusy(true);
     setError("");
@@ -747,6 +932,7 @@ export default function WorkspaceApp({
         throw new Error("Files must be 10 MB or smaller.");
 
       const runtimeResponse = await fetch("/api/runtime");
+      if (runtimeResponse.status === 401) setSessionExpired(true);
       let presignedUpload = false;
       if (runtimeResponse.ok) {
         const runtime = (await runtimeResponse.json()) as {
@@ -786,6 +972,7 @@ export default function WorkspaceApp({
           method?: string;
           error?: string;
         };
+        if (preparedResponse.status === 401) setSessionExpired(true);
         if (!preparedResponse.ok)
           throw new Error(prepared.error ?? "Could not prepare the upload.");
         if (
@@ -829,6 +1016,7 @@ export default function WorkspaceApp({
         imported?: number;
         hasMore?: boolean;
       };
+      if (r.status === 401) setSessionExpired(true);
       if (!r.ok) throw new Error(data.error ?? "Upload failed.");
       setState(data);
       setModal(null);
@@ -864,8 +1052,10 @@ export default function WorkspaceApp({
     );
 
   return (
-    <div className="cw cw-shell">
+    <div className="cw cw-shell" data-design-screen={preview?.id}>
+      {/* Full document navigation preserves the unsaved-report beforeunload guard. */}
       <aside className="cw-sidebar">
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a className="cw-brand" href="/" aria-label="Causality">
           <span className="cw-mark">C</span>
           <span>Causality</span>
@@ -917,7 +1107,16 @@ export default function WorkspaceApp({
           <div className="cw-breadcrumb">
             <span>Workspace</span>
             <ChevronRight size={16} />
-            <strong>{views.find((v) => v.id === view)?.title}</strong>
+            <strong>
+              {views.find((v) => v.id === view)?.title ??
+                (
+                  {
+                    setup: "Workspace setup",
+                    policies: "Company policies",
+                    scope: "Data scope",
+                  } as Record<string, string>
+                )[view]}
+            </strong>
             {current && (
               <>
                 <ChevronRight size={16} />
@@ -953,13 +1152,30 @@ export default function WorkspaceApp({
               </button>
             </div>
           )}
-          {loading ? (
+          {sessionExpired ? (
+            <div className="cw-panel cw-recovery">
+              <Empty
+                icon={LockKeyhole}
+                title="Let’s reconnect your session."
+                description="Your workspace is still here. Sign in again to continue with your cases and evidence."
+              >
+                <a
+                  className="cw-button primary"
+                  href={`/login?returnTo=${encodeURIComponent(`/workspace?view=${view}${caseId ? `&case=${caseId}` : ""}`)}`}
+                  target="_top"
+                >
+                  Sign in to continue
+                  <ArrowRight size={18} />
+                </a>
+              </Empty>
+            </div>
+          ) : loading ? (
             <div className="cw-loading">
               <LoaderCircle className="cw-spin" size={24} />
               Opening your workspace…
             </div>
-          ) : !state ? (
-            <div className="cw-panel">
+          ) : !state || preview?.mode === "error" ? (
+            <div className="cw-panel cw-recovery">
               <Empty
                 title="Your workspace couldn’t load."
                 description="Check your connection and try again."
@@ -976,9 +1192,32 @@ export default function WorkspaceApp({
               </Empty>
             </div>
           ) : !state.workspace ? (
-            <Onboarding busy={busy} create={mutate} />
+            <Onboarding
+              busy={busy}
+              create={mutate}
+              initialStep={preview?.onboardingStep}
+              designMode={!!preview}
+            />
           ) : (
             <>
+              {view === "overview" && (
+                <div className="cw-setup-link">
+                  <span className="cw-step-icon">
+                    <Check size={20} />
+                  </span>
+                  <div>
+                    <h3>Make the workspace yours.</h3>
+                    <p>
+                      Review your business context, policies, and evidence
+                      readiness.
+                    </p>
+                  </div>
+                  <Button onClick={() => navigate("setup")}>
+                    Setup checklist
+                    <ArrowRight size={18} />
+                  </Button>
+                </div>
+              )}
               {view === "overview" && (
                 <Overview
                   state={state}
@@ -988,7 +1227,20 @@ export default function WorkspaceApp({
                   addCase={() => setModal("case")}
                 />
               )}
-              {view === "cases" && !current && (
+              {view === "cases" && caseId && !current && (
+                <div className="cw-panel cw-recovery">
+                  <Empty
+                    title="This case isn’t available."
+                    description="It may not exist, or it may belong to a different workspace. Your other investigations are still available."
+                  >
+                    <Button primary onClick={() => navigate("cases")}>
+                      Back to cases
+                      <ArrowRight size={18} />
+                    </Button>
+                  </Empty>
+                </div>
+              )}
+              {view === "cases" && !caseId && (
                 <>
                   <div className="cw-page-head">
                     <div>
@@ -1007,13 +1259,13 @@ export default function WorkspaceApp({
                         aria-label="Search cases"
                         placeholder="Search customer, order, or case…"
                         value={search}
-                        onChange={(e) => setSearch(e.target.value)}
+                        onChange={(e) => updateSearch(e.target.value)}
                       />
                     </div>
                     <select
                       aria-label="Filter case status"
                       value={filter}
-                      onChange={(e) => setFilter(e.target.value)}
+                      onChange={(e) => updateFilter(e.target.value)}
                     >
                       <option value="all">All statuses</option>
                       {Object.entries(statusNames)
@@ -1036,6 +1288,11 @@ export default function WorkspaceApp({
                     </select>
                   </div>
                   <CaseTable
+                    noMatches={!!search || filter !== "all"}
+                    clearSearch={() => {
+                      updateSearch("");
+                      updateFilter("all");
+                    }}
                     cases={filtered}
                     onOpen={(c) => navigate("cases", c.id)}
                     emptyAction={
@@ -1049,7 +1306,7 @@ export default function WorkspaceApp({
               )}
               {view === "cases" && current && (
                 <CaseDetail
-                  key={current.id}
+                  key={`${current.id}:${current.draft?.revision}:${current.draft?.status}`}
                   current={current}
                   run={visibleRun || null}
                   investigationConfig={investigationConfig}
@@ -1070,6 +1327,17 @@ export default function WorkspaceApp({
                   }}
                   openConnections={() => navigate("integrations")}
                   submissionEnabled={Boolean(stripe?.submissionEnabled)}
+                  connected={state.integrations.some(
+                    (i) => i.provider === "stripe" && i.status === "connected",
+                  )}
+                  initialTab={detail.tab}
+                  initialEvidence={detail.evidence}
+                  onTab={(v) => updateDetail("tab", v)}
+                  onEvidence={(v) => updateDetail("evidence", v)}
+                  unsavedPreview={preview?.unsaved}
+                  onDirtyChange={setDirtyReport}
+                  navigate={navigate}
+                  attachPolicy={() => setModal("attach-policy")}
                   busy={busy}
                   mutate={mutate}
                   back={() => navigate("cases")}
@@ -1082,11 +1350,13 @@ export default function WorkspaceApp({
                 <EvidenceLibrary
                   state={state}
                   search={search}
-                  setSearch={setSearch}
-                  open={(id) => navigate("cases", id)}
+                  setSearch={updateSearch}
+                  open={(id, evidence) =>
+                    navigate("cases", id, { tab: "investigation", evidence })
+                  }
                 />
               )}
-              {view === "integrations" && (
+              {view === "integrations" && !detail.source && (
                 <Integrations
                   state={state}
                   stripe={stripe}
@@ -1095,24 +1365,103 @@ export default function WorkspaceApp({
                   busy={busy}
                   stripeAction={stripeAction}
                   requestAccess={() => setModal("access")}
+                  navigate={navigate}
                 />
               )}
-              {view === "access" && (
+              {view === "integrations" && detail.source && (
+                <ConnectionDetail
+                  provider={detail.source}
+                  state={state}
+                  stripe={stripe}
+                  busy={busy}
+                  action={stripeAction}
+                  navigate={navigate}
+                  requestAccess={() => setModal("access")}
+                  healthError={preview?.healthError}
+                />
+              )}
+              {view === "access" && !detail.request && (
                 <Access
                   state={state}
+                  initialTab={detail.tab}
+                  onTab={(v) => updateDetail("tab", v)}
+                  openRequest={(id) => updateDetail("request", id)}
                   busy={busy}
                   mutate={mutate}
                   request={() => setModal("access")}
                   openCase={(id) => navigate("cases", id)}
                 />
               )}
-              {view === "settings" && (
-                <Settings
+              {view === "access" &&
+                detail.request &&
+                (state.accessRequests.find((r) => r.id === detail.request) ? (
+                  <AccessRequestDetail
+                    request={state.accessRequests.find(
+                      (r) => r.id === detail.request,
+                    )!}
+                    state={state}
+                    navigate={navigate}
+                  />
+                ) : (
+                  <Empty
+                    title="Request unavailable."
+                    description="Choose an available request from the access queue."
+                  >
+                    <Button onClick={() => navigate("access")}>
+                      Back to requests
+                    </Button>
+                  </Empty>
+                ))}
+              {view === "setup" && (
+                <SetupChecklist
+                  state={state}
+                  navigate={navigate}
+                  addCase={() => setModal("case")}
+                  addPolicy={() => setModal("policy")}
+                />
+              )}
+              {view === "policies" && (
+                <PolicyLibrary
                   state={state}
                   busy={busy}
                   mutate={mutate}
                   addPolicy={() => setModal("policy")}
                 />
+              )}
+              {view === "scope" && (
+                <ScopeConfiguration
+                  state={state}
+                  preview={detail.tab === "preview"}
+                  designMode={!!preview}
+                  navigate={navigate}
+                />
+              )}
+              {view === "settings" && (
+                <>
+                  <div className="cw-tabs cw-settings-tabs">
+                    <button
+                      className={detail.tab !== "account" ? "active" : ""}
+                      onClick={() => updateDetail("tab", "business")}
+                    >
+                      Business details
+                    </button>
+                    <button
+                      className={detail.tab === "account" ? "active" : ""}
+                      onClick={() => updateDetail("tab", "account")}
+                    >
+                      Account & access
+                    </button>
+                    <button onClick={() => navigate("policies")}>
+                      Company policies
+                      <ArrowRight size={15} />
+                    </button>
+                  </div>
+                  {detail.tab === "account" ? (
+                    <AccountSettings state={state} />
+                  ) : (
+                    <Settings state={state} busy={busy} mutate={mutate} />
+                  )}
+                </>
               )}
             </>
           )}
@@ -1141,7 +1490,7 @@ export default function WorkspaceApp({
             onSubmit={(event) => void importApprovedCase(event)}
           >
             <p>
-              Your business's evidence API verifies the case and returns only
+              Your business’s evidence API verifies the case and returns only
               its permitted records.
             </p>
             <Field
@@ -1282,6 +1631,8 @@ export default function WorkspaceApp({
       {modal === "evidence" && current && (
         <Modal title="Add case evidence" onClose={closeModal} error={error}>
           <EvidenceForm
+            defaultDate={preview ? "2026-11-07T12:00" : ""}
+            initialMode={preview?.evidenceMode}
             current={current}
             busy={busy}
             upload={upload}
@@ -1409,6 +1760,41 @@ export default function WorkspaceApp({
           </form>
         </Modal>
       )}
+      {modal === "attach-policy" && current && state && (
+        <Modal
+          title="Attach an applicable policy"
+          onClose={closeModal}
+          error={error}
+        >
+          <AttachPolicy
+            policies={state.policies}
+            current={current}
+            busy={busy}
+            attach={async (p) => {
+              if (
+                await mutate(
+                  {
+                    action: "addEvidence",
+                    caseId: current.id,
+                    source: "policy",
+                    title: p.name,
+                    content: p.content,
+                    occurredAt: new Date(p.effectiveDate).toISOString(),
+                    reference: `Policy ${p.id} · effective ${p.effectiveDate}`,
+                  },
+                  "Policy snapshot attached. Review the updated draft.",
+                )
+              )
+                setModal(null);
+            }}
+          />
+        </Modal>
+      )}
+      {preview && (
+        <div className="cw-design-note">
+          SYNTHETIC DESIGN PREVIEW · {preview.id}
+        </div>
+      )}
       {modal === "submit" && current && (
         <Modal
           title="Submit evidence to Stripe?"
@@ -1467,12 +1853,16 @@ export default function WorkspaceApp({
 function Onboarding({
   busy,
   create,
+  initialStep = 0,
+  designMode = false,
 }: {
   busy: boolean;
   create: (action: WorkspaceAction, message?: string) => Promise<boolean>;
+  initialStep?: number;
+  designMode?: boolean;
 }) {
-  const [step, setStep] = useState(0),
-    [name, setName] = useState(""),
+  const [step, setStep] = useState(initialStep),
+    [name, setName] = useState(designMode ? "Aster Supply" : ""),
     [industry, setIndustry] = useState(""),
     [website, setWebsite] = useState(""),
     [accepted, setAccepted] = useState(false);
@@ -1874,7 +2264,7 @@ function Overview({
                   </div>
                   <button
                     className="cw-button ghost icon"
-                    onClick={() => navigate("settings")}
+                    onClick={() => navigate("policies")}
                     aria-label="Manage policies"
                   >
                     <ArrowRight size={18} />
@@ -1910,11 +2300,15 @@ function CaseTable({
   onOpen,
   emptyAction,
   nested,
+  noMatches,
+  clearSearch,
 }: {
   cases: DisputeCase[];
   onOpen: (c: DisputeCase) => void;
   emptyAction?: ReactNode;
   nested?: boolean;
+  noMatches?: boolean;
+  clearSearch?: () => void;
 }) {
   const content = cases.length ? (
     <div className="cw-table-wrap">
@@ -1965,10 +2359,18 @@ function CaseTable({
     </div>
   ) : (
     <Empty
-      title="No cases here yet."
-      description="Create a case, connect Stripe, or change your search to see more results."
+      title={noMatches ? "No cases match that search." : "No cases here yet."}
+      description={
+        noMatches
+          ? "Try another customer, order reference, or status."
+          : "Create a case or connect Stripe to start an investigation."
+      }
     >
-      {emptyAction}
+      {noMatches ? (
+        <Button onClick={clearSearch}>Clear search & filters</Button>
+      ) : (
+        emptyAction
+      )}
     </Empty>
   );
   return nested ? content : <div className="cw-panel">{content}</div>;
@@ -1999,9 +2401,19 @@ function CaseDetail({
   cancelInvestigation,
   archive,
   openConnections,
+  connected,
+  initialTab = "investigation",
+  initialEvidence,
+  onTab,
+  onEvidence,
+  unsavedPreview,
+  onDirtyChange,
+  navigate,
+  attachPolicy,
 }: {
   current: DisputeCase;
   submissionEnabled: boolean;
+  connected: boolean;
   busy: boolean;
   mutate: (a: WorkspaceAction, message?: string) => Promise<boolean>;
   back: () => void;
@@ -2016,19 +2428,42 @@ function CaseDetail({
   cancelInvestigation: () => void;
   archive: () => void;
   openConnections: () => void;
+  initialTab?: string;
+  initialEvidence?: string;
+  onTab: (tab: string) => void;
+  onEvidence: (id: string) => void;
+  unsavedPreview?: boolean;
+  onDirtyChange: (dirty: boolean) => void;
+  navigate: (
+    view: string,
+    id?: string,
+    detail?: Record<string, string>,
+  ) => void;
+  attachPolicy: () => void;
 }) {
-  const [tab, setTab] = useState("investigation");
-  const [selectedId, setSelectedId] = useState(current.evidence[0]?.id ?? "");
-  const [draft, setDraft] = useState(current.draft?.content ?? "");
+  const tab = ["investigation", "report", "preview", "submission"].includes(
+      initialTab,
+    )
+      ? initialTab
+      : "investigation",
+    selectedId = initialEvidence ?? current.evidence[0]?.id ?? "";
+  const [draft, setDraft] = useState(
+    (current.draft?.content ?? "") +
+      (unsavedPreview
+        ? "\n\nMerchant review note: recipient confirmation is still needed."
+        : ""),
+  );
+  const switchTab = onTab;
+  const openEvidence = (id: string) => {
+    onEvidence(id);
+    switchTab("investigation");
+  };
   const previousRunStatus = useRef(run?.status);
   useEffect(() => {
-    setDraft(current.draft?.content ?? "");
-  }, [current.id, current.draft?.content]);
-  useEffect(() => {
     if (run?.status === "completed" && previousRunStatus.current === "running")
-      setTab("report");
+      onTab("report");
     previousRunStatus.current = run?.status;
-  }, [run?.status]);
+  }, [run?.status, onTab]);
   const selected =
     current.evidence.find((e) => e.id === selectedId) ?? current.evidence[0];
   const selectedFindings = current.findings.filter(
@@ -2041,6 +2476,19 @@ function CaseDetail({
     (e) => e.fileName || e.downloadUrl,
   );
   const dirty = draft !== (current.draft?.content ?? "");
+  useEffect(() => {
+    onDirtyChange(dirty);
+    return () => onDirtyChange(false);
+  }, [dirty, onDirtyChange]);
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
   const stale = Boolean(current.draft?.sourceStale);
   const analysis = current.draft?.analysis;
   const canExport = Boolean(
@@ -2055,7 +2503,7 @@ function CaseDetail({
     window.confirm("Replace your unsaved response edits with a new draft?");
   const start = () => {
     if (!confirmReplace()) return;
-    setTab("investigation");
+    switchTab("investigation");
     investigate(mode);
   };
   const template = async () => {
@@ -2066,11 +2514,11 @@ function CaseDetail({
         "Evidence template prepared. No AWS model was called. Review every claim.",
       )
     )
-      setTab("report");
+      switchTab("report");
   };
   const inspectEvidence = (id: string) => {
-    setSelectedId(id);
-    setTab("investigation");
+    onEvidence(id);
+    switchTab("investigation");
     requestAnimationFrame(() =>
       document.getElementById("case-source-heading")?.focus(),
     );
@@ -2137,6 +2585,7 @@ function CaseDetail({
   const tabs = [
     ["investigation", "Investigation"],
     ["report", "Report"],
+    ["preview", "Report preview"],
     ["submission", "Submission package"],
   ];
   return (
@@ -2150,6 +2599,10 @@ function CaseDetail({
           <Button onClick={requestAccess}>
             <ShieldCheck size={18} />
             Request access
+          </Button>
+          <Button disabled={frozen || investigating} onClick={attachPolicy}>
+            <FileText size={18} />
+            Attach policy
           </Button>
           <Button
             primary
@@ -2170,16 +2623,7 @@ function CaseDetail({
           </p>
         </div>
       )}
-      {current.status === "submitting" && (
-        <div className="cw-banner neutral">
-          <Clock3 size={20} />
-          <p>
-            Stripe submission is being verified. Editing is locked; check the
-            dispute in Stripe before attempting another submission. Synchronize
-            disputes to reconcile its status.
-          </p>
-        </div>
-      )}
+      {frozen && <SubmissionOutcome current={current} navigate={navigate} />}
       {stale && (
         <div className="cw-banner error" role="alert">
           <TriangleAlert size={20} />
@@ -2235,7 +2679,7 @@ function CaseDetail({
                       : -1;
             if (next >= 0) {
               event.preventDefault();
-              setTab(tabs[next][0]);
+              switchTab(tabs[next][0]);
               document.getElementById(`case-tab-${tabs[next][0]}`)?.focus();
             }
           }}
@@ -2249,7 +2693,7 @@ function CaseDetail({
               id={`case-tab-${id}`}
               tabIndex={tab === id ? 0 : -1}
               className={tab === id ? "active" : ""}
-              onClick={() => setTab(id)}
+              onClick={() => switchTab(id)}
             >
               {title}
             </button>
@@ -2324,7 +2768,7 @@ function CaseDetail({
                       <button
                         key={e.id}
                         className={`cw-evidence-row ${selected?.id === e.id ? "selected" : ""}`}
-                        onClick={() => setSelectedId(e.id)}
+                        onClick={() => onEvidence(e.id)}
                       >
                         <span className="cw-date">{date(e.occurredAt)}</span>
                         <span>
@@ -2374,6 +2818,22 @@ function CaseDetail({
                       </span>
                     </div>
                     {selected.reference && <p>{selected.reference}</p>}
+                    {selected.fileName && (
+                      <div className="cw-original-file">
+                        <FileText size={20} />
+                        <div>
+                          <h3>{selected.fileName}</h3>
+                          <p>
+                            {selected.mimeType ?? "Original attachment"} · Case{" "}
+                            {current.orderRef || current.id}
+                          </p>
+                          <p>
+                            PDF and image text has not been extracted. Inspect
+                            the original file.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                     <div className="cw-source-content">
                       {selected.content ||
                         "This record contains an attachment. Open the original file to inspect its contents."}
@@ -2598,7 +3058,7 @@ function CaseDetail({
                       {dirty
                         ? "Save and approve your changes before exporting."
                         : current.draft.status === "approved"
-                          ? `Reviewed ${dateTime(current.draft.approvedAt)} · Revision ${current.draft.revision}`
+                          ? `Reviewed ${dateTime(current.draft.approvedAt)} by ${current.draft.approvedBy || "workspace owner"} · Revision ${current.draft.revision}`
                           : "Inspect the cited records before approving. Approval does not send anything."}
                     </p>
                   </div>
@@ -2670,6 +3130,22 @@ function CaseDetail({
             )}
           </div>
         )}
+        {tab === "preview" && (
+          <div
+            role="tabpanel"
+            id="case-panel-preview"
+            aria-labelledby="case-tab-preview"
+          >
+            <ReportPreview
+              current={current}
+              draft={draft}
+              dirty={dirty}
+              exportEnabled={canExport}
+              exportReport={() => exportDraft()}
+              openEvidence={openEvidence}
+            />
+          </div>
+        )}
         {tab === "submission" && (
           <div
             className="cw-report"
@@ -2679,7 +3155,11 @@ function CaseDetail({
           >
             <div className="cw-page-head" style={{ marginBottom: 0 }}>
               <div>
-                <h2>Prepared. Then approved.</h2>
+                <h2>
+                  {frozen
+                    ? "A preserved case record."
+                    : "Prepared. Then approved."}
+                </h2>
                 <p>
                   Inspect the exact response and supporting records before
                   submission.
@@ -2704,9 +3184,26 @@ function CaseDetail({
                 </p>
               </div>
             )}
+            {dirty && (
+              <div className="cw-banner">
+                <TriangleAlert size={20} />
+                <p>
+                  Your report has unsaved edits. This package shows the last
+                  saved response. Save and approve the new revision before
+                  reviewing submission.
+                </p>
+              </div>
+            )}
+            {!frozen && (
+              <SubmissionReadiness
+                current={current}
+                submissionEnabled={submissionEnabled}
+                connected={connected}
+              />
+            )}
             <div className="cw-two-col">
               <div>
-                <h3>Response</h3>
+                <h3>{frozen ? "Preserved response" : "Response"}</h3>
                 <div className="cw-source-content">
                   {current.draft?.content ??
                     "Prepare and review a response in the Report tab."}
@@ -2750,24 +3247,26 @@ function CaseDetail({
                   <ArrowDownToLine size={18} />
                   Export
                 </Button>
-                {current.source === "stripe" && submissionEnabled && (
-                  <Button
-                    primary
-                    disabled={
-                      busy ||
-                      frozen ||
-                      investigating ||
-                      stale ||
-                      dirty ||
-                      hasAttachments ||
-                      current.draft?.status !== "approved"
-                    }
-                    onClick={submit}
-                  >
-                    Review submission
-                    <ArrowRight size={18} />
-                  </Button>
-                )}
+                {current.source === "stripe" &&
+                  submissionEnabled &&
+                  connected && (
+                    <Button
+                      primary
+                      disabled={
+                        busy ||
+                        frozen ||
+                        investigating ||
+                        stale ||
+                        dirty ||
+                        hasAttachments ||
+                        current.draft?.status !== "approved"
+                      }
+                      onClick={submit}
+                    >
+                      Review submission
+                      <ArrowRight size={18} />
+                    </Button>
+                  )}
               </div>
             </div>
           </div>
@@ -2873,13 +3372,17 @@ function EvidenceForm({
   busy,
   submit,
   upload,
+  initialMode = "record",
+  defaultDate = "",
 }: {
+  initialMode?: string;
+  defaultDate?: string;
   current: DisputeCase;
   busy: boolean;
   submit: (e: FormEvent<HTMLFormElement>) => void;
   upload: (e: FormEvent<HTMLFormElement>) => Promise<void>;
 }) {
-  const [mode, setMode] = useState("record");
+  const [mode, setMode] = useState(initialMode);
   return (
     <>
       <div className="cw-tabs" style={{ padding: 0, marginBottom: 24 }}>
@@ -2921,11 +3424,7 @@ function EvidenceForm({
                 type="datetime-local"
                 name="occurredAt"
                 required
-                defaultValue={new Date(
-                  Date.now() - new Date().getTimezoneOffset() * 60000,
-                )
-                  .toISOString()
-                  .slice(0, 16)}
+                defaultValue={defaultDate}
               />
             </Field>
           </div>
@@ -2979,8 +3478,9 @@ function EvidenceForm({
             />
           </label>
           <p className="cw-caption">
-            The original file is stored with this case. Upload only records
-            you’re authorized to use.
+            The original file is stored privately with this case. PDF and image
+            text is not extracted. The upload timestamp is recorded; add a
+            separate source record for the factual event date.
           </p>
           <Button primary type="submit" disabled={busy}>
             <Upload size={18} />
@@ -3001,7 +3501,7 @@ function EvidenceLibrary({
   state: WorkspaceState;
   search: string;
   setSearch: (s: string) => void;
-  open: (id: string) => void;
+  open: (id: string, evidence: string) => void;
 }) {
   const records = state.cases
     .flatMap((c) =>
@@ -3055,13 +3555,13 @@ function EvidenceLibrary({
               </thead>
               <tbody>
                 {records.map((e) => (
-                  <tr key={e.id} onClick={() => open(e.caseId)}>
+                  <tr key={e.id} onClick={() => open(e.caseId, e.id)}>
                     <td>
                       <button
                         className="cw-row-link"
                         onClick={(x) => {
                           x.stopPropagation();
-                          open(e.caseId);
+                          open(e.caseId, e.id);
                         }}
                       >
                         <span className="cw-case-name">{e.title}</span>
@@ -3109,6 +3609,7 @@ function Integrations({
   busy,
   stripeAction,
   requestAccess,
+  navigate,
 }: {
   state: WorkspaceState;
   stripe: StripeStatus | null;
@@ -3120,6 +3621,11 @@ function Integrations({
     body?: object,
   ) => Promise<void>;
   requestAccess: () => void;
+  navigate: (
+    view: string,
+    id?: string,
+    detail?: Record<string, string>,
+  ) => void;
 }) {
   const connection = state.integrations.find((i) => i.provider === "stripe"),
     connected = connection?.status === "connected";
@@ -3195,10 +3701,10 @@ function Integrations({
               </p>
             </div>
           )}
-          <a className="cw-button" href="/workspace?view=cases">
+          <Button onClick={() => navigate("cases")}>
             Open cases
             <ArrowRight size={18} />
-          </a>
+          </Button>
         </section>
 
         <section className="cw-panel cw-integration">
@@ -3251,6 +3757,14 @@ function Integrations({
             )
           )}
           <div className="cw-actions">
+            <Button
+              onClick={() =>
+                navigate("integrations", undefined, { source: "stripe" })
+              }
+            >
+              Setup & status
+              <ArrowRight size={16} />
+            </Button>
             {connected ? (
               <>
                 <Button
@@ -3322,10 +3836,14 @@ function Integrations({
             Direct Gmail authorization is a planned connection. Selected
             messages can be added now using Add evidence inside a case.
           </p>
-          <a className="cw-button" href="/workspace?view=cases">
-            Open cases
+          <Button
+            onClick={() =>
+              navigate("integrations", undefined, { source: "gmail" })
+            }
+          >
+            Import instructions
             <ArrowRight size={18} />
-          </a>
+          </Button>
         </section>
         <section className="cw-panel cw-integration">
           <div className="cw-integration-head">
@@ -3347,7 +3865,7 @@ function Integrations({
           </p>
           <div className="cw-rule" />
           <p>
-            Import an approved case through your business's evidence API. It
+            Import an approved case through your business’s evidence API. It
             verifies the case, follows linked records, and returns only
             permitted fields. Database credentials stay with the business.
           </p>
@@ -3366,6 +3884,14 @@ function Integrations({
             >
               <Database size={18} />
               Import approved case
+            </Button>
+            <Button
+              onClick={() =>
+                navigate("integrations", undefined, { source: "database" })
+              }
+            >
+              Access setup
+              <ArrowRight size={18} />
             </Button>
             <Button onClick={requestAccess}>
               <ShieldCheck size={18} />
@@ -3391,10 +3917,10 @@ function Integrations({
             policy to the case as evidence. Policy text never grants data-access
             permissions.
           </p>
-          <a className="cw-button" href="/workspace?view=settings">
+          <Button onClick={() => navigate("policies")}>
             Manage policies
             <ArrowRight size={18} />
-          </a>
+          </Button>
         </section>
         <section className="cw-panel cw-integration">
           <div className="cw-integration-head">
@@ -3472,14 +3998,21 @@ function Access({
   mutate,
   request,
   openCase,
+  initialTab = "requests",
+  onTab,
+  openRequest,
 }: {
   state: WorkspaceState;
   busy: boolean;
   mutate: (a: WorkspaceAction, m?: string) => Promise<boolean>;
   request: () => void;
   openCase: (id: string) => void;
+  initialTab?: string;
+  onTab: (tab: string) => void;
+  openRequest: (id: string) => void;
 }) {
-  const [tab, setTab] = useState("requests");
+  const tab = initialTab,
+    switchTab = onTab;
   return (
     <>
       <div className="cw-page-head">
@@ -3527,19 +4060,19 @@ function Access({
         <div className="cw-tabs">
           <button
             className={tab === "requests" ? "active" : ""}
-            onClick={() => setTab("requests")}
+            onClick={() => switchTab("requests")}
           >
             Access requests
           </button>
           <button
             className={tab === "activity" ? "active" : ""}
-            onClick={() => setTab("activity")}
+            onClick={() => switchTab("activity")}
           >
             Activity log
           </button>
           <button
             className={tab === "model" ? "active" : ""}
-            onClick={() => setTab("model")}
+            onClick={() => switchTab("model")}
           >
             Access model
           </button>
@@ -3556,7 +4089,13 @@ function Access({
                 </p>
               </div>
               {state.accessRequests.map((r) => (
-                <AccessRow key={r.id} request={r} busy={busy} mutate={mutate} />
+                <AccessRow
+                  key={r.id}
+                  request={r}
+                  busy={busy}
+                  mutate={mutate}
+                  open={() => openRequest(r.id)}
+                />
               ))}
             </div>
           ) : (
@@ -3627,10 +4166,12 @@ function AccessRow({
   request: r,
   busy,
   mutate,
+  open,
 }: {
   request: AccessRequest;
   busy: boolean;
   mutate: (a: WorkspaceAction, m?: string) => Promise<boolean>;
+  open: () => void;
 }) {
   return (
     <div className="cw-policy">
@@ -3650,6 +4191,10 @@ function AccessRow({
         style={{ alignItems: "flex-end", gap: 12 }}
       >
         <Badge status={r.status} />
+        <Button className="small" onClick={open}>
+          View request
+          <ArrowRight size={16} />
+        </Button>
         {r.status === "pending" && r.canReview && (
           <div className="cw-actions">
             <Button
@@ -3694,12 +4239,10 @@ function Settings({
   state,
   busy,
   mutate,
-  addPolicy,
 }: {
   state: WorkspaceState;
   busy: boolean;
   mutate: (a: WorkspaceAction, m?: string) => Promise<boolean>;
-  addPolicy: () => void;
 }) {
   const workspace = state.workspace!;
   return (
@@ -3785,94 +4328,6 @@ function Settings({
               </Button>
             </div>
           </form>
-        </section>
-        <section className="cw-panel">
-          <div className="cw-panel-header">
-            <div>
-              <h3>Company policies</h3>
-              <p>Preserve the terms that applied at the time of purchase.</p>
-            </div>
-            <Button onClick={addPolicy}>
-              <Plus size={18} />
-              Add policy
-            </Button>
-          </div>
-          {state.policies.length ? (
-            <div className="cw-panel-body">
-              {state.policies.map((p) => (
-                <div className="cw-policy" key={p.id}>
-                  <FileText size={21} />
-                  <div className="cw-policy-body">
-                    <h3>{p.name}</h3>
-                    <p>
-                      Effective{" "}
-                      {calendarDate(p.effectiveDate, {
-                        month: "long",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </p>
-                    <details style={{ marginTop: 10 }}>
-                      <summary style={{ cursor: "pointer" }}>
-                        Read policy
-                      </summary>
-                      <p>{p.content}</p>
-                    </details>
-                  </div>
-                  <button
-                    className="cw-button ghost icon danger"
-                    aria-label={`Remove ${p.name}`}
-                    disabled={busy}
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          `Remove “${p.name}” from workspace policies? Evidence already attached to a case remains.`,
-                        )
-                      )
-                        void mutate(
-                          { action: "removePolicy", policyId: p.id },
-                          "Policy removed.",
-                        );
-                    }}
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <Empty
-              icon={FileText}
-              title="Keep the applicable terms close."
-              description="Add refund, cancellation, delivery, or service policies with an effective date."
-            >
-              <Button onClick={addPolicy}>
-                <Plus size={18} />
-                Add your first policy
-              </Button>
-            </Empty>
-          )}
-        </section>
-        <section className="cw-panel">
-          <div className="cw-panel-header">
-            <h3>Identity & workspace access</h3>
-            <LockKeyhole size={20} />
-          </div>
-          <div className="cw-panel-body">
-            <div className="cw-form-grid">
-              <div>
-                <h3>{state.user.name}</h3>
-                <p>{state.user.email}</p>
-              </div>
-              <div>
-                <span className="cw-pill outline">Workspace owner</span>
-                <p style={{ marginTop: 8 }}>
-                  Sign-in is managed by ChatGPT. Every workspace API operation
-                  verifies your identity and record ownership.
-                </p>
-              </div>
-            </div>
-          </div>
         </section>
       </div>
     </>
