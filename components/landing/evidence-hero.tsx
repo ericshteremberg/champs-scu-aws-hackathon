@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { Pause, Play } from "lucide-react";
+import { HeroShader } from "./hero-shader";
 import "./evidence-hero.css";
 
 const aperture = "M382 102H285Q270 102 261 117L204 207Q195 221 204 235L261 325Q270 339 285 339H382V281H301L264 221L301 161H382Z";
@@ -50,6 +51,7 @@ export function EvidenceHero() {
   const url = (name: string) => `url(#${id}-${name})`;
   return (
     <figure ref={figure} className="landing-hero-visual causality-evidence-hero" data-running={!paused && inView && !reducedMotion && pageVisible}>
+      <HeroShader running={!paused && inView && !reducedMotion && pageVisible} />
       <div className="ceh-art">
         <svg className="ceh-scene" viewBox="0 0 636 460" role="img" aria-labelledby={`${id}-title ${id}-description`}>
           <title id={`${id}-title`}>Scattered evidence becomes one connected case</title>

@@ -1,0 +1,67 @@
+/* Compact desktop navigation and open, rule-divided marketing sections. */
+.cw.cw-login { background: #fff; }
+.cw.cw .cw-login-card { padding: 32px; border-radius: 8px; border-color: #e5e5e5; box-shadow: none; }
+.cw.cw-login .cw-button { min-height: 40px; border-radius: 6px; box-shadow: none; }
+.cw.cw .cw-login-story img { border-radius: 12px; }
+.cw-preview-gallery { background: #fff; }
+.cw-preview-grid a { border-radius: 6px; padding: 20px; box-shadow: none; }
+.cw-preview-grid a:hover { transform: none; box-shadow: none; }
+.causality-landing.causality-landing {
+  --landing-ink: #171717;
+  --landing-muted: #666;
+  --landing-rule: #e5e5e5;
+}
+.causality-landing.causality-landing .landing-header {
+  background: #fff;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.causality-landing.causality-landing .landing-nav { height: 64px; gap: 24px; }
+.causality-landing.causality-landing .landing-brand { gap: 8px; }
+.causality-landing.causality-landing .landing-brand svg { width: 24px; height: 24px; }
+.causality-landing.causality-landing .landing-brand span { font-size: 16px; line-height: 24px; letter-spacing: -.02em; font-weight: 600; }
+.causality-landing.causality-landing .landing-nav nav { margin-right: auto; margin-left: 32px; gap: 24px; }
+.causality-landing.causality-landing .landing-nav nav a { display: inline-flex; align-items: center; min-height: 36px; color: var(--landing-muted); }
+.causality-landing.causality-landing .landing-nav nav a:hover { color: var(--landing-ink); }
+.causality-landing.causality-landing .landing-button {
+  min-height: 40px;
+  padding: 7px 16px;
+  border-radius: 6px;
+  gap: 12px;
+  line-height: 24px;
+  box-shadow: none;
+  transform: none;
+}
+.causality-landing.causality-landing .landing-nav-cta { min-height: 36px; padding: 5px 12px; }
+.causality-landing.causality-landing .landing-button svg { display: block; width: 18px; height: 18px; flex: none; }
+.causality-landing.causality-landing .landing-motion-toggle { min-height: 36px; padding: 6px 8px; line-height: 24px; border-radius: 6px; }
+.causality-landing.causality-landing .landing-motion-toggle svg { display: block; flex: none; }
+.causality-landing.causality-landing .landing-hero-visual figcaption { padding-left: 0; }
+.causality-landing.causality-landing .hero-shader-study { padding: 3px; border-radius: 6px; box-shadow: none; background: #fafafa; }
+.causality-landing.causality-landing .hero-shader-study button { padding: 4px 10px; min-height: 32px; border-radius: 4px; }
+.causality-landing.causality-landing .hero-shader-study button[aria-pressed="true"] { box-shadow: none; background: #eaeaea; }
+.causality-landing.causality-landing .landing-control-panel {
+  padding: 32px 0;
+  border-radius: 0;
+  border-top: 1px solid var(--landing-rule);
+  background: transparent;
+}
+.causality-landing.causality-landing .landing-control-grid { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); gap: 64px; }
+.causality-landing.causality-landing .landing-scope-list { border-top-width: 1px; }
+.causality-landing.causality-landing .landing-scope-list > div { padding-block: 16px; gap: 16px; }
+.causality-landing.causality-landing .landing-scope-list dt span { margin-top: 0; }
+.causality-landing.causality-landing .landing-scope-list dd { width: 152px; }
+.causality-landing.causality-landing .landing-principle { padding-block: 24px; gap: 16px; }
+.causality-landing.causality-landing .landing-principle:first-child { padding-top: 0; }
+.causality-landing.causality-landing .landing-outcome-band { border-radius: 8px; padding: 24px 32px; }
+.causality-landing.causality-landing :is(.landing-footer-runway, .landing-footer) { border-radius: 0; }
+.causality-landing.causality-landing .product-demo { border-radius: 12px; }
+.causality-landing.causality-landing .pd-window { border-radius: 12px; }
+.causality-landing.causality-landing .pd-sidebar-nav .pd-sidebar-selected { border-radius: 6px; background: #ebebeb; box-shadow: none; }
+.causality-landing.causality-landing :is(.pd-original-message, .pd-manifest, .pd-response-preview, .pd-review-document, .pd-stripe-receipt) { border-radius: 8px; box-shadow: none; }
+.causality-landing.causality-landing .pd-source-row { border-radius: 6px; box-shadow: none; }
+.causality-landing.causality-landing .pd-soft-pill { border-radius: 4px; }
+.causality-landing.causality-landing .pd-overlay-controls button { border-radius: 6px; box-shadow: none; }
+@media (max-width: 1000px) {
+  .causality-landing.causality-landing .landing-control-grid { grid-template-columns: 1fr; gap: 32px; }
+}
