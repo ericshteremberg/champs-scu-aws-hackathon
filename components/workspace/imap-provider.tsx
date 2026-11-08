@@ -3,27 +3,38 @@
 import { useState, type FormEvent } from 'react';
 import { Mail, Search, Unplug } from 'lucide-react';
 import type { WorkspaceState } from '../../lib/domain';
-import type { ImapConnection, ImapMessage, ImapPreview, ProviderStatus } from '../../lib/providers/types';
+import type { ImapConnection, ImapDiscovery, ImapMessage, ImapPreview, ProviderStatus } from '../../lib/providers/types';
 
 export function ImapConnector({ status, cases, onChange, onImported }: { status: ProviderStatus['imap']; cases: WorkspaceState['cases']; onChange: (connection: ImapConnection | null) => void; onImported: (state: WorkspaceState, caseId: string) => void }) {
   const [setup, setSetup] = useState(false), [email, setEmail] = useState(''), [host, setHost] = useState(''), [password, setPassword] = useState(''), [sentFolder, setSentFolder] = useState(''), [consent, setConsent] = useState(false);
+  const [discovery, setDiscovery] = useState<ImapDiscovery | null>(null), [advanced, setAdvanced] = useState(false), [includeSent, setIncludeSent] = useState(true);
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [caseId, setCaseId] = useState(''), [messages, setMessages] = useState<ImapMessage[]>([]), [preview, setPreview] = useState<ImapPreview | null>(null), [confirmDisconnect, setConfirmDisconnect] = useState(false);
   const connection = status?.connection, authorized = connection?.status === 'authorized';
   const selected = cases.find(c => c.id === caseId);
   async function request(body: unknown) {
     const response = await fetch('/api/providers/imap', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' });
-    const result = await response.json() as { error?: string; connection?: ImapConnection; messages?: ImapMessage[]; preview?: ImapPreview; moreAvailable?: boolean; scanLimited?: boolean };
+    const result = await response.json() as { error?: string; discovery?: ImapDiscovery; connection?: ImapConnection; messages?: ImapMessage[]; preview?: ImapPreview; moreAvailable?: boolean; scanLimited?: boolean };
     if (!response.ok) throw new Error(result.error || 'The mailbox request could not be completed.');
     return result;
   }
+  async function discover() {
+    setBusy(true); setError(''); setNotice(''); setHost(''); setPassword(''); setConsent(false); setDiscovery(null);
+    try {
+      const result = await request({ action: 'discover', email: email.trim() });
+      if (!result.discovery) throw new Error('Settings could not be detected. Use Advanced settings.');
+      setDiscovery(result.discovery); setAdvanced(result.discovery.kind === 'manual');
+      if (result.discovery.kind === 'imap') setHost(result.discovery.host);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Settings could not be detected.'); setAdvanced(true); }
+    finally { setBusy(false); }
+  }
   async function connect(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (!consent) return;
+    event.preventDefault(); if (!consent || !host.trim() || busy) return;
     setBusy(true); setError(''); setNotice('');
     const settings = { email: email.trim(), host: host.trim(), password, folders: ['INBOX', ...(sentFolder.trim() ? [sentFolder.trim()] : [])] };
     setPassword('');
     try {
-      const result = await request({ action: 'connect', settings, confirmed: true });
+      const result = await request({ action: 'connect', settings, detectSent: includeSent && !sentFolder.trim(), confirmed: true });
       onChange(result.connection || null); setSetup(false); setConsent(false); setNotice('Mailbox connected. Choose a case to find relevant emails.');
     } catch (e) { setError(e instanceof Error ? e.message : 'Connection failed.'); }
     finally { settings.password = ''; setBusy(false); }
@@ -53,15 +64,28 @@ export function ImapConnector({ status, cases, onChange, onImported }: { status:
     {connection?.email && <p><strong>{connection.email}</strong><br />{connection.host}<br />Folders: {connection.folders?.join(', ')}</p>}
     {connection?.status === 'reconnect_required' && <p role="status">This login needs attention. Disconnect, then reconnect with current credentials.</p>}
     {(!connection || connection.status === 'disconnected') && (!setup ? <button className="cw-button primary" disabled={!status?.configured || busy} onClick={() => setSetup(true)}>Connect other email</button> : <form onSubmit={connect} className="cw-imap-form">
-      <label className="cw-field"><span>Mailbox email</span><input type="email" autoComplete="username" required maxLength={254} value={email} disabled={busy} onChange={e => setEmail(e.target.value)} placeholder="support@yourbusiness.com" /></label>
-      <label className="cw-field"><span>Incoming IMAP server</span><input type="text" autoComplete="off" autoCapitalize="none" spellCheck={false} required maxLength={253} value={host} disabled={busy} onChange={e => setHost(e.target.value)} placeholder="imap.yourprovider.com" /></label>
-      <p className="cw-provider-note">Use your provider&apos;s exact server hostname. Port 993 with verified TLS is required. <a href="https://www.networksolutions.com/help/article/how-do-i-get-started-with-pop3-and-imap" target="_blank" rel="noopener noreferrer">Find Network Solutions settings</a>.</p>
-      <label className="cw-field"><span>Mailbox or app password</span><input type="password" autoComplete="off" required maxLength={1024} value={password} disabled={busy} onChange={e => setPassword(e.target.value)} /></label>
-      <label className="cw-field"><span>Sent folder name (optional)</span><input autoComplete="off" maxLength={150} value={sentFolder} disabled={busy} onChange={e => setSentFolder(e.target.value)} placeholder="Exact name, for example Sent" /></label>
-      <p className="cw-provider-note">INBOX is included. Add the exact Sent folder name to search replies too. Searches check the newest 500 messages per folder and show up to ten matches.</p>
-      <p className="cw-provider-note">Your login is stored privately in AWS with encryption at rest. Causality opens folders read-only and does not send, delete or mark mail as read. The credential itself may permit broader access. Use an app password when your provider supports one. This team preview shares connections with everyone using the team login.</p>
-      <label className="cw-imap-consent"><input type="checkbox" checked={consent} disabled={busy} onChange={e => setConsent(e.target.checked)} />I authorize Causality to store this login and read the selected mailbox folders.</label>
-      <div className="cw-actions"><button className="cw-button primary" disabled={busy || !consent}>{busy ? 'Checking mailbox…' : 'Test and connect mailbox'}</button><button type="button" className="cw-button" disabled={busy} onClick={() => { setSetup(false); setPassword(''); setConsent(false); }}>Cancel setup</button></div>
+      <label className="cw-field"><span>Mailbox email</span><input type="email" autoComplete="username" required maxLength={254} value={email} disabled={busy} onChange={e => { setEmail(e.target.value); setDiscovery(null); setHost(''); setPassword(''); setConsent(false); setSentFolder(''); setIncludeSent(true); setError(''); }} placeholder="support@yourbusiness.com" /></label>
+      <button type="button" className="cw-button" disabled={busy || !email.trim()} onClick={() => void discover()}>{busy && !host ? 'Finding settings…' : 'Find email settings'}</button>
+      {!discovery && <p className="cw-provider-note">Enter your email and we will look up your provider. No password is needed for this step.</p>}
+      {discovery?.kind === 'imap' && <p role="status">{discovery.provider} detected. Connect securely to <strong>{host}</strong> using TLS. Your mailbox login will be checked when you connect.</p>}
+      {discovery?.kind === 'manual' && <p role="status">{discovery.reason === 'unavailable' ? 'The settings lookup is temporarily unavailable.' : 'We could not detect this provider automatically.'} Enter the server supplied by your email provider below.</p>}
+      {discovery?.kind === 'oauth' ? <p role="status">{discovery.provider === 'Google' ? <>This mailbox uses Google. <a href="#gmail-connection">Use Connect Gmail</a> to authorize it with Google sign-in.</> : 'This mailbox uses Microsoft. Microsoft sign-in is not available yet.'}</p> : <>
+        <details open={advanced} onToggle={e => setAdvanced(e.currentTarget.open)}>
+          <summary>Advanced settings</summary>
+          <label className="cw-field"><span>Incoming IMAP server</span><input type="text" autoComplete="off" autoCapitalize="none" spellCheck={false} maxLength={253} value={host} disabled={busy} onChange={e => { setHost(e.target.value); setPassword(''); setConsent(false); setDiscovery(null); }} placeholder="imap.yourprovider.com" /></label>
+          <p className="cw-provider-note">Port 993 with verified TLS. <a href="https://www.networksolutions.com/help/article/how-do-i-get-started-with-pop3-and-imap" target="_blank" rel="noopener noreferrer">Find Network Solutions settings</a>.</p>
+          <label className="cw-field"><span>Sent folder name (optional)</span><input autoComplete="off" maxLength={150} value={sentFolder} disabled={busy} onChange={e => { setSentFolder(e.target.value); setConsent(false); }} placeholder="Override automatic detection" /></label>
+          {!sentFolder.trim() && <label className="cw-imap-consent"><input type="checkbox" checked={includeSent} disabled={busy} onChange={e => { setIncludeSent(e.target.checked); setConsent(false); }} />Find the Sent folder automatically</label>}
+        </details>
+        {!!host.trim() && <>
+          <label className="cw-field"><span>Mailbox or app password</span><input type="password" autoComplete="off" required maxLength={1024} value={password} disabled={busy} onChange={e => setPassword(e.target.value)} /></label>
+          <p className="cw-provider-note">INBOX is included.{sentFolder.trim() ? ' Your selected Sent folder is included.' : includeSent ? ' We will also include Sent if your provider identifies it. You can change this under Advanced settings.' : ' Only INBOX will be searched.'} Searches check the newest 500 messages per folder and show up to ten matches.</p>
+          <p className="cw-provider-note">Your login is stored privately in AWS with encryption at rest. Causality opens folders read-only and does not send, delete or mark mail as read. Use an app password when available. This team preview shares connections with everyone using the team login.</p>
+          <label className="cw-imap-consent"><input type="checkbox" checked={consent} disabled={busy} onChange={e => setConsent(e.target.checked)} />I authorize Causality to store this login and read the selected mailbox folders.</label>
+          <button className="cw-button primary" disabled={busy || !consent}>{busy ? 'Checking mailbox…' : 'Test and connect mailbox'}</button>
+        </>}
+      </>}
+      <button type="button" className="cw-button" disabled={busy} onClick={() => { setSetup(false); setPassword(''); setConsent(false); }}>Cancel setup</button>
     </form>)}
     {authorized && <>
       <label className="cw-field"><span>Case for IMAP evidence</span><select disabled={busy} value={caseId} onChange={e => { setCaseId(e.target.value); setMessages([]); setPreview(null); setNotice(''); setError(''); }}><option value="">Choose a case</option>{cases.filter(c => ['needs_review', 'investigating', 'ready'].includes(c.status)).map(c => <option value={c.id} key={c.id}>{c.title} ({c.email})</option>)}</select></label>

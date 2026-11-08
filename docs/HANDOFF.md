@@ -28,7 +28,11 @@ Release verification: `npm run check` passed (556 backend/adapter tests, TypeScr
 
 ## IMAP customer setup
 
-Other email provider is available in Connections for Network Solutions and compatible password-based IMAP servers. The customer supplies the mailbox login, exact server and optional Sent folder directly in the app. No Google registration or custom endpoint is needed. Lambda verifies TLS and read-only folder access, then stores credentials in private encrypted-at-rest DynamoDB records. Search/preview/import is bound to an open case and requires review. Real provider login and mailbox reads remain untested. See [IMAP connector handoff](IMAP_CONNECTOR.md).
+Other email provider is available in Connections for Network Solutions and compatible password-based IMAP servers. The customer enters an email and selects Find email settings. AWS detects Network Solutions Cloud Mail or a public TLS SRV endpoint without a password. The customer then supplies the mailbox password and consent. Server and Sent-folder overrides are under Advanced settings; Sent is included automatically only when the server explicitly identifies one selectable folder. Unknown providers use manual settings, Google directs to Gmail OAuth, and Microsoft OAuth remains unavailable. No Google registration or custom endpoint is needed. Lambda verifies TLS and read-only folder access, then stores credentials in private encrypted-at-rest DynamoDB records. Search/preview/import is bound to an open case and requires review. Real provider login and mailbox reads remain untested. See [IMAP connector handoff](IMAP_CONNECTOR.md).
+
+### Simplified mailbox setup verification
+
+Password-free discovery and progressive setup are deployed to AWS and Worker version `c28e91bb-8dcf-4e37-b9f7-3d30eca39f7c`. The hosted flow detected Network Solutions for the customer's domain and passed desktop/mobile checks without a mailbox login or read. Existing customer connections were preserved. `npm run check` passed (576 backend/adapter tests, type checking and both builds), all 13 connector browser scenarios passed, and targeted ESLint plus Wrangler dry-run passed. The browser callback assertion was scoped to its message to avoid a concurrent evidence-loading status. See `scripts/smoke-imap.mjs` for repeatable hosted discovery and input-boundary checks. This repository has no root `context.md`; the existing architecture/handoff documents were updated instead.
 
 ## Access and credential refresh
 

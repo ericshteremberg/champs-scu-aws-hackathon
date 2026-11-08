@@ -43,3 +43,8 @@ export type OrderEvidenceMapping = {
 };
 export type LinkedEvidenceRecord = { id: string; section: string; table: string; fields: Record<string, string | number | boolean | null> };
 export type LinkedEvidencePreview = { id: string; caseId: string; projectRef: string; paymentRef: string; fetchedAt: string; records: LinkedEvidenceRecord[]; limitations: string[] };
+
+export type ImapDiscovery =
+  | { kind: 'imap'; provider: string; host: string; source: 'provider_dns' | 'imaps_srv' }
+  | { kind: 'oauth'; provider: 'Google' | 'Microsoft' }
+  | { kind: 'manual'; reason: 'unknown' | 'unavailable' };

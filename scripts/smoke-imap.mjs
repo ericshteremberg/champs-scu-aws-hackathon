@@ -18,6 +18,9 @@ async function main() {
   const invalid = { action: 'connect', settings: { email: 'synthetic@example.test', host: '127.0.0.1', password: 'synthetic-not-a-real-mailbox-password', folders: ['INBOX'] }, confirmed: true };
   const post = (Origin, body) => fetch(`${base}/api/providers/imap`, { method: 'POST', headers: { Authorization, Origin, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   stage = 'origin and input rejection';
+  const discovery = await post(base, { action: 'discover', email: 'info@broeseevents.com' });
+  assert.equal(discovery.status, 200);
+  assert.deepEqual((await discovery.json()).discovery, { kind: 'imap', provider: 'Network Solutions', host: 'netsol-imap-oxcs.hostingplatform.com', source: 'provider_dns' });
   assert.equal((await post('https://untrusted.example', invalid)).status, 403);
   const rejected = await post(base, invalid); assert.equal(rejected.status, 400); assert.equal((await rejected.json()).code, 'invalid_request');
   assert.equal((await post(base, { action: 'send' })).status, 400);
@@ -35,11 +38,12 @@ async function main() {
     await page.goto(`${base}/workspace?view=integrations`);
     const card = page.getByRole('article', { name: 'Other email IMAP connection' });
     await card.getByRole('button', { name: 'Connect other email' }).click();
-    await expect(card.getByRole('button', { name: 'Test and connect mailbox' })).toBeDisabled();
+    await expect(card.getByLabel('Mailbox or app password')).toHaveCount(0);
+    await card.getByText('Advanced settings', { exact: true }).click();
     await card.getByLabel('Mailbox email', { exact: true }).fill(invalid.settings.email);
     await card.getByLabel('Incoming IMAP server').fill(invalid.settings.host);
     await card.getByLabel('Mailbox or app password').fill(invalid.settings.password);
-    await card.getByRole('checkbox').check();
+    await card.getByRole('checkbox', { name: /I authorize Causality/ }).check();
     const reply = page.waitForResponse(r => r.url() === `${base}/api/providers/imap` && r.request().method() === 'POST');
     await card.getByRole('button', { name: 'Test and connect mailbox' }).click();
     assert.equal((await reply).status(), 400);
@@ -49,15 +53,18 @@ async function main() {
     await card.getByRole('button', { name: 'Cancel setup' }).click();
     await page.reload();
     await card.getByRole('button', { name: 'Connect other email' }).click();
-    await card.getByLabel('Mailbox email', { exact: true }).fill('');
-    await card.getByLabel('Incoming IMAP server').fill('');
+    await card.getByLabel('Mailbox email', { exact: true }).fill('info@broeseevents.com');
+    await card.getByRole('button', { name: 'Find email settings' }).click();
+    await expect(card.getByRole('status')).toContainText('Network Solutions detected');
+    await expect(card.getByLabel('Incoming IMAP server')).toBeHidden();
+    await expect(card.getByRole('button', { name: 'Test and connect mailbox' })).toBeDisabled();
     mkdirSync('.aws-build', { recursive: true });
     await card.screenshot({ path: '.aws-build/imap-hosted-desktop.png' });
     await page.setViewportSize({ width: 390, height: 844 });
     assert.equal(await card.evaluate(el => el.scrollWidth <= el.clientWidth), true);
     await card.screenshot({ path: '.aws-build/imap-hosted-mobile.png' });
     assert.deepEqual(errors, []);
-    const report = { verifiedAt: new Date().toISOString(), authenticatedAwsStatus: true, crossOriginRejected: true, invalidHostRejected: true, sendRejected: true, customerConnectionUnchanged: true, consentRequired: true, passwordCleared: true, mobileLayout: true, realMailboxLoginTested: false, mailboxRead: false };
+    const report = { verifiedAt: new Date().toISOString(), authenticatedAwsStatus: true, passwordFreeDiscovery: true, crossOriginRejected: true, invalidHostRejected: true, sendRejected: true, customerConnectionUnchanged: true, consentRequired: true, passwordCleared: true, mobileLayout: true, realMailboxLoginTested: false, mailboxRead: false };
     writeFileSync('.aws-build/imap-hosted-smoke.json', JSON.stringify(report, null, 2) + '\n');
     console.log('PASS: hosted IMAP form, AWS status, origin/input rejection, consent control, password clearing and mobile layout. No mailbox login or read attempted.');
   } finally { await browser.close(); }

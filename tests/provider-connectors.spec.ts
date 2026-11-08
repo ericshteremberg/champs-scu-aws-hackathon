@@ -65,7 +65,7 @@ test('callback feedback is readable and the connection panel fits a phone', asyn
   await page.setViewportSize({ width: 390, height: 844 });
   const { panel } = await setup(page);
   await page.goto('/workspace?view=integrations&provider_result=denied');
-  await expect(panel.getByRole('status')).toContainText('Authorization was canceled');
+  await expect(panel.getByRole('status').filter({ hasText: 'Authorization was canceled' })).toContainText('Authorization was canceled');
   await expect(page).not.toHaveURL(/provider_result/);
   const box = await panel.boundingBox();
   expect(box!.x).toBeGreaterThanOrEqual(0); expect(box!.x + box!.width).toBeLessThanOrEqual(391);
@@ -149,17 +149,18 @@ test('IMAP setup requires consent, clears passwords on failure and fits a phone'
   const card = page.getByRole('article', { name: 'Other email IMAP connection' });
   await card.getByRole('button', { name: 'Connect other email' }).click();
   await card.getByLabel('Mailbox email', { exact: true }).fill('merchant@example.test');
+  await card.getByText('Advanced settings', { exact: true }).click();
   await card.getByLabel('Incoming IMAP server').fill('imap.provider.com');
   await card.getByLabel('Mailbox or app password').fill('synthetic_private_password');
   const submit = card.getByRole('button', { name: 'Test and connect mailbox' });
   await expect(submit).toBeDisabled();
-  await card.getByRole('checkbox').check();
+  await card.getByRole('checkbox', { name: /I authorize Causality/ }).check();
   let sent: Record<string, unknown> | undefined;
   await page.route('**/api/providers/imap', async route => { sent = route.request().postDataJSON(); return route.fulfill({ status: 502, json: { error: 'Could not read this mailbox. Check the server.' } }); });
   await submit.click();
   await expect(card.getByRole('alert')).toContainText('Check the server');
   await expect(card.getByLabel('Mailbox or app password')).toHaveValue('');
-  expect(sent).toEqual({ action: 'connect', settings: { email: 'merchant@example.test', host: 'imap.provider.com', password: 'synthetic_private_password', folders: ['INBOX'] }, confirmed: true });
+  expect(sent).toEqual({ action: 'connect', settings: { email: 'merchant@example.test', host: 'imap.provider.com', password: 'synthetic_private_password', folders: ['INBOX'] }, detectSent: true, confirmed: true });
   expect(await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]))).not.toContain('synthetic_private_password');
   expect(await card.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
 });
@@ -183,10 +184,11 @@ test('IMAP connection searches a selected case and imports only after preview', 
   const card = page.getByRole('article', { name: 'Other email IMAP connection' });
   await card.getByRole('button', { name: 'Connect other email' }).click();
   await card.getByLabel('Mailbox email', { exact: true }).fill('merchant@example.test');
+  await card.getByText('Advanced settings', { exact: true }).click();
   await card.getByLabel('Incoming IMAP server').fill('imap.provider.com');
   await card.getByLabel('Mailbox or app password').fill('synthetic_private_password');
   await card.getByLabel('Sent folder name (optional)').fill('Sent');
-  await card.getByRole('checkbox').check();
+  await card.getByRole('checkbox', { name: /I authorize Causality/ }).check();
   await card.getByRole('button', { name: 'Test and connect mailbox' }).click();
   await expect(card.getByRole('button', { name: 'Find customer emails via IMAP' })).toBeDisabled();
   await card.getByLabel('Case for IMAP evidence').selectOption(caseId);
@@ -203,4 +205,59 @@ test('IMAP connection searches a selected case and imports only after preview', 
   await card.getByRole('button', { name: 'Disconnect IMAP', exact: true }).click();
   await card.getByRole('button', { name: 'Confirm disconnect IMAP' }).click();
   await expect(card.getByRole('button', { name: 'Connect other email' })).toBeEnabled();
+});
+
+test('IMAP detects the provider before requesting a password and submits automatic folder discovery', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await setup(page);
+  const requests: Record<string, unknown>[] = [];
+  await page.route('**/api/providers/imap', async route => {
+    const body = route.request().postDataJSON(); requests.push(body);
+    if (body.action === 'discover') return route.fulfill({ json: { discovery: { kind: 'imap', provider: 'Network Solutions', host: 'netsol-imap-oxcs.hostingplatform.com', source: 'provider_dns' } } });
+    return route.fulfill({ json: { connection: { status: 'authorized', email: body.settings.email, host: body.settings.host, folders: ['INBOX', 'Sent Items'] } } });
+  });
+  const card = page.getByRole('article', { name: 'Other email IMAP connection' });
+  await card.getByRole('button', { name: 'Connect other email' }).click();
+  await expect(card.getByLabel('Mailbox or app password')).toHaveCount(0);
+  await expect(card.getByLabel('Incoming IMAP server')).toBeHidden();
+  await card.getByLabel('Mailbox email', { exact: true }).fill('support@business.com');
+  await card.getByRole('button', { name: 'Find email settings' }).click();
+  await expect(card.getByRole('status')).toContainText('Network Solutions detected');
+  expect(requests).toEqual([{ action: 'discover', email: 'support@business.com' }]);
+  await expect(card.getByLabel('Incoming IMAP server')).toBeHidden();
+  await card.getByLabel('Mailbox or app password').fill('synthetic-password');
+  await card.getByRole('checkbox', { name: /I authorize Causality/ }).check();
+  expect(await card.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await card.getByRole('button', { name: 'Test and connect mailbox' }).click();
+  await expect(card).toContainText('Folders: INBOX, Sent Items');
+  expect(requests.at(-1)).toEqual({ action: 'connect', settings: { email: 'support@business.com', host: 'netsol-imap-oxcs.hostingplatform.com', password: 'synthetic-password', folders: ['INBOX'] }, detectSent: true, confirmed: true });
+});
+
+test('IMAP falls back to manual settings and clears passwords when the account changes', async ({ page }) => {
+  await setup(page);
+  await page.route('**/api/providers/imap', route => route.fulfill({ json: { discovery: { kind: 'manual', reason: 'unavailable' } } }));
+  const card = page.getByRole('article', { name: 'Other email IMAP connection' });
+  await card.getByRole('button', { name: 'Connect other email' }).click();
+  await card.getByLabel('Mailbox email', { exact: true }).fill('support@business.com');
+  await card.getByRole('button', { name: 'Find email settings' }).click();
+  await expect(card.getByLabel('Incoming IMAP server')).toBeVisible();
+  await card.getByLabel('Incoming IMAP server').fill('imap.business.com');
+  await card.getByLabel('Mailbox or app password').fill('synthetic-password');
+  await card.getByRole('checkbox', { name: /I authorize Causality/ }).check();
+  await card.getByLabel('Mailbox email', { exact: true }).fill('different@business.com');
+  await expect(card.getByLabel('Mailbox or app password')).toHaveCount(0);
+  await card.getByLabel('Incoming IMAP server').fill('imap.business.com');
+  await expect(card.getByLabel('Mailbox or app password')).toHaveValue('');
+  await expect(card.getByRole('checkbox', { name: /I authorize Causality/ })).not.toBeChecked();
+});
+
+test('Google discovery directs customers to OAuth without asking for a mailbox password', async ({ page }) => {
+  await setup(page);
+  await page.route('**/api/providers/imap', route => route.fulfill({ json: { discovery: { kind: 'oauth', provider: 'Google' } } }));
+  const card = page.getByRole('article', { name: 'Other email IMAP connection' });
+  await card.getByRole('button', { name: 'Connect other email' }).click();
+  await card.getByLabel('Mailbox email', { exact: true }).fill('support@gmail.com');
+  await card.getByRole('button', { name: 'Find email settings' }).click();
+  await expect(card.getByRole('link', { name: 'Use Connect Gmail' })).toHaveAttribute('href', '#gmail-connection');
+  await expect(card.getByLabel('Mailbox or app password')).toHaveCount(0);
 });
