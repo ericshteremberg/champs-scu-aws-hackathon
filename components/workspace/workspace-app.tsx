@@ -1,5 +1,7 @@
 "use client";
 
+import { investigationProgressEvent } from "@/lib/investigation/progress";
+
 import { PolicyEditor } from "./policy-editor";
 import { ResendConnector } from "./resend-provider";
 import { ProviderConnectors } from "./provider-connectors";
@@ -3066,7 +3068,8 @@ function InvestigationActivity({
   cancel: () => void;
 }) {
   const active = run?.status === "running" || pending;
-  const latest = run?.events.at(-1);
+  const events = run?.events.map(event => investigationProgressEvent(event, active)) || [];
+  const latest = events.at(-1);
   const title = active
     ? "Following the evidence"
     : run?.status === "completed"
@@ -3122,7 +3125,7 @@ function InvestigationActivity({
             </span>
           </summary>
           <ol>
-            {run!.events.map((event) => (
+            {events.map((event) => (
               <li key={event.id}>
                 <span className="cw-run-event-dot" />
                 <div>
