@@ -2,6 +2,10 @@
 
 Rehearse three minutes and adapt to the organizer's presentation limit. The business story is faster dispute preparation from case-scoped evidence. AWS runs the API, investigation, database, and file storage.
 
+## Local rehearsal available
+
+The current Causality interface has a fresh [silent sample walkthrough, five screenshots and reviewed sample export](evaluation/artifacts/README.md). The recording uses all three fictional ticket cases and deterministic sample investigations on local compatibility storage. It is a workflow backup, not a live Bedrock demonstration or a narrated presentation. All 13 existing local browser tests passed on the fresh build. [Repeatable instructions](evaluation/README.md) do not require the deployed password or shared AWS access. Submission-package work is deferred at the user's request; the selected track is AWS.
+
 ## Before presenting
 
 Open [the development frontend](https://causality-hackathon-dev.slidah60.workers.dev) with username `dev` and the privately shared password. It uses a shared team development workspace. Refresh the Worker's temporary AWS bridge credentials before the session.

@@ -8,10 +8,11 @@
 // Usage: node docs/evaluation/run-evaluation.mjs [ATM-1042 ATM-1043 ATM-1044]
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { LambdaClient, InvokeCommand, GetFunctionConfigurationCommand } from '@aws-sdk/client-lambda';
 
 const deployment = JSON.parse(readFileSync('.aws-build/deployment.json', 'utf8'));
-if (deployment.FunctionName !== 'causality-hackathon-backend' || deployment.region !== 'us-east-1') {
+if (deployment.FunctionName !== 'causality-hackathon-backend' || deployment.InvestigatorFunctionName !== 'causality-hackathon-investigator' || deployment.region !== 'us-east-1') {
   throw new Error('This runner targets only the named hackathon development backend.');
 }
 const client = new LambdaClient({ region: deployment.region });
@@ -40,8 +41,26 @@ async function waitRun(caseId, deadline = 240000) {
 }
 
 const wanted = process.argv.slice(2).length ? process.argv.slice(2) : ['ATM-1042', 'ATM-1043', 'ATM-1044'];
-const config = await client.send(new GetFunctionConfigurationCommand({ FunctionName: deployment.FunctionName }));
-const appCommit = execFileSync('git', ['rev-parse', '--short', 'HEAD']).toString().trim();
+if (wanted.some(order => !['ATM-1042', 'ATM-1043', 'ATM-1044'].includes(order))) throw new Error('Select only the three fictional ticket cases.');
+const git = args => execFileSync('git', args, { encoding: 'utf8' }).trim();
+const appCommit = git(['rev-parse', 'HEAD']);
+const sourceFiles = git(['ls-files', 'aws', 'lib/investigation', 'lib/domain.ts', 'lib/ticket-demo.ts', 'package.json', 'package-lock.json', 'scripts/build-aws.mjs']).split('\n').filter(Boolean);
+const sourceHash = createHash('sha256');
+for (const file of sourceFiles) sourceHash.update(file + '\0').update(readFileSync(file)).update('\0');
+const localSource = {
+  commit: appCommit, sourceTreeSha256: sourceHash.digest('hex'),
+  hashMethod: 'SHA-256 of sorted tracked path + NUL + working file bytes + NUL', files: sourceFiles,
+  applicationDiff: git(['diff', 'HEAD', '--', ...sourceFiles]),
+};
+// Whitelist metadata; GetFunctionConfiguration also returns environment secrets.
+async function artifacts() {
+  const read = async name => {
+    const config = await client.send(new GetFunctionConfigurationCommand({ FunctionName: name }));
+    return { name, lastModified: config.LastModified, codeSha256: config.CodeSha256, revisionId: config.RevisionId, version: config.Version };
+  };
+  const [api, investigator] = await Promise.all([read(deployment.FunctionName), read(deployment.InvestigatorFunctionName)]);
+  return { api, investigator };
+}
 
 let value = await api('/api/workspace', { action: 'createWorkspace', name: 'Evaluation run (synthetic)' });
 if (value.status !== 200) throw new Error(`createWorkspace failed: ${JSON.stringify(value)}`);
@@ -54,18 +73,25 @@ for (const order of wanted) {
   const item = seeded.cases.find(entry => entry.orderRef === order);
   if (!item) throw new Error(`Case ${order} not found`);
   const startedAt = new Date().toISOString();
+  const before = await artifacts();
   value = await api('/api/investigations', { action: 'start', caseId: item.id, mode: 'bedrock' });
   if (value.status !== 202) throw new Error(`start failed for ${order}: ${JSON.stringify(value)}`);
   const run = await waitRun(item.id);
   const state = (await api('/api/workspace')).body;
   const saved = state.cases.find(entry => entry.id === item.id);
+  const after = await artifacts();
+  const deploymentStable = JSON.stringify(before) === JSON.stringify(after);
   const out = {
     order,
     caseId: item.id,
     startedAt,
     finishedAt: new Date().toISOString(),
     repoCommit: appCommit,
-    backendLambda: { name: deployment.FunctionName, lastModified: config.LastModified, codeSha256: config.CodeSha256 },
+    backendLambda: before.api,
+    backendArtifacts: { before, after, deploymentStable },
+    localSource,
+    backendSourceCommitVerified: false,
+    sourceMappingNote: 'Local source fingerprint is not proof of deployed source. Both Lambda artifacts are recorded; establish source mapping from a verified deployment record before claiming a post-fix rerun.',
     inputProvenance: 'synthetic fixture (lib/ticket-demo.ts) seeded into a fresh throwaway workspace',
     run,
     draft: saved.draft,
@@ -74,4 +100,6 @@ for (const order of wanted) {
   const file = `docs/evaluation/runs/${order}-${run.id}.json`;
   writeFileSync(file, JSON.stringify(out, null, 2) + '\n');
   console.log(`${order}: run ${run.id} -> ${run.status}; method=${saved.draft?.method}; assessment=${saved.draft?.analysis?.assessment}; saved ${file}`);
+  if (!deploymentStable) throw new Error(`Deployment changed during ${run.id}; result saved for diagnosis, not a stable release evaluation.`);
+  if (run.status !== 'completed' || !saved.draft || saved.draft.method !== 'bedrock') throw new Error(`Investigation failed for ${order}; raw result saved.`);
 }

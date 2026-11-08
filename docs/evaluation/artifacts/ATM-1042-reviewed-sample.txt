@@ -1,0 +1,148 @@
+CAUSALITY · REVIEWED INVESTIGATION REPORT
+Ticket not received: ATM-1042
+Sample customer 1042 · ATM-1042
+Amount disputed: $92.00
+SYNTHETIC SAMPLE: NOT FOR SUBMISSION
+Prepared using: Sample investigation
+Approved revision: 2 · 2026-11-08T02:46:09.587Z
+
+MERCHANT REVIEW DRAFT
+
+Ticket not received: ATM-1042
+
+Order: ATM-1042 | Amount: $92.00
+
+Claim: product_not_received
+
+This sample investigation is assembled from the retrieved records using explicit rules. It was not analyzed by a language model.
+
+SOURCE TIMELINE
+
+2026-11-02T18:03:00Z | Payment captured
+A fictional USD 92.00 payment maps to order ATM-1042.
+Source: stripe / Synthetic: pi_demo_atm_1042 [ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:payment]
+
+2026-11-02T18:03:00Z | Order confirmed for two tickets
+Order ATM-1042 contains two general-admission tickets to After Hours: Fall Session.
+Source: database / Synthetic: order_demo_1042 [ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:order]
+
+2026-11-02T18:03:04Z | First ticket issued
+A ticket was created and linked to order ATM-1042. Issuance alone does not establish delivery.
+Source: database / Synthetic: ticket_demo_1042_a [ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:ticket-1]
+
+2026-11-02T18:03:04Z | Second ticket issued
+A second ticket was created for the same order.
+Source: database / Synthetic: ticket_demo_1042_b [ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:ticket-2]
+
+2026-11-02T18:03:12Z | Confirmation email accepted
+The email provider accepted the confirmation for processing. Inbox delivery and reading are not recorded.
+Source: database / Synthetic: email_demo_1042 [ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:email]
+
+2026-11-02T18:04:02Z | Ticket-link SMS marked delivered
+The SMS provider returned delivered for the order-linked message. Reading is not established.
+Source: database / Synthetic: sms_demo_1042 [ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:sms]
+
+2026-11-02T18:08:10Z | Customer asked for help finding tickets
+Fictional customer message: "My payment went through, but I cannot see the tickets for order ATM-1042."
+Source: manual / Synthetic: thread_demo_1042:message_1 [ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:support-1]
+
+2026-11-02T18:09:20Z | Organizer explained ticket recovery
+Fictional organizer message: "Please open the ticket recovery link for order ATM-1042 and sign in with the purchase address."
+Source: manual / Synthetic: thread_demo_1042:message_2 [ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:support-2]
+
+2026-11-02T18:10:41Z | Ticket recovery completed
+An order-linked recovery flow completed. This records account access, not physical event attendance.
+Source: database / Synthetic: recovery_demo_1042 [ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:recovery]
+
+2026-11-02T18:12:18Z | Customer acknowledged finding both tickets
+Fictional customer message: "Found both tickets in my account for ATM-1042. Thank you."
+Source: manual / Synthetic: thread_demo_1042:message_3 [ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:support-3]
+
+2026-11-06T20:15:00Z | Dispute requires a response
+I paid for two tickets but never received them.
+Source: stripe / Synthetic: dp_demo_atm-1042 [ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:dispute]
+
+Review each statement and its source before approval. This draft has not been submitted to the payment provider.
+
+SOURCE LIMITATIONS
+- Email acceptance does not prove inbox delivery. An SMS delivery status does not prove the message was read.
+- This is a fictional conversation for the demo. Acknowledged access does not establish attendance or determine a bank decision.
+- No attendance records are attached to this case. This does not establish that an event did not occur.
+- Missing scan records do not establish nonattendance. A scan alone does not establish cardholder identity.
+- No policy records are attached to this case. This does not establish that an event did not occur.
+- Current terms do not establish which disclosures were shown at purchase time.
+- A provider delivery status does not establish that a message was read by the cardholder.
+- Attendance evidence is unavailable.
+- Policy evidence is unavailable.
+
+Reviewer note: customer acknowledged account access; email acceptance does not establish inbox delivery or attendance.
+
+FINDINGS
+SUPPORTED: Payment captured
+A fictional USD 92.00 payment maps to order ATM-1042.
+Sources: ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:payment
+SUPPORTED: Dispute requires a response
+I paid for two tickets but never received them.
+Sources: ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:dispute
+SUPPORTED: Order confirmed for two tickets
+Order ATM-1042 contains two general-admission tickets to After Hours: Fall Session.
+Sources: ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:order
+SUPPORTED: First ticket issued
+A ticket was created and linked to order ATM-1042. Issuance alone does not establish delivery.
+Sources: ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:ticket-1
+SUPPORTED: Second ticket issued
+A second ticket was created for the same order.
+Sources: ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:ticket-2
+SUPPORTED: Confirmation email accepted
+The email provider accepted the confirmation for processing. Inbox delivery and reading are not recorded.
+Sources: ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:email
+SUPPORTED: Ticket-link SMS marked delivered
+The SMS provider returned delivered for the order-linked message. Reading is not established.
+Sources: ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:sms
+SUPPORTED: Ticket recovery completed
+An order-linked recovery flow completed. This records account access, not physical event attendance.
+Sources: ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:recovery
+SUPPORTED: Customer asked for help finding tickets
+Fictional customer message: "My payment went through, but I cannot see the tickets for order ATM-1042."
+Sources: ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:support-1
+SUPPORTED: Organizer explained ticket recovery
+Fictional organizer message: "Please open the ticket recovery link for order ATM-1042 and sign in with the purchase address."
+Sources: ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:support-2
+SUPPORTED: Customer acknowledged finding both tickets
+Fictional customer message: "Found both tickets in my account for ATM-1042. Thank you."
+Sources: ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:support-3
+
+SOURCE RECORDS
+[ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:payment] Payment captured · Stripe · 2026-11-02T18:03:00Z
+Reference: Synthetic: pi_demo_atm_1042
+A fictional USD 92.00 payment maps to order ATM-1042.
+[ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:dispute] Dispute requires a response · Stripe · 2026-11-06T20:15:00Z
+Reference: Synthetic: dp_demo_atm-1042
+I paid for two tickets but never received them.
+[ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:order] Order confirmed for two tickets · Company records · 2026-11-02T18:03:00Z
+Reference: Synthetic: order_demo_1042
+Order ATM-1042 contains two general-admission tickets to After Hours: Fall Session.
+[ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:ticket-1] First ticket issued · Company records · 2026-11-02T18:03:04Z
+Reference: Synthetic: ticket_demo_1042_a
+A ticket was created and linked to order ATM-1042. Issuance alone does not establish delivery.
+[ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:ticket-2] Second ticket issued · Company records · 2026-11-02T18:03:04Z
+Reference: Synthetic: ticket_demo_1042_b
+A second ticket was created for the same order.
+[ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:email] Confirmation email accepted · Company records · 2026-11-02T18:03:12Z
+Reference: Synthetic: email_demo_1042
+The email provider accepted the confirmation for processing. Inbox delivery and reading are not recorded.
+[ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:sms] Ticket-link SMS marked delivered · Company records · 2026-11-02T18:04:02Z
+Reference: Synthetic: sms_demo_1042
+The SMS provider returned delivered for the order-linked message. Reading is not established.
+[ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:recovery] Ticket recovery completed · Company records · 2026-11-02T18:10:41Z
+Reference: Synthetic: recovery_demo_1042
+An order-linked recovery flow completed. This records account access, not physical event attendance.
+[ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:support-1] Customer asked for help finding tickets · Manual evidence · 2026-11-02T18:08:10Z
+Reference: Synthetic: thread_demo_1042:message_1
+Fictional customer message: "My payment went through, but I cannot see the tickets for order ATM-1042."
+[ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:support-2] Organizer explained ticket recovery · Manual evidence · 2026-11-02T18:09:20Z
+Reference: Synthetic: thread_demo_1042:message_2
+Fictional organizer message: "Please open the ticket recovery link for order ATM-1042 and sign in with the purchase address."
+[ws_719c8594-509a-40e5-bb7f-f174dc9eecb0_case_atm_1042:support-3] Customer acknowledged finding both tickets · Manual evidence · 2026-11-02T18:12:18Z
+Reference: Synthetic: thread_demo_1042:message_3
+Fictional customer message: "Found both tickets in my account for ATM-1042. Thank you."

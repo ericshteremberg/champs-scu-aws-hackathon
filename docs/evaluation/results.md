@@ -4,6 +4,19 @@ Owner: teammate 3 (`codex/demo-evaluation`). Last edited: 2026-11-07.
 
 This file separates three things: what the fixtures say (written before looking at any model output), what each run produced, and what a reviewer decided. Every input is a fictional fixture from [`lib/ticket-demo.ts`](../../lib/ticket-demo.ts). None of it is ATMSPHR customer evidence, and nothing here measures savings, accuracy across real cases, or dispute outcomes.
 
+## Branch follow-through (2026-11-07 Pacific)
+
+Evaluation is proceeding independently of application fixes. The user asked this branch to complete work within its scope and later deferred the submission package (AWS track selected).
+
+- A fresh local application build and all **13 existing browser tests passed** (23.2 seconds). The first test attempt was interrupted after rebuilding beneath a running preview invalidated its asset map; the complete passing run used a restarted preview after the build finished.
+- A fresh, silent [sample rehearsal](artifacts/README.md) now covers all three ticket cases, original-source inspection, a saved reviewer edit, exact-revision approval and sample TXT export. Five current screenshots and a video are captured with zero page errors. This uses local D1/R2 compatibility storage and deterministic samples, not the deployed AWS path.
+- [The offline audit](audit-summary.json) reproduces source membership: **53 citation occurrences, 50 unique citation IDs summed across runs, zero unresolved IDs**. All six runs have completed Bedrock drafts with case-scoped synthetic evidence. Three of six labels match the proposed rubric; this is not an accuracy score.
+- [The generated review packet](review-packet.md) places every finding beside its cited text and includes complete drafts, summaries, recommendations, gaps and source fields. [Reference responses](reference-responses.md) provide corrected editorial examples. Neither artifact is human sign-off or a new model result.
+- `run-evaluation.mjs` now records both API and investigator Lambda artifacts before and after a run, plus full local commit, source fingerprint and application diff. It rejects a deployment change after saving the diagnostic result. Historical investigator identity remains unknown; a current configuration read cannot recover it.
+- No application code changed, no deployment occurred and no new paid Bedrock run was made. Repeating the unchanged deployment would not demonstrate a fix. The nine application observations below remain available as reproducible follow-up, with no implication that evaluation is waiting for permission to continue.
+
+Human sign-off and real preparation-time measurements remain unrecorded. They are limits on claims, not blockers for local testing, review preparation or rehearsal. Submission files are left unchanged at the user's request.
+
 ## Status summary
 
 | Case | Live Bedrock runs | Claim-level review (AI-assisted, against fixtures) | Human sign-off | Outcome |
@@ -12,7 +25,7 @@ This file separates three things: what the fixtures say (written before looking 
 | ATM-1043 | 2 (both completed) | Done | **Pending** | **Needs correction**: counterevidence kept, but an unsupported "did not attend" claim appears in both runs |
 | ATM-1044 | 2 (both completed) | Done | **Pending** | **Acceptable on evidence claims**; advisory text and one label overreach |
 
-Headline: across six live runs, no run claimed receipt or failed delivery for ATM-1044 from missing history, and no run omitted ATM-1043's counterevidence. All 53 citations resolve to real records in their case. The failures are in what the cited sentences claim, which is the gap the handoff warns about: a valid citation shows membership, not support.
+Headline: across six live runs, no run claimed receipt or failed delivery for ATM-1044 from missing history, and no run omitted ATM-1043's counterevidence. All 53 citation occurrences resolve to real records in their case (50 unique IDs summed per run). The failures are in what the cited sentences claim, which is the gap the handoff warns about: a valid citation shows membership, not support.
 
 These are two runs per case on a model that is not deterministic. Two runs show which problems repeat; they do not estimate a rate. Nothing here supports a claim about accuracy on real cases.
 
@@ -190,21 +203,21 @@ For each material finding in a run, open the original source and judge whether i
 
 Source IDs are shortened to the trailing part of the evidence ID. Every one resolves in the saved evidence list for its run (0 broken citations in 53).
 
-## Issues to route
+## Application follow-up outside this branch
 
-Reasoning failures go to Aiden; interaction problems go to Eric. Include case, expected behavior, observed behavior and source IDs. Rerun affected cases after a fix. "Sent to" says drafted until a person actually sends it; I cannot message teammates from this session.
+The table preserves the reproducible application observations and suggested owners. It is a repository handoff, not a dependency on sending teammate messages. No teammate notification is claimed. Rerun affected cases only after the target application fix and its deployed build are identified. Corrected editorial examples are available now in [reference-responses.md](reference-responses.md); application outputs remain unchanged.
 
-| # | Case | Type | Sent to | Expected | Observed | Source IDs | Repeats? | Rerun result |
+| # | Case | Type | Suggested owner | Expected | Observed | Source IDs | Repeats? | Post-fix live rerun |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | ATM-1042 | Reasoning | Aiden (drafted, not sent) | Email acceptance is not receipt. Say SMS was marked delivered and the customer found tickets in their account after recovery | Summary says tickets "delivered" in both runs. Run 2's body says the customer "received the tickets electronically" and recommends submitting "delivery confirmations" | `email_demo_1042`, `sms_demo_1042`, `thread_demo_1042:message_3`, `recovery_demo_1042` | 2 of 2 summaries; 1 of 2 bodies | Pending |
-| 2 | ATM-1043 | Reasoning | Aiden (drafted, not sent) | Describe the claim as written: the ticket email never arrived and the customer contacted support before the event | Both runs state the customer "therefore did not attend the event", citing the dispute record, which says no such thing. The recommendation then turns on attendance | `dp_demo_atm-1043` | 2 of 2 | Pending |
-| 3 | ATM-1043 | Reasoning | Aiden (drafted, not sent) | A citation should support its sentence. "Also failed" should cite the bounced retry | Run 1 cites the resend *request* record for a failure | `resend_demo_1043`, `email_demo_1043_retry` | 1 of 2 | Pending |
-| 4 | ATM-1043 | Reasoning | Aiden (drafted, not sent) | Label `mixed` per the definitions above (the UI banner for `insufficient`, "More evidence is needed", is wrong when the records back the customer). Preserve that the evidence supports the complaint, and carry the "not every route" limit into the narrative | Label is "insufficient" in both runs and run 2 says "not delivered" flatly, although the limitations section says other routes are unverified | `email_demo_1043`, `sms_demo_1043`, `email_demo_1043_retry` | 2 of 2 labels | Pending |
-| 5 | ATM-1044 | Reasoning | Aiden (drafted, not sent) | Label `insufficient` per the definitions above, matching a body that says delivery cannot be confirmed | Run 1 label is "supported" over a body that says delivery cannot be confirmed. Run 2 is "insufficient". The label is unstable | draft analysis, no single source | 1 of 2 | Pending |
-| 6 | ATM-1042, ATM-1044 | Reasoning | Aiden (drafted, not sent) | Do not advise on refunds, closing, contesting or likely outcomes | "consider offering a refund" (1044 run 1); "may lean toward the customer" (1044 run 2); "closing the dispute as unresolved... or as supported" (1042 run 1); "contest the dispute" (1042 run 2); "escalated to a higher authority" (1043 run 2) | none | 5 of 6 runs have such a line | Pending |
-| 7 | ATM-1044 | Reasoning | Aiden (drafted, not sent) | State local time zone from the fixture, or avoid dates | "November 4, 2026" is the UTC date; the event is November 3 local | `order_demo_1044` | 1 of 2 | Pending |
-| 8 | ATM-1044 | Interaction | Eric (drafted, not sent) | Limitations read cleanly and are not repeated | Run 1 lists 17 limitation lines, many restating each other, with the stock phrase "does not establish that an event did not occur" attached to records that are not about an event | `gaps` list in the draft | Seen in 1044 run 1 | Pending |
-| 9 | All | Reasoning | Aiden (drafted, not sent) | The `content` field is the "Merchant response draft": something the organizer could send after editing. Where records support the organizer (ATM-1042), it should state the sourced facts as a response; where they support the customer (ATM-1043), say so plainly; where silent (ATM-1044), name what is missing | Drafts read as third-person case recaps ("This case involves a customer who claims...", "We have a payment captured..."), not as a response to the issuer. Only ATM-1042 run 2 argues a position, and it overreaches (issue 1) | all six saved drafts | 6 of 6 recaps | Pending |
+| 1 | ATM-1042 | Reasoning | Backend (Aiden) | Email acceptance is not receipt. Say SMS was marked delivered and the customer found tickets in their account after recovery | Summary says tickets "delivered" in both runs. Run 2's body says the customer "received the tickets electronically" and recommends submitting "delivery confirmations" | `email_demo_1042`, `sms_demo_1042`, `thread_demo_1042:message_3`, `recovery_demo_1042` | 2 of 2 summaries; 1 of 2 bodies | Pending |
+| 2 | ATM-1043 | Reasoning | Backend (Aiden) | Describe the claim as written: the ticket email never arrived and the customer contacted support before the event | Both runs state the customer "therefore did not attend the event", citing the dispute record, which says no such thing. The recommendation then turns on attendance | `dp_demo_atm-1043` | 2 of 2 | Pending |
+| 3 | ATM-1043 | Reasoning | Backend (Aiden) | A citation should support its sentence. "Also failed" should cite the bounced retry | Run 1 cites the resend *request* record for a failure | `resend_demo_1043`, `email_demo_1043_retry` | 1 of 2 | Pending |
+| 4 | ATM-1043 | Reasoning | Backend (Aiden) | Label `mixed` per the definitions above (the UI banner for `insufficient`, "More evidence is needed", is wrong when the records back the customer). Preserve that the evidence supports the complaint, and carry the "not every route" limit into the narrative | Label is "insufficient" in both runs and run 2 says "not delivered" flatly, although the limitations section says other routes are unverified | `email_demo_1043`, `sms_demo_1043`, `email_demo_1043_retry` | 2 of 2 labels | Pending |
+| 5 | ATM-1044 | Reasoning | Backend (Aiden) | Label `insufficient` per the definitions above, matching a body that says delivery cannot be confirmed | Run 1 label is "supported" over a body that says delivery cannot be confirmed. Run 2 is "insufficient". The label is unstable | draft analysis, no single source | 1 of 2 | Pending |
+| 6 | ATM-1042, ATM-1044 | Reasoning | Backend (Aiden) | Do not advise on refunds, closing, contesting or likely outcomes | "consider offering a refund" (1044 run 1); "may lean toward the customer" (1044 run 2); "closing the dispute as unresolved... or as supported" (1042 run 1); "contest the dispute" (1042 run 2); "escalated to a higher authority" (1043 run 2) | none | 5 of 6 runs have such a line | Pending |
+| 7 | ATM-1044 | Reasoning | Backend (Aiden) | State local time zone from the fixture, or avoid dates | "November 4, 2026" is the UTC date; the event is November 3 local | `order_demo_1044` | 1 of 2 | Pending |
+| 8 | ATM-1044 | Interaction | Interface (Eric) | Limitations read cleanly and are not repeated | Run 1 lists 17 limitation lines, many restating each other, with the stock phrase "does not establish that an event did not occur" attached to records that are not about an event | `gaps` list in the draft | Seen in 1044 run 1 | Pending |
+| 9 | All | Reasoning | Backend (Aiden) | The `content` field is the "Merchant response draft": something the organizer could send after editing. Where records support the organizer (ATM-1042), it should state the sourced facts as a response; where they support the customer (ATM-1043), say so plainly; where silent (ATM-1044), name what is missing | Drafts read as third-person case recaps ("This case involves a customer who claims...", "We have a payment captured..."), not as a response to the issuer. Only ATM-1042 run 2 argues a position, and it overreaches (issue 1) | all six saved drafts | 6 of 6 recaps | Pending |
 
 ## Disclosed limitations
 
@@ -216,4 +229,4 @@ Reasoning failures go to Aiden; interaction problems go to Eric. Include case, e
 - Runs used a fresh throwaway workspace through the backend Lambda's direct API, not the browser. Nothing was approved, exported or archived, and the browser flow was not exercised by these runs.
 - Production ATMSPHR evidence and Stripe submission are not connected.
 - Citation validity is not claim validity. Only the source-level review log counts as a check of support.
-- Not yet done: sending the issues to Aiden and Eric, rerunning after fixes, and the recorded rehearsal.
+- Application fixes and post-fix live runs remain outside this documentation change. A local deterministic rehearsal is complete and linked above; teammate messages and shared deployments were not performed.

@@ -1,0 +1,61 @@
+{
+  "startedAt": "2026-11-08T02:45:57.104Z",
+  "finishedAt": "2026-11-08T02:46:34.446Z",
+  "applicationUrl": "http://127.0.0.1:8788",
+  "applicationCommit": "e03de6119d27b63f6e2f0e483d4e1d010cbdc6fc",
+  "sourceTreeSha256": "f343b4b6c54666997152072c3356489c877f1c58f24d8c93c28ede91cb630f8b",
+  "sourceTreeHashMethod": "SHA-256 of sorted git ls-files path + NUL + file bytes + NUL for the application paths listed in capture-rehearsal.mjs",
+  "applicationDiff": "",
+  "mode": "deterministic sample",
+  "inputs": "Fictional bundled ticket fixtures; isolated local workspace",
+  "runtime": {
+    "storage": "local D1/R2 compatibility",
+    "inference": "deterministic sample"
+  },
+  "runs": [
+    {
+      "order": "ATM-1042",
+      "runId": "run_39aaff31-3c3c-487a-b6f6-a9b5e9f51a7e",
+      "mode": "sample",
+      "assessment": "supported"
+    },
+    {
+      "order": "ATM-1043",
+      "runId": "run_defb1423-e3e7-4dfc-b5f9-e5873dec724e",
+      "mode": "sample",
+      "assessment": "mixed"
+    },
+    {
+      "order": "ATM-1044",
+      "runId": "run_2a524024-a811-4a6a-a69e-ee0b6e75780c",
+      "mode": "sample",
+      "assessment": "insufficient"
+    }
+  ],
+  "steps": [
+    {
+      "elapsedMs": 7071,
+      "description": "ATM-1042: deterministic sample report; synthetic inputs"
+    },
+    {
+      "elapsedMs": 8694,
+      "description": "Inspect the original fictional customer acknowledgement"
+    },
+    {
+      "elapsedMs": 17157,
+      "description": "Save the reviewer edit and approve its exact revision; sample remains non-submittable"
+    },
+    {
+      "elapsedMs": 25873,
+      "description": "ATM-1043: deterministic sample report; synthetic inputs"
+    },
+    {
+      "elapsedMs": 34553,
+      "description": "ATM-1044: deterministic sample report; synthetic inputs"
+    }
+  ],
+  "pageErrors": [],
+  "video": "causality-local-sample.webm",
+  "narration": "none; silent workflow capture",
+  "limitation": "Local Sites compatibility storage. No live Bedrock, AWS bridge, S3 archive or production connector is exercised."
+}

@@ -1,0 +1,29 @@
+Local browser acceptance, November 7, 2026 Pacific
+Application: e03de6119d27b63f6e2f0e483d4e1d010cbdc6fc, fresh local build
+Command: npm run test:e2e
+Runtime: Node v25.4.0, system Chrome, local compatibility preview
+
+
+> causality@0.1.0 test:e2e
+> playwright test --config playwright.config.ts
+
+
+Running 13 tests using 1 worker
+
+(node:25991) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 tests/investigation-ui.spec.ts:75:1 › a sample investigation preserves source inspection and revision-bound review/export (3.4s)
+  ✓   2 tests/investigation-ui.spec.ts:147:1 › failed delivery and incomplete evidence produce distinct findings (3.2s)
+  ✓   3 tests/investigation-ui.spec.ts:172:1 › cancellation uses the server action and does not present a completed draft (1.8s)
+  ✓   4 tests/investigation-ui.spec.ts:253:1 › AWS failure and stale source results stay visible without false success (525ms)
+  ✓   5 tests/investigation-ui.spec.ts:315:1 › mobile keeps the Causality workspace and sources within the viewport (373ms)
+  ✓   6 tests/investigation-ui.spec.ts:341:1 › an asynchronous AWS response reloads the draft even when the first poll is already complete (1.7s)
+  ✓   7 tests/investigation-ui.spec.ts:435:3 › AWS attachment upload controls › uploads to S3 with signed fields and confirms the attachment before displaying it (513ms)
+  ✓   8 tests/investigation-ui.spec.ts:535:3 › AWS attachment upload controls › rejects files over 10 MB before preparing or uploading them (1.0s)
+  ✓   9 tests/investigation-ui.spec.ts:559:3 › AWS attachment upload controls › does not finalize a failed S3 upload (528ms)
+  ✓  10 tests/investigation-ui.spec.ts:604:3 › AWS attachment upload controls › retains the legacy multipart upload when the runtime endpoint is absent (495ms)
+  ✓  11 tests/investigation-ui.spec.ts:636:1 › upstream search filters, case recovery, and setup routes remain available (881ms)
+  ✓  12 tests/investigation-ui.spec.ts:690:1 › unsaved navigation protection and report preview preserve reviewed export gates (2.8s)
+  ✓  13 tests/investigation-ui.spec.ts:721:1 › all upstream synthetic design screens render without reading or writing workspace APIs (5.0s)
+
+  13 passed (23.2s)
