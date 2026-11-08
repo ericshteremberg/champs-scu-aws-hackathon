@@ -5,8 +5,12 @@ export const metadata: Metadata = {
   title: { default: "Causality — The whole story", template: "%s · Causality" },
   description: "Investigate disputes, connect the evidence, and prepare a considered response. Your records. Your control.",
   icons: {
-    icon: "/favicon.svg",
-    shortcut: "/favicon.svg",
+    icon: [
+      { url: "/favicon.svg?v=2", type: "image/svg+xml" },
+      { url: "/favicon-32.png?v=2", type: "image/png", sizes: "32x32" },
+    ],
+    shortcut: "/favicon.ico?v=2",
+    apple: "/apple-touch-icon.png?v=2",
   },
 };
 
