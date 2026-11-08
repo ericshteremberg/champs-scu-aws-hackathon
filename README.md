@@ -47,6 +47,8 @@ This is a shared team development workspace. The Worker strips caller-supplied p
 
 ## Setup and deployment
 
+For the local desktop preview, run `npm run dev`. It applies pending local database migrations before starting the server, so a fresh checkout can open `/workspace` without a separate build or manual schema setup. This uses local D1/R2 emulation; it does not connect to or migrate the deployed AWS database. Sign-in uses the local development identity. Case and screen query parameters survive the sign-in redirect.
+
 Use Node 22.13 or newer. Install dependencies and run checks:
 
 ```sh
