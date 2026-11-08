@@ -1,0 +1,10 @@
+{
+  "provider": "gmail",
+  "registrationStatus": "not_registered",
+  "secretName": "causality/dev/oauth/gmail",
+  "secretArn": "",
+  "region": "us-east-1",
+  "accountId": "156129572861",
+  "redirectUri": "https://causality-hackathon-dev.slidah60.workers.dev/api/providers/gmail/callback",
+  "scopes": ["https://www.googleapis.com/auth/gmail.readonly"]
+}

@@ -21,7 +21,7 @@ export async function proxyAwsApi(request: Request, env: AwsBridgeEnvironment): 
  }
  let body:unknown;
  if(text){try{body=JSON.parse(text);}catch{return reply({error:'Send a valid JSON request.'},400);}}
- const oauthRoute=/^\/api\/providers\/(supabase|stripe)\/(start|callback)$/.exec(url.pathname);
+ const oauthRoute=/^\/api\/providers\/(supabase|stripe|gmail)\/(start|callback)$/.exec(url.pathname);
  const oauthStart=oauthRoute?.[2]==='start' && request.method==='POST';
  const oauthCallback=oauthRoute?.[2]==='callback' && request.method==='GET';
  const cookieName=`__Host-causality-${oauthRoute?.[1] || 'unused'}`;

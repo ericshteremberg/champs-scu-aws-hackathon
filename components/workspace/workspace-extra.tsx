@@ -597,7 +597,7 @@ export function ConnectionDetail({
             {isStripe
               ? "Importing disputes and approving a draft never submit evidence. Submission remains a separate, confirmed action."
               : isEmail
-                ? "This build has no Gmail OAuth or background mailbox reader. Only the selected records you add enter your workspace."
+                ? "Use the Gmail connector on the Connections page to authorize read-only access, search by case customer email, and review messages before importing. Manual import remains available."
                 : "This workspace imports approved cases through a configured merchant-owned evidence API. The merchant endpoint verifies the case and limits linked records and fields. No database credentials are shared."}
           </p>
           {!isStripe && !isEmail && (

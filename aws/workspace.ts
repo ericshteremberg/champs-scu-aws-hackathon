@@ -1,3 +1,4 @@
+import type { GmailConnection } from '../lib/providers/types.ts';
 import { randomUUID } from 'node:crypto';
 import type { AccessRequest, Finding, InvestigationRun, Policy, WorkspaceState } from '../lib/domain.ts';
 import { DEMO_CASES } from '../lib/demo.ts';
@@ -76,7 +77,7 @@ export async function getWorkspaceState(user: TrustedUser): Promise<WorkspaceSta
   if (!storedWorkspace) return base;
   if (storedWorkspace.data.ownerId !== user.userId) throw new ApiError(403, 'This workspace belongs to a different owner.');
   base.workspace = storedWorkspace.data;
-  const [caseRows, evidenceRows, draftRows, policyRows, accessRows, auditRows, stripe] = await Promise.all([
+  const [caseRows, evidenceRows, draftRows, policyRows, accessRows, auditRows, stripe, gmail] = await Promise.all([
     queryItems<CaseDoc>(workspaceId, 'case#', { maxItems: 500 }),
     queryItems<EvidenceDoc>(workspaceId, 'evidence#', { maxItems: 5000 }),
     queryItems<DraftDoc>(workspaceId, 'draft#', { maxItems: 500 }),
@@ -84,6 +85,7 @@ export async function getWorkspaceState(user: TrustedUser): Promise<WorkspaceSta
     queryItems<Omit<AccessRequest, 'canReview'>>(workspaceId, 'access#', { maxItems: 5000 }),
     queryItems<AuditDoc>(workspaceId, 'audit#', { maxItems: 5000 }),
     listStripeIntegration(workspaceId),
+    getItem<GmailConnection>(workspaceId, 'provider#gmail'),
   ]);
   base.cases = await Promise.all(caseRows.map(async ({ data: item }) => {
     const evidence = evidenceRows.filter(record => record.data.caseId === item.id).map(record => evidenceForClient(record.data));
@@ -96,7 +98,7 @@ export async function getWorkspaceState(user: TrustedUser): Promise<WorkspaceSta
   const bedrockConfigured = Boolean(process.env.BEDROCK_MODEL_ID && (process.env.AWS_REGION || 'us-east-1') === 'us-east-1');
   base.integrations = [stripe,
     { id: 'bedrock', provider: 'bedrock', name: 'Amazon Bedrock', status: bedrockConfigured ? 'connected' : 'configuration_required', accountName: process.env.BEDROCK_MODEL_ID, description: bedrockConfigured ? 'Configured for sourced AI investigations using the AWS execution role. Model access is checked when an investigation runs.' : 'Configure a tool-capable Bedrock model in us-east-1. Sample investigations remain available for sample cases.' },
-    { id: 'gmail', provider: 'gmail', name: 'Gmail', status: 'configuration_required', description: 'Import selected customer emails as evidence. Automatic mailbox access requires a configured OAuth integration.' },
+    { id: 'gmail', provider: 'gmail', name: 'Gmail', status: gmail?.data.status === 'authorized' ? 'connected' : process.env.GMAIL_OAUTH_SECRET_ARN ? 'not_connected' : 'configuration_required', accountName: gmail?.data.email, description: 'Authorize read-only Gmail access in Connections, search by case customer email, and review selected plain-text messages before importing.' },
     { id: 'database', provider: 'database', name: 'Company records', status: merchantConfigured(workspaceId) ? 'connected' : 'configuration_required', description: merchantConfigured(workspaceId) ? 'A merchant-owned evidence API is configured for this workspace. Only records linked to an approved case are retrieved.' : 'Connect a merchant-owned evidence API with a workspace binding. No database credentials are required.' },
   ];
   base.policies = policyRows.map(record => record.data).sort((a, b) => b.createdAt.localeCompare(a.createdAt));

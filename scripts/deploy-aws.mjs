@@ -15,6 +15,9 @@ const providerRegistration=JSON.parse(readFileSync('integrations/oauth/supabase-
 params.Parameters.push({ParameterKey:'SupabaseOAuthSecretArn',ParameterValue:process.env.SUPABASE_OAUTH_SECRET_ARN || providerRegistration.secretArn});
 const stripeRegistration=JSON.parse(readFileSync('integrations/oauth/stripe-secret-location.json','utf8'));
 params.Parameters.push({ParameterKey:'StripeOAuthSecretArn',ParameterValue:process.env.STRIPE_OAUTH_SECRET_ARN || stripeRegistration.arn});
+const gmailRegistration=JSON.parse(readFileSync('integrations/oauth/gmail-registration.json','utf8'));
+const gmailSecretArn=process.env.GMAIL_OAUTH_SECRET_ARN || gmailRegistration.secretArn;
+params.Parameters.push({ParameterKey:'GmailOAuthSecretArn',...(gmailSecretArn ? {ParameterValue:gmailSecretArn} : existing?.Parameters?.some(p=>p.ParameterKey==='GmailOAuthSecretArn') ? {UsePreviousValue:true} : {ParameterValue:''})});
 let changed=true;
 try{await cloudformation.send(existing?new UpdateStackCommand(params):new CreateStackCommand(params));}catch(error){if(error.name==='ValidationError' && error.message.includes('No updates'))changed=false;else throw error;}
 let stack,lastStatus='';

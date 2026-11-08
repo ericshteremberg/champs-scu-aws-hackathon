@@ -3662,7 +3662,7 @@ function Integrations({
         </span>
       </div>
       {!isDesignPreview && <>
-        <ProviderConnectors />
+        <ProviderConnectors cases={state.cases} onImported={onConnectorImported} />
         <LiveEvidenceConnectors onImported={onConnectorImported} />
         <EvidenceConnectors onImported={onConnectorImported} />
       </>}
@@ -3851,12 +3851,12 @@ function Integrations({
             </li>
             <li>
               <LockKeyhole size={19} />
-              <span>No automatic mailbox access in this build</span>
+              <span>Use the Gmail connection above to review matching emails</span>
             </li>
           </ul>
           <p>
-            Direct Gmail authorization is a planned connection. Selected
-            messages can be added now using Add evidence inside a case.
+            Connect Gmail above to search and review selected messages. You can also
+            use Add evidence inside a case for email exports and screenshots.
           </p>
           <Button
             onClick={() =>

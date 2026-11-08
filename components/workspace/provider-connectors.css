@@ -16,3 +16,13 @@
 .cw-provider-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px 0; }
 .cw-provider-columns label { display: flex; align-items: start; gap: 8px; font-size: 13px; overflow-wrap: anywhere; }
 @media (max-width: 800px) { .cw-provider-grid { grid-template-columns: 1fr; } .cw-provider-panel, .cw-provider-card { padding: 16px; } .cw-provider-columns { grid-template-columns: 1fr; } }
+
+.cw-gmail-card { grid-column: 1 / -1; grid-row: 2; }
+.cw-gmail-card .cw-field { margin-top: 16px; }
+.cw-gmail-card select { max-width: 100%; }
+.cw-gmail-results { list-style: none; padding: 0; }
+.cw-gmail-results li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--cw-border, #dededb); }
+.cw-gmail-results li > div { min-width: 0; flex: 1 1 240px; }
+.cw-gmail-card p, .cw-gmail-preview h4 { overflow-wrap: anywhere; }
+.cw-gmail-preview { margin-top: 20px; padding: 16px; border: 1px solid var(--cw-border, #dededb); border-radius: 8px; }
+.cw-gmail-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow-y: auto; font: inherit; line-height: 1.6; }

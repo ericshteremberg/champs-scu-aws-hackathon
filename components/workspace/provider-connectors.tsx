@@ -4,9 +4,15 @@ import { useEffect, useState } from 'react';
 import { Database, Link2, LoaderCircle, ShieldCheck, Unplug } from 'lucide-react';
 import type { ProviderStatus, SchemaTable, SupabaseConnection, SupabaseProject } from '../../lib/providers/types';
 import './provider-connectors.css';
+import { GmailConnector } from './gmail-provider';
+import type { WorkspaceState } from '../../lib/domain';
 import { StripeAccountConnector } from './stripe-provider';
 
 const outcomes: Record<string, string> = {
+  gmail_authorized: 'Gmail authorized. Choose a case and review messages before importing.',
+  gmail_denied: 'Gmail authorization was canceled.',
+  gmail_invalid_state: 'Gmail authorization expired or belongs to another browser. Start again here.',
+  gmail_failed: 'Gmail authorization could not be completed. Check the Google app setup and test-user access, then try again.',
   authorized: 'Supabase authorized. Choose the project you want to connect.',
   denied: 'Authorization was canceled. You can connect when you are ready.',
   invalid_state: 'This authorization attempt expired or belongs to another browser. Start again here.',
@@ -24,7 +30,7 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
   return value as T;
 }
 
-export function ProviderConnectors() {
+export function ProviderConnectors({ cases, onImported }: { cases: WorkspaceState['cases']; onImported: (state: WorkspaceState, caseId: string) => void }) {
   const [status, setStatus] = useState<ProviderStatus | null>(null);
   const [busy, setBusy] = useState('loading');
   const [error, setError] = useState('');
@@ -114,6 +120,7 @@ export function ProviderConnectors() {
           {confirmDisconnect ? <div className="cw-provider-disconnect"><p>Stop Supabase access and clear the selected project and scope?</p><div className="cw-actions"><button className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(false)}>Keep connection</button><button className="cw-button danger" disabled={!!busy} onClick={() => void disconnect()}>Confirm disconnect Supabase</button></div></div> : <button className="cw-button" disabled={!!busy} onClick={() => setConfirmDisconnect(true)}><Unplug size={16} />Disconnect Supabase</button>}
         </>}
       </article>
+      <GmailConnector status={status?.gmail} cases={cases} onImported={onImported} onChange={connection => setStatus(current => current ? { ...current, gmail: { configured: current.gmail?.configured || false, connection } } : current)} />
       <StripeAccountConnector status={status?.stripe} onChange={connection => setStatus(current => current ? { ...current, stripe: { ...current.stripe, connection } } : current)} />
     </div>
   </section>;
