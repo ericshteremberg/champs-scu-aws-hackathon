@@ -6,6 +6,8 @@ The deployment has no Cloudflare database or R2 binding. The temporary developme
 
 ## Current state
 
+- Latest full deployment, November 8, 2026: source `cd60a59`, Worker `87fe64e0-5688-4718-b2f1-742653f3cfee`, and AWS API/investigator/webhook bundles. Bedrock now uses a more persuasive first-person merchant voice, decisive rebuttal first, explicit fact-to-claim connections and a supported reversal request. Builds and deployment commands completed; tests were skipped at the user’s request. Existing drafts require a new investigation. Demo submission buttons remain inert. Earlier entries below are deployment history.
+
 - Latest frontend: source `7307978`, Worker `13f51efd-81ce-436c-9491-5166d7949846`, with inert Send to Stripe demo buttons on Report and Review package. Backend remains on the rebuttal prompt deployment (`649bc5a`); real submissions remain disabled.
 - Development demo cleanup, November 8, 2026: removed four explicitly seeded sample cases and 319 related evidence/draft/run/event records from DynamoDB. The live workspace now contains only Mason Mueller and Thomas Larson. Their records and active investigations were not modified. A recovery copy of the removed sample records is in ignored local storage. Fixture source and explicit sample-loading tools remain available for regression work; samples are not automatically reloaded.
 

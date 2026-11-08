@@ -85,3 +85,5 @@ Demo button deployed November 8, 2026 from source `7307978` to Worker `13f51efd-
 ## Persuasive merchant voice
 
 The Bedrock draft and correction instructions now prioritize a firm first-person merchant rebuttal, strongest contradiction first, precise dates/amounts/order links, short relevant quotations, and an explicit explanation after each fact table. Independent corroboration supports the argument; duplicate exports do not count as independent sources. The closing synthesizes the strongest supported grounds for reversal. Generic caveats are consolidated, while material uncertainty and counterevidence remain. No unsupported accusations, inferred agreement from silence, or stronger factual claims are introduced. This changes newly generated responses only. Testing remains with the team as requested.
+
+Deployed November 8, 2026 from source `cd60a59` to the AWS functions and Worker `87fe64e0-5688-4718-b2f1-742653f3cfee`. No existing customer report was regenerated during deployment.
