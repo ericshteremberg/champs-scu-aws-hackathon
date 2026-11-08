@@ -19,6 +19,9 @@ for (const [ParameterKey, envName] of [['ResendSecretArn','RESEND_SECRET_ARN'],[
  const prior = existing?.Parameters?.some(p => p.ParameterKey === ParameterKey);
  params.Parameters.push({ParameterKey,...(process.env[envName] ? {ParameterValue:process.env[envName]} : prior ? {UsePreviousValue:true} : {ParameterValue:''})});
 }
+const gmailRegistration=JSON.parse(readFileSync('integrations/oauth/gmail-registration.json','utf8'));
+const gmailSecretArn=process.env.GMAIL_OAUTH_SECRET_ARN || gmailRegistration.secretArn;
+params.Parameters.push({ParameterKey:'GmailOAuthSecretArn',...(gmailSecretArn ? {ParameterValue:gmailSecretArn} : existing?.Parameters?.some(p=>p.ParameterKey==='GmailOAuthSecretArn') ? {UsePreviousValue:true} : {ParameterValue:''})});
 let changed=true;
 try{await cloudformation.send(existing?new UpdateStackCommand(params):new CreateStackCommand(params));}catch(error){if(error.name==='ValidationError' && error.message.includes('No updates'))changed=false;else throw error;}
 let stack,lastStatus='';

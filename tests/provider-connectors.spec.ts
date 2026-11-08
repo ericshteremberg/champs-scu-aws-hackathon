@@ -1,13 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { ProviderStatus, SupabaseConnection } from '../lib/providers/types';
 
-async function setup(page: Page, connection: SupabaseConnection | null = null, stripe: ProviderStatus['stripe'] = { configured: false, reason: 'Pending' }) {
+async function setup(page: Page, connection: SupabaseConnection | null = null, stripe: ProviderStatus['stripe'] = { configured: false, reason: 'Pending' }, gmail: ProviderStatus['gmail'] = { configured: false, connection: null }) {
   const identity = `provider-ui-${crypto.randomUUID()}`;
   const headers = { 'oai-authenticated-user-id': identity, 'oai-authenticated-user-email': `${identity}@example.test`, 'oai-authenticated-user-full-name': 'Provider Reviewer' };
   await page.context().setExtraHTTPHeaders(headers);
   const base = process.env.CAUSALITY_UI_TEST_BASEURL || 'http://127.0.0.1:8788';
   expect((await page.request.post(`${base}/api/workspace`, { headers: { ...headers, Origin: base }, data: { action: 'createWorkspace', name: 'Provider UI test' } })).status()).toBe(200);
-  const status: ProviderStatus = { supabase: { configured: true, connection }, stripe };
+  const status: ProviderStatus = { supabase: { configured: true, connection }, stripe, gmail };
   const requests: Record<string, unknown>[] = [];
   await page.route('**/api/providers', route => route.fulfill({ json: status }));
   await page.route('**/api/providers/stripe', async route => {
@@ -26,7 +26,7 @@ async function setup(page: Page, connection: SupabaseConnection | null = null, s
     return route.fulfill({ json: { connection: status.supabase.connection } });
   });
   await page.goto('/workspace?view=integrations');
-  return { panel: page.getByRole('region', { name: 'Business account connections' }), requests };
+  return { identity, headers, status, base, panel: page.getByRole('region', { name: 'Business account connections' }), requests };
 }
 
 test('customer starts authorization with a button and no key-entry fields', async ({ page }) => {
@@ -91,4 +91,52 @@ test('Stripe read verification and disconnect use the saved customer connection'
   await expect(panel.getByRole('button', { name: 'Connect Stripe', exact: true })).toBeEnabled();
   await expect(panel.getByRole('status')).toContainText('Uninstall Causality in Stripe');
   expect(requests.at(-1)).toEqual({ provider: 'stripe', action: 'disconnect' });
+});
+
+
+test('Gmail authorization opens Google without asking customers for credentials', async ({ page }) => {
+  const { panel } = await setup(page, null, undefined, { configured: true, connection: null });
+  await page.route('**/api/providers/gmail/start', route => route.fulfill({ json: { authorizationUrl: 'https://accounts.google.com/o/oauth2/v2/auth?scope=https://www.googleapis.com/auth/gmail.readonly&state=fictional' } }));
+  await page.route('https://accounts.google.com/**', route => route.fulfill({ contentType: 'text/html', body: '<h1>Fictional Google consent</h1>' }));
+  await panel.getByRole('button', { name: 'Connect Gmail', exact: true }).click();
+  await expect(page).toHaveURL(/accounts\.google\.com\/o\/oauth2\/v2\/auth/);
+});
+
+test('Gmail requires preview before import, renders email as text and disconnects on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const { headers, base, status } = await setup(page, null, undefined, { configured: true, connection: { status: 'authorized', updatedAt: new Date().toISOString(), email: 'merchant@example.test' } });
+  const response = await page.request.post(`${base}/api/workspace`, { headers: { ...headers, Origin: base }, data: { action: 'addCase', title: 'Gmail ticket case', customerName: 'Customer', email: 'customer@example.test', amount: 5000, currency: 'usd', reason: 'Ticket not received', orderRef: 'ORDER-1', dueAt: '2026-12-01' } });
+  expect(response.status()).toBe(200); const caseId = (await response.json()).cases[0].id;
+  const message = { id: 'ab12', threadId: 'cd34', subject: 'Ticket support', from: 'customer@example.test', to: 'merchant@example.test', occurredAt: '2026-11-01T00:00:00Z' };
+  const requests: Record<string, unknown>[] = [];
+  await page.route('**/api/providers/gmail', async route => {
+    const body = route.request().postDataJSON(); requests.push(body);
+    if (body.action === 'search') return route.fulfill({ json: { messages: [message], moreAvailable: true } });
+    if (body.action === 'preview') return route.fulfill({ json: { preview: { ...message, text: '<script>window.gmailInjected=true</script> Original customer statement', truncated: false } } });
+    if (body.action === 'import') return route.fulfill({ json: { imported: true, caseId } });
+    status.gmail!.connection = { status: 'disconnected', updatedAt: new Date().toISOString() };
+    return route.fulfill({ json: { connection: status.gmail!.connection } });
+  });
+  await page.goto('/workspace?view=integrations&provider_result=gmail_authorized');
+  const card = page.getByRole('article', { name: 'Gmail account authorization' });
+  await expect(card.getByRole('button', { name: 'Find customer emails' })).toBeDisabled();
+  await card.getByRole('combobox', { name: 'Case for Gmail evidence' }).selectOption(caseId);
+  await card.getByRole('button', { name: 'Find customer emails' }).click();
+  await expect(card.getByRole('button', { name: 'Import reviewed email' })).toHaveCount(0);
+  await card.getByRole('button', { name: 'Preview email Ticket support' }).click();
+  await expect(card.locator('pre')).toContainText('<script>window.gmailInjected=true</script>');
+  expect(await page.evaluate(() => 'gmailInjected' in window)).toBe(false);
+  expect(await card.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  await card.getByRole('button', { name: 'Import reviewed email' }).click();
+  await expect(page).toHaveURL(/view=cases/); expect(requests.at(-1)).toEqual({ action: 'import', caseId, messageId: 'ab12', confirmed: true });
+  await page.goto('/workspace?view=integrations');
+  await card.getByRole('button', { name: 'Disconnect Gmail', exact: true }).click();
+  await card.getByRole('button', { name: 'Confirm disconnect Gmail' }).click();
+  await expect(card.getByRole('button', { name: 'Connect Gmail', exact: true })).toBeEnabled();
+});
+
+test('Gmail stays unavailable without developer registration', async ({ page }) => {
+  const { panel } = await setup(page);
+  await expect(panel.getByRole('button', { name: 'Gmail setup unavailable' })).toBeDisabled();
+  await expect(panel).toContainText('one-time Google app registration');
 });

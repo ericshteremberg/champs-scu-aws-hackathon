@@ -50,3 +50,6 @@ yarn-error.log*
 /.dev-worker-access.txt
 /.dev-worker-secrets.json
 /.aws-build/
+
+# Downloaded Google OAuth client credentials
+client_secret*.json

@@ -7,9 +7,9 @@ async function main() {
 // Exercises the actual hosted bridge, app secret and pending state, but does not
 // authorize a customer account, exchange a code or read merchant database rows.
 const provider = process.argv[2] || 'supabase';
-assert.ok(['supabase', 'stripe'].includes(provider), 'Choose supabase or stripe.');
-const providerOrigin = provider === 'stripe' ? 'https://marketplace.stripe.com' : 'https://api.supabase.com';
-const label = provider === 'stripe' ? 'Stripe' : 'Supabase';
+assert.ok(['supabase', 'stripe', 'gmail'].includes(provider), 'Choose supabase, stripe or gmail.');
+const providerOrigin = { stripe: 'https://marketplace.stripe.com', supabase: 'https://api.supabase.com', gmail: 'https://accounts.google.com' }[provider];
+const label = { stripe: 'Stripe', supabase: 'Supabase', gmail: 'Gmail' }[provider];
 const base = 'https://causality-hackathon-dev.slidah60.workers.dev';
 const password = readFileSync('.dev-worker-access.txt', 'utf8').match(/^Password: (.+)$/m)?.[1];
 assert.ok(password, 'Private development access is required.');
@@ -47,7 +47,15 @@ try {
   await expect(page).toHaveURL(url => url.origin === providerOrigin, { timeout: 30000 });
   assert.ok(authorization);
   assert.equal(authorization.searchParams.get('redirect_uri'), `${base}/api/providers/${provider}/callback`);
-  if (provider === 'supabase') assert.equal(authorization.searchParams.get('code_challenge_method'), 'S256');
+  if (provider !== 'stripe') assert.equal(authorization.searchParams.get('code_challenge_method'), 'S256');
+  if (provider === 'gmail') {
+    assert.equal(authorization.pathname, '/o/oauth2/v2/auth');
+    assert.equal(authorization.searchParams.get('scope'), 'https://www.googleapis.com/auth/gmail.readonly');
+    assert.equal(authorization.searchParams.get('access_type'), 'offline');
+    assert.equal(authorization.searchParams.get('prompt'), 'consent');
+    assert.ok(authorization.searchParams.get('client_id')?.endsWith('.apps.googleusercontent.com'));
+    assert.ok(authorization.searchParams.get('code_challenge'));
+  }
   const cookie = (await context.cookies(base)).find(c => c.name === `__Host-causality-${provider}`);
   assert.ok(cookie?.secure && cookie.httpOnly && cookie.sameSite === 'Lax');
   const callback = new URL(`${base}/api/providers/${provider}/callback`);
@@ -55,7 +63,7 @@ try {
   checkStage = 'denied callback';
   const response = await page.goto(callback.toString());
   assert.ok(response?.ok());
-  await expect(panel.getByRole('status')).toContainText(provider === 'stripe' ? 'Stripe authorization was canceled' : 'Authorization was canceled', { timeout: 30000 });
+  await expect(panel.getByRole('status')).toContainText(provider === 'supabase' ? 'Authorization was canceled' : `${label} authorization was canceled`, { timeout: 30000 });
   assert.ok(!(await context.cookies(base)).some(c => c.name === cookie.name));
   // Restore only the original synthetic-flow browser cookie to isolate state replay protection.
   checkStage = 'callback replay';
@@ -64,8 +72,18 @@ try {
   await expect(panel.getByRole('status')).toContainText('expired or belongs to another browser', { timeout: 30000 });
   const after = await (await fetch(`${base}/api/providers`, { headers: { Authorization } })).json();
   assert.equal(after[provider].connection.status, 'disconnected');
-  const read = await fetch(`${base}/api/providers/${provider}`, { method: 'POST', headers: { Authorization, Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: provider === 'stripe' ? 'verify' : 'projects' }) });
+  let readAction = { action: provider === 'stripe' ? 'verify' : 'projects' };
+  if (provider === 'gmail') {
+    const workspaceResponse = await fetch(`${base}/api/workspace`, { headers: { Authorization } });
+    assert.equal(workspaceResponse.status, 200);
+    const workspace = await workspaceResponse.json();
+    const openCase = workspace.cases.find(c => ['needs_review', 'investigating', 'ready'].includes(c.status));
+    assert.ok(openCase, 'An existing open case is required for the disconnected Gmail read check.');
+    readAction = { action: 'search', caseId: openCase.id };
+  }
+  const read = await fetch(`${base}/api/providers/${provider}`, { method: 'POST', headers: { Authorization, Origin: base, 'Content-Type': 'application/json' }, body: JSON.stringify(readAction) });
   assert.equal(read.status, 409);
+  if (provider === 'gmail') assert.equal((await read.json()).code, 'provider_disconnected');
   assert.deepEqual(errors, []);
   mkdirSync('.aws-build', { recursive: true });
   await page.screenshot({ path: `.aws-build/${provider}-connections-desktop.png`, fullPage: true });

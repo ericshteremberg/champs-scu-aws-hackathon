@@ -58,3 +58,5 @@ Aiden owns workshop credential refresh and the shared preview login. `sync:dev-s
 The deployed smoke commands make real AWS calls and change synthetic records. `test:dev:smoke` approves ATM-1042 and uploads a file to ATM-1044 in the shared demo workspace. Coordinate its timing before a recording. The earlier `docs/demo/` video depicts standalone Casework, so record the current Causality app for submission.
 
 There is no project-root `context.md` at this checkpoint. Keep the existing architecture and handoff documents accurate; adding a new context document remains a separate decision.
+
+- [06: Gmail developer registration and customer test](06-gmail-oauth-registration.md): one-time Google Web OAuth client, secure AWS storage, enabling the runtime and testing through the app.

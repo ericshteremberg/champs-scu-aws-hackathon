@@ -34,6 +34,11 @@
       "Type": "String",
       "Default": "",
       "Description": "Comma-separated exact sending domains approved for evidence."
+    },
+    "GmailOAuthSecretArn": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Existing Secrets Manager Google OAuth registration ARN, never a client secret."
     }
   },
   "Resources": {
@@ -333,6 +338,29 @@
                 "Ref": "AWS::NoValue"
               }
             ]
+          },
+          {
+            "Fn::If": [
+              "HasGmailOAuth",
+              {
+                "PolicyName": "GmailOAuthRegistration",
+                "PolicyDocument": {
+                  "Version": "2012-10-17",
+                  "Statement": [
+                    {
+                      "Effect": "Allow",
+                      "Action": "secretsmanager:GetSecretValue",
+                      "Resource": {
+                        "Ref": "GmailOAuthSecretArn"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "Ref": "AWS::NoValue"
+              }
+            ]
           }
         ]
       }
@@ -387,6 +415,9 @@
             },
             "RESEND_ALLOWED_DOMAINS": {
               "Ref": "ResendAllowedDomains"
+            },
+            "GMAIL_OAUTH_SECRET_ARN": {
+              "Ref": "GmailOAuthSecretArn"
             }
           }
         }
@@ -673,6 +704,18 @@
                 ""
               ]
             }
+          ]
+        }
+      ]
+    },
+    "HasGmailOAuth": {
+      "Fn::Not": [
+        {
+          "Fn::Equals": [
+            {
+              "Ref": "GmailOAuthSecretArn"
+            },
+            ""
           ]
         }
       ]
