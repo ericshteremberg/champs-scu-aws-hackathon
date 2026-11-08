@@ -13,7 +13,7 @@ SHA is in Eric's return message. No merge into main or shared deployment was mad
 
 **Supabase developer registration: COMPLETE.**
 **Stripe app registration and external testing: COMPLETE.**
-**Stripe developer credential storage: awaiting explicit approval for a dedicated standard live key.**
+**Stripe developer credential storage: approved by Eric; awaiting Stripe email identity verification before key creation.**
 **Customer OAuth end-to-end: NOT TESTED; implementation pending on Aiden's computer.**
 
 Registration does not establish a customer connection. Neither provider's
@@ -103,7 +103,7 @@ live mode, explicitly selected by Eric.
 | Testers / installs | 0 of 25 testers / 0 installations |
 | Permissions | `dispute_read`, `charge_read` only |
 | Callback | `https://causality-hackathon-dev.slidah60.workers.dev/api/providers/stripe/callback` |
-| Developer credential | Dedicated standard live key awaiting action-time approval |
+| Developer credential | Creation and AWS storage approved; Stripe requires Eric to complete email verification first |
 | Authorization link location | Temporary ignored mode-0600 `.env.oauth.local`; not yet available cross-computer |
 
 Eric reviewed and accepted the Stripe Apps developer agreement himself, then
@@ -116,7 +116,11 @@ no installation was performed against the not-yet-implemented callback.
 
 The manifest requests no writes. `charge_read` also covers refund reads.
 `connected_account_read` was not added because no implemented verification
-endpoint demonstrated a need. Standard developer credentials have full access
+endpoint demonstrated a need. Eric explicitly approved creating a dedicated standard live key and storing it
+in the verified AWS secret. Stripe then required email identity verification
+before creation; no new key has been issued or stored yet.
+
+Standard developer credentials have full access
 to the developer account; these are separate from customer OAuth grants, which
 are limited by the app permissions. The credential is for server-side OAuth
 exchange/refresh and must never be exposed through the frontend or legacy
@@ -169,7 +173,7 @@ so application builds, Bedrock runs, and synthetic data mutation suites were not
    callback and read-only Management API query endpoint. Enforce approved tables,
    columns, merchant/case filters, and bounded parameterized queries server-side;
    OAuth read scope itself is broader than one case.
-4. Finish secure Stripe developer key storage after explicit approval, then
+4. Finish secure Stripe developer key storage after Eric completes provider verification, then
    implement Stripe OAuth using the registered app and exact private live test
    URL. Preserve denial, replay, wrong-workspace, refresh and disconnect checks.
    Complete the customer consent permission review with Eric before installation.
