@@ -1,0 +1,37 @@
+{
+  "marks": [
+    {
+      "at": 0,
+      "label": "Select one disputed transaction"
+    },
+    {
+      "at": 3.526,
+      "label": "One click starts the automated investigation"
+    },
+    {
+      "at": 8.466,
+      "label": "Records gathered. Findings prepared automatically."
+    },
+    {
+      "at": 14.939,
+      "label": "Trace every finding to its original evidence"
+    },
+    {
+      "at": 20.699,
+      "label": "A sourced response is already drafted"
+    },
+    {
+      "at": 25.436,
+      "label": "Review saved. Evidence packet ready."
+    },
+    {
+      "at": 30.942,
+      "label": "Saved case survives refresh"
+    }
+  ],
+  "sourceMode": "synthetic",
+  "investigationMode": "demo",
+  "savedStatus": "reviewed",
+  "reviewedAt": "2026-11-08T00:36:07.473Z",
+  "duration": 33.307
+}

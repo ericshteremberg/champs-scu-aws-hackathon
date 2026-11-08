@@ -101,6 +101,7 @@ Local checks do not establish live AWS connectivity. Use the separate AWS check 
 
 - [Handoff and live integration steps](docs/HANDOFF.md)
 - [Demo walkthrough](docs/DEMO.md)
+- [Recorded demo, source footage, and Higgsfield edit](docs/demo/README.md)
 - [Business assumptions and pilot measurements](docs/BUSINESS.md)
 - [Merchant evidence API](docs/EVIDENCE_API.md)
 
