@@ -35,7 +35,7 @@ export function GmailConnector({ status, cases, onChange, onImported }: { status
     } catch (e) { setError(e instanceof Error ? e.message : 'The Gmail request failed.'); }
     finally { setBusy(false); }
   };
-  return <article className="cw-provider-card cw-gmail-card" aria-label="Gmail account authorization">
+  return <article id="gmail-connection" className="cw-provider-card cw-gmail-card" aria-label="Gmail account authorization">
     <h3><Mail size={20} />Gmail <span className={`cw-pill${authorized ? ' green' : ''}`}>{authorized ? 'Authorized' : connection?.status === 'reconnect_required' ? 'Reconnect required' : 'Not connected'}</span></h3>
     <p>Find and import emails for a case.</p>
     <p className="cw-provider-note">Read-only mailbox access. Causality searches the case’s customer email and opens messages only on preview. No sending or deletion.</p>

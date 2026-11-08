@@ -27,7 +27,7 @@
 .cw-gmail-preview { margin-top: 20px; padding: 16px; border: 1px solid var(--cw-border, #dededb); border-radius: 8px; }
 .cw-gmail-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 320px; overflow-y: auto; font: inherit; line-height: 1.6; }
 
-.cw-imap-card { grid-column: 1 / -1; grid-row: 3; }
+.cw-imap-card { grid-column: 1 / -1; }
 .cw-imap-card p, .cw-imap-card label { overflow-wrap: anywhere; }
 .cw-imap-card .cw-field { margin-top: 16px; }
 .cw-imap-form { display: grid; gap: 12px; }
@@ -50,3 +50,13 @@
 .cw-resend-preview pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; line-height: 1.6; }
 .cw-resend-preview summary, .cw-resend-linked summary { cursor: pointer; }
 .cw-resend-linked > div { padding: 12px 0; border-bottom: 1px solid var(--cw-border, #dededb); }
+
+.cw-evidence-card { grid-column: 1 / -1; }
+.cw-evidence-card .cw-field { margin: 16px 0; }
+.cw-evidence-card select { width: 100%; min-width: 0; max-width: 100%; }
+.cw-evidence-card p, .cw-evidence-card label { overflow-wrap: anywhere; }
+.cw-evidence-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 16px; }
+.cw-evidence-preview dl > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; padding: 6px 0; }
+.cw-evidence-preview dt, .cw-evidence-preview dd { margin: 0; overflow-wrap: anywhere; }
+.cw-evidence-preview dd { white-space: pre-wrap; }
+

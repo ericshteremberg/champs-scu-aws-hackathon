@@ -35,3 +35,16 @@ export type GmailPreview = GmailMessage & { text: string; truncated: boolean };
 export type ImapConnection = { status: 'disconnected' | 'authorized' | 'reconnect_required'; updatedAt: string; email?: string; host?: string; folders?: string[] };
 export type ImapMessage = { id: string; folder: string; subject: string; from: string; to: string; occurredAt: string };
 export type ImapPreview = ImapMessage & { text: string; truncated: boolean };
+
+export type StripeDisputeSummary = { id: string; amount: number; currency: string; reason: string; status: string; dueAt: string; createdAt: string };
+export type OrderEvidenceMapping = {
+  order: { table: string; idColumn: string; paymentColumn: string; paymentKind: 'payment_intent' | 'charge'; customerEmailColumn?: string; columns: string[] };
+  related: { section: 'tickets' | 'delivery' | 'history' | 'attendance' | 'support'; table: string; orderColumn: string; columns: string[] }[];
+};
+export type LinkedEvidenceRecord = { id: string; section: string; table: string; fields: Record<string, string | number | boolean | null> };
+export type LinkedEvidencePreview = { id: string; caseId: string; projectRef: string; paymentRef: string; fetchedAt: string; records: LinkedEvidenceRecord[]; limitations: string[] };
+
+export type ImapDiscovery =
+  | { kind: 'imap'; provider: string; host: string; source: 'provider_dns' | 'imaps_srv' }
+  | { kind: 'oauth'; provider: 'Google' | 'Microsoft' }
+  | { kind: 'manual'; reason: 'unknown' | 'unavailable' };

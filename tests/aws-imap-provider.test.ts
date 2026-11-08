@@ -30,7 +30,7 @@ const disconnect = () => imapProviderAction(user, { action: 'disconnect' });
 async function preview() { await action('search'); await action('preview', { messageId: message.id }); }
 beforeEach(async () => {
   fixture.rows.clear(); vi.clearAllMocks();
-  fixture.verify.mockResolvedValue(true); fixture.search.mockResolvedValue({ messages: [message], moreAvailable: false, scanLimited: false }); fixture.preview.mockResolvedValue({ ...message, text: 'Original customer statement', truncated: false });
+  fixture.verify.mockImplementation(async settings => settings.folders); fixture.search.mockResolvedValue({ messages: [message], moreAvailable: false, scanLimited: false }); fixture.preview.mockResolvedValue({ ...message, text: 'Original customer statement', truncated: false });
   await executeAction(user, { action: 'createWorkspace', name: 'IMAP test' }); await executeAction(other, { action: 'createWorkspace', name: 'Other IMAP test' });
   const state = await executeAction(user, { action: 'addCase', title: 'Missing ticket', customerName: 'Customer', email: 'customer@example.test', amount: 5000, currency: 'usd', reason: 'Ticket not received', orderRef: 'ORDER-1', dueAt: '2026-12-01' });
   caseId = state.cases[0].id;
@@ -44,10 +44,21 @@ describe('IMAP customer connection and evidence boundary', () => {
   it('stores credentials only after verifying and never exposes them through public responses', async () => {
     const result = await connect();
     expect(result).toMatchObject({ connection: { status: 'authorized', email: settings.email, host: settings.host } });
-    expect(fixture.verify).toHaveBeenCalledWith(settings);
+    expect(fixture.verify).toHaveBeenCalledWith(settings, false);
     expect(JSON.stringify([result, await imapProviderStatus(wid), await getWorkspaceState(user)])).not.toContain(settings.password);
     expect(fixture.rows.get(key('provider-token#imap'))?.data).toEqual(settings);
     await expect(connect()).rejects.toMatchObject({ code: 'provider_already_connected' });
+  });
+  it('stores verified discovered folders and accepts discovery without credentials or writes', async () => {
+    const before = structuredClone(fixture.rows);
+    expect(await imapProviderAction(user, { action: 'discover', email: 'merchant@gmail.com' })).toEqual({ discovery: { kind: 'oauth', provider: 'Google' } });
+    expect(fixture.rows).toEqual(before); expect(fixture.verify).not.toHaveBeenCalled();
+    await expect(imapProviderAction(user, { action: 'discover', email: 'merchant@gmail.com', password: 'never-accepted' })).rejects.toMatchObject({ code: 'invalid_request' });
+    expect(await handler({ kind: 'api', path: '/api/providers/imap', method: 'POST', body: { action: 'discover', email: 'merchant@gmail.com' } })).toMatchObject({ status: 401 });
+    fixture.verify.mockResolvedValueOnce(['INBOX', 'Sent Items']);
+    expect(await imapProviderAction(user, { action: 'connect', settings, detectSent: true, confirmed: true })).toMatchObject({ connection: { folders: ['INBOX', 'Sent Items'] } });
+    expect(fixture.verify).toHaveBeenCalledWith(settings, true);
+    expect(fixture.rows.get(key('provider-token#imap'))?.data).toMatchObject({ folders: ['INBOX', 'Sent Items'] });
   });
   it('does not store failed credentials and rate limits repeated login checks', async () => {
     fixture.verify.mockRejectedValueOnce(new ApiError(502, 'Unavailable', 'imap_unavailable'));
@@ -58,7 +69,7 @@ describe('IMAP customer connection and evidence boundary', () => {
     expect(fixture.verify).toHaveBeenCalledTimes(1);
   });
   it('disconnect wins an in-flight connection check and prevents credential resurrection', async () => {
-    fixture.verify.mockImplementationOnce(async () => { await disconnect(); return true; });
+    fixture.verify.mockImplementationOnce(async () => { await disconnect(); return settings.folders; });
     await expect(connect()).rejects.toMatchObject({ code: 'conflict' });
     expect(fixture.rows.has(key('provider-token#imap'))).toBe(false);
     expect((await imapProviderStatus(wid)).connection?.status).toBe('disconnected');

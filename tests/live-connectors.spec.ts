@@ -40,7 +40,7 @@ async function setup(page: Page) {
   });
   await page.route("**/api/investigations", route => route.request().method() === "GET" ? route.fulfill({ json: { config: { bedrockConfigured: false, merchantConfigured: false, archiveConfigured: false, region: "us-east-1" } } }) : route.continue());
   await page.goto("/workspace?view=integrations");
-  await page.getByText("Custom data sources", { exact: false }).click();
+  await page.locator("summary").filter({ hasText: "Custom data sources" }).click();
   return { requests, connections, setError: (message: string) => { error = message; } };
 }
 

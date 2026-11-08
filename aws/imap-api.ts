@@ -10,10 +10,10 @@ import type { ImapMessage, ImapPreview } from '../lib/providers/types.ts';
 
 const MAX_BYTES = 256 * 1024;
 const MAX_SCAN = 500;
-const hostname = z.string().trim().toLowerCase().max(253).refine(value => !isIP(value) && value.split('.').length >= 2 && value.split('.').every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)) && !/(?:^|\.)(localhost|local|internal|home|lan|test|invalid|example|onion|arpa)$/.test(value));
+export const imapHostname = z.string().trim().toLowerCase().max(253).refine(value => !isIP(value) && value.split('.').length >= 2 && value.split('.').every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label)) && !/(?:^|\.)(localhost|local|internal|home|lan|test|invalid|example|onion|arpa)$/.test(value));
 const folder = z.string().min(1).max(150).refine(value => !/[\x00-\x1f\x7f]/.test(value) && Buffer.byteLength(value) <= 150).transform(value => value.toLowerCase() === 'inbox' ? 'INBOX' : value);
 export const imapSettingsSchema = z.object({
-  host: hostname,
+  host: imapHostname,
   email: z.string().trim().email().max(254),
   password: z.string().min(1).max(1024).refine(value => !/[\r\n\x00]/.test(value)),
   folders: z.array(folder).min(1).max(2).refine(values => new Set(values).size === values.length),
@@ -39,7 +39,7 @@ const envelopeMessage = (box: MailboxObject, message: FetchMessageObject): ImapM
 // All endpoints are public DNS names on implicit TLS/993. Pin a validated address
 // for the socket and check the certificate against the original hostname.
 export async function publicImapAddress(host: string): Promise<string> {
-  if (!hostname.safeParse(host).success) throw new ApiError(400, 'Enter a public IMAP hostname without a URL or port.', 'imap_host_invalid');
+  if (!imapHostname.safeParse(host).success) throw new ApiError(400, 'Enter a public IMAP hostname without a URL or port.', 'imap_host_invalid');
   const answers = await lookup(host, { all: true, order: 'ipv4first' });
   if (!answers.length || answers.some(a => !publicAddress(a.address) || isIP(a.address) !== a.family)) throw new ApiError(400, 'The mail server must resolve only to public internet addresses.', 'imap_host_blocked');
   // Lambda deployment uses IPv4 egress. Do not silently fall back to another host.
@@ -82,10 +82,18 @@ async function openReadOnly(client: ImapFlow, path: string) {
   if (!box || !box.readOnly || !box.uidValidity) throw unavailable();
   return box;
 }
-export async function verifyImap(settings: ImapSettings) {
+export async function verifyImap(settings: ImapSettings, detectSent = false): Promise<string[]> {
   return withMailbox(settings, async client => {
-    for (const path of settings.folders) await openReadOnly(client, path);
-    return true;
+    const folders = [...settings.folders];
+    if (detectSent && folders.length === 1 && folders[0] === 'INBOX') {
+      const listing = await client.list();
+      if (listing.length > 200) throw new ApiError(413, 'This mailbox has too many folders for automatic setup. Use Advanced settings.', 'imap_folder_limit');
+      // Trust an explicit server SPECIAL-USE designation, not a guessed folder name.
+      const sent = listing.filter(item => item.specialUse === '\\Sent' && item.specialUseSource === 'extension' && !item.flags.has('\\Noselect'));
+      if (sent.length === 1 && folder.safeParse(sent[0].path).success && sent[0].path.toLowerCase() !== 'inbox') folders.push(sent[0].path);
+    }
+    for (const path of folders) await openReadOnly(client, path);
+    return folders;
   });
 }
 export async function searchImap(settings: ImapSettings, email: string) {

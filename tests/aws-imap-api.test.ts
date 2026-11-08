@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-const fixture = vi.hoisted(() => ({ lookup: vi.fn(), options: [] as Record<string, unknown>[], connect: vi.fn(), close: vi.fn(), open: vi.fn(), search: vi.fn(), fetch: vi.fn(), fetchOne: vi.fn() }));
+const fixture = vi.hoisted(() => ({ list: vi.fn(), lookup: vi.fn(), options: [] as Record<string, unknown>[], connect: vi.fn(), close: vi.fn(), open: vi.fn(), search: vi.fn(), fetch: vi.fn(), fetchOne: vi.fn() }));
 vi.mock('node:dns/promises', () => ({ lookup: fixture.lookup }));
 vi.mock('imapflow', () => ({ ImapFlow: class {
   constructor(options: Record<string, unknown>) { fixture.options.push(options); }
   on() { return this; }
-  connect = fixture.connect; close = fixture.close; mailboxOpen = fixture.open; search = fixture.search; fetch = fixture.fetch; fetchOne = fixture.fetchOne;
+  list = fixture.list; connect = fixture.connect; close = fixture.close; mailboxOpen = fixture.open; search = fixture.search; fetch = fixture.fetch; fetchOne = fixture.fetchOne;
 } }));
 import { imapSettingsSchema, publicImapAddress, verifyImap, searchImap, previewImap, parseImapText } from '../aws/imap-api.ts';
 const settings = { host: 'imap.provider.com', email: 'merchant@example.test', password: 'synthetic_secret', folders: ['INBOX'] };
 const box = { path: 'INBOX', uidValidity: BigInt(7), exists: 700, readOnly: true };
 const row = { uid: 123, internalDate: new Date('2026-11-01'), envelope: { subject: 'Customer request', from: [{ address: 'customer@example.test' }], to: [{ address: 'merchant@example.test' }] } };
 beforeEach(() => {
-  vi.clearAllMocks(); fixture.options.length = 0; fixture.lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]); fixture.connect.mockResolvedValue(undefined); fixture.open.mockResolvedValue(box); fixture.search.mockResolvedValue([123]); fixture.fetch.mockImplementation(async function* () { yield row; });
+  vi.clearAllMocks(); fixture.list.mockResolvedValue([]); fixture.options.length = 0; fixture.lookup.mockResolvedValue([{ address: '93.184.216.34', family: 4 }]); fixture.connect.mockResolvedValue(undefined); fixture.open.mockResolvedValue(box); fixture.search.mockResolvedValue([123]); fixture.fetch.mockImplementation(async function* () { yield row; });
 });
 afterEach(() => vi.useRealTimers());
 describe('IMAP public TLS transport and bounded reads', () => {
@@ -35,6 +35,24 @@ describe('IMAP public TLS transport and bounded reads', () => {
     const tls = fixture.options[0].tls as { checkServerIdentity: (host: string, cert: unknown) => Error | undefined };
     expect(tls.checkServerIdentity('93.184.216.34', { subjectaltname: 'DNS:attacker.example.com', subject: {} })).toBeInstanceOf(Error);
     fixture.open.mockResolvedValueOnce({ ...box, readOnly: false }); await expect(verifyImap(settings)).rejects.toMatchObject({ code: 'imap_unavailable' });
+  });
+  it('uses only server-advertised Sent metadata and verifies both folders read-only', async () => {
+    fixture.list.mockResolvedValue([{ path: 'Sent Items', flags: new Set(), specialUse: '\\Sent', specialUseSource: 'extension' }]);
+    expect(await verifyImap(settings, true)).toEqual(['INBOX', 'Sent Items']);
+    expect(fixture.open).toHaveBeenCalledWith('Sent Items', { readOnly: true });
+    expect(fixture.search).not.toHaveBeenCalled(); expect(fixture.fetch).not.toHaveBeenCalled();
+  });
+  it('does not guess Sent from names, ambiguous metadata or unselectable folders', async () => {
+    const sent = { path: 'Sent', flags: new Set(), specialUse: '\\Sent', specialUseSource: 'extension' };
+    for (const listing of [[{ ...sent, specialUseSource: 'name' }], [sent, { ...sent, path: 'Other Sent' }], [{ ...sent, flags: new Set(['\\Noselect']) }]]) {
+      fixture.list.mockResolvedValue(listing); expect(await verifyImap(settings, true)).toEqual(['INBOX']);
+    }
+  });
+  it('respects manual folders and bounds folder discovery', async () => {
+    expect(await verifyImap({ ...settings, folders: ['INBOX', 'Replies'] }, true)).toEqual(['INBOX', 'Replies']);
+    expect(fixture.list).not.toHaveBeenCalled();
+    fixture.list.mockResolvedValue(Array(201).fill({ path: 'Folder' }));
+    await expect(verifyImap(settings, true)).rejects.toMatchObject({ code: 'imap_folder_limit' });
   });
   it('bounds searches and confirms exact customer addresses after IMAP substring matching', async () => {
     fixture.search.mockResolvedValue([123, 124]);

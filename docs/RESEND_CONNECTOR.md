@@ -1,12 +1,12 @@
 # Resend evidence connector
 
-## Handoff status — November 7, 2026
+## Handoff status, updated November 8, 2026
 
 - Branch: `codex/eric-resend-evidence`, based on `codex/aiden-aws-harness` at `5e5da74`.
 - Dedicated API key created, stored in Secrets Manager, and successfully verified against both sending domains.
-- AWS stack and Lambda code deployed successfully. Receiver URL: `https://vnbplyjmvidsee4ioh6eycru4u0sxxtb.lambda-url.us-east-1.on.aws/`.
+- AWS stack and Lambda code deployed successfully. Receiver URL: `https://iutoe2cj4htkfsokxobt36iyr40rmfyh.lambda-url.us-east-1.on.aws/`.
 - **Pending:** finish registering that URL in the Resend Webhooks dashboard and save its generated `webhookSecret` alongside the existing `apiKey`. The prepared browser form was interrupted before registration. The receiver intentionally returns 503 until its signing secret is configured. Live webhook delivery has not been tested yet.
-- **Pending on the teammate's computer:** deploy the frontend using the existing team Cloudflare session. The current shared website does not yet show the new Resend controls. From this branch, run `npm ci` then `npm run deploy:dev`, or merge this branch into the team's working branch before deploying. Preserve the account ID and existing hosted secrets in `wrangler.dev.jsonc`.
+- Frontend controls are deployed on the shared dev website with the integrated `codex/aiden-aws-harness` branch (Worker `569fb256-cde1-4273-b26e-dabc4f2bf930`). The AWS receiver was recreated while restoring the merged configuration; use the current URL above, not the earlier receiver URL. Live domain-read verification passed again, and an unsigned webhook returned 503 with no signing secret configured.
 - Typecheck, 35 focused tests, frontend build, and AWS bundle build passed. No email was sent and no dispute was submitted.
 
 ```sh
@@ -39,6 +39,7 @@ The receiver drops events from unrelated sender domains. It stores only the prov
 Open a real case → Investigation → Resend → Add email evidence. Verify access, paste the specific email UUID, preview its recipient/order match, and choose Attach to report. The case refreshes immediately; its next compilation includes the imported delivery source. Connections → Resend offers the same controls with a case selector. Linked records have a Check latest status action; refresh still requires preview and attach. No message is sent.
 
 The controls distinguish connection loading, missing deployment, missing configuration, and provider errors. Live imports are disabled on sample or closed cases and while an investigation is running. Unsaved response edits must be saved before importing from the case view. Deploy matching frontend and AWS backend versions; local-only storage cannot call the live Resend connector.
+
 
 The private API `/api/providers/resend` supports:
 

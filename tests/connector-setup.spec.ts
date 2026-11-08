@@ -71,7 +71,7 @@ async function setup(page: Page, initiallyUnavailable = false) {
     }
   });
   await page.goto("/workspace?view=integrations");
-  await page.getByText("Custom data sources", { exact: false }).click();
+  await page.locator("summary").filter({ hasText: "Custom data sources" }).click();
   return { connections, available: () => { unavailable = false; } };
 }
 
@@ -87,7 +87,7 @@ for (const templateId of ["atmsphr-tickets", "rentul-rentals"] as const) {
     await setupSection.getByLabel("Connection name", { exact: true }).fill(`${template.name} reviewed`);
     await setupSection.getByRole("button", { name: "Review mapping", exact: true }).click();
     await expect(setupSection.getByRole("button", { name: "Preview case access", exact: true })).toBeDisabled();
-    await setupSection.getByRole("checkbox", { name: /I have reviewed/ }).check();
+    await setupSection.getByRole("checkbox", { name: /I reviewed/ }).check();
     await setupSection.getByRole("button", { name: "Preview case access", exact: true }).click();
     await expect(setupSection.getByText("Boundary checks passed", { exact: true })).toBeVisible();
     await expect(setupSection.getByText("Unrelated case", { exact: true })).toBeVisible();
@@ -112,16 +112,16 @@ test("mapping changes require confirmation again and an invalid relationship rem
   const section = page.getByRole("region", { name: "Evidence connectors" });
   await section.getByRole("button", { name: "Add evidence connector" }).click();
   await section.getByRole("button", { name: "Review mapping", exact: true }).click();
-  await section.getByRole("checkbox", { name: /I have reviewed/ }).check();
+  await section.getByRole("checkbox", { name: /I reviewed/ }).check();
   await section.getByText("Review purchase mapping", { exact: false }).click();
   await section.getByRole("combobox", { name: "Payment reference", exact: true }).selectOption("order_number");
-  await expect(section.getByRole("checkbox", { name: /I have reviewed/ })).not.toBeChecked();
-  await section.getByRole("checkbox", { name: /I have reviewed/ }).check();
+  await expect(section.getByRole("checkbox", { name: /I reviewed/ })).not.toBeChecked();
+  await section.getByRole("checkbox", { name: /I reviewed/ }).check();
   await section.getByRole("button", { name: "Preview case access", exact: true }).click();
   await expect(section.getByRole("alert")).toBeVisible();
   await expect(section.getByRole("button", { name: "Save configuration", exact: true })).toHaveCount(0);
   await section.getByRole("combobox", { name: "Payment reference", exact: true }).selectOption("payment_ref");
-  await section.getByRole("checkbox", { name: /I have reviewed/ }).check();
+  await section.getByRole("checkbox", { name: /I reviewed/ }).check();
   await section.getByRole("button", { name: "Preview case access", exact: true }).click();
   await expect(section.getByText("Boundary checks passed", { exact: true })).toBeVisible();
 });

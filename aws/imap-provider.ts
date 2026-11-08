@@ -1,3 +1,4 @@
+import { discoverImap, discoveryEmail } from './imap-discovery.ts';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { commit, getItem, keys } from './store.ts';
@@ -13,7 +14,8 @@ type Preview = { caseVersion: number; connectionVersion: number; message: ImapPr
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 const caseId = z.string().min(1).max(200);
 const actions = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('connect'), settings: imapSettingsSchema, confirmed: z.literal(true) }).strict(),
+  z.object({ action: z.literal('discover'), email: discoveryEmail }).strict(),
+  z.object({ action: z.literal('connect'), settings: imapSettingsSchema, confirmed: z.literal(true), detectSent: z.boolean().optional() }).strict(),
   z.object({ action: z.literal('disconnect') }).strict(),
   z.object({ action: z.literal('search'), caseId }).strict(),
   z.object({ action: z.literal('preview'), caseId, messageId: imapMessageId }).strict(),
@@ -24,13 +26,14 @@ export async function imapProviderStatus(wid: string) {
   const connection: ImapConnection | null = row ? { status: row.data.status, updatedAt: row.data.updatedAt, ...(row.data.email ? { email: row.data.email } : {}), ...(row.data.host ? { host: row.data.host } : {}), ...(row.data.folders ? { folders: row.data.folders } : {}) } : null;
   return { configured: true, connection };
 }
-async function connect(user: TrustedUser, wid: string, settings: ImapSettings) {
+async function connect(user: TrustedUser, wid: string, settings: ImapSettings, detectSent: boolean) {
   const [existing, token] = await Promise.all([getItem<InternalConnection>(wid, connectionKey), getItem<ImapSettings>(wid, tokenKey)]);
   if ((existing && existing.data.status !== 'disconnected') || token) throw new ApiError(409, 'Disconnect the existing IMAP mailbox before connecting again.', 'provider_already_connected');
   if (existing?.data.attemptedAt && Date.now() - existing.data.attemptedAt < 30000) throw new ApiError(429, 'Wait 30 seconds before testing another mailbox login.', 'imap_rate_limited');
   // Reserve a version before network I/O. Disconnect invalidates in-flight connects.
   await commit(wid, [{ key: connectionKey, expectedVersion: existing?.version ?? null, data: { status: 'disconnected', updatedAt: now(), attemptedAt: Date.now() } satisfies InternalConnection }]);
-  await verifyImap(settings);
+  const folders = await verifyImap(settings, detectSent);
+  settings = imapSettingsSchema.parse({ ...settings, folders });
   const connection: ImapConnection = { status: 'authorized', updatedAt: now(), email: settings.email, host: settings.host, folders: settings.folders };
   await commit(wid, [
     { key: connectionKey, expectedVersion: (existing?.version ?? 0) + 1, data: connection },
@@ -57,7 +60,8 @@ export async function imapProviderAction(user: TrustedUser, input: unknown) {
   const parsed = actions.safeParse(input);
   if (!parsed.success) throw new ApiError(400, 'Choose a valid IMAP connection action.', 'invalid_request');
   const action = parsed.data; const wid = (await requireWorkspace(user)).data.id;
-  if (action.action === 'connect') return connect(user, wid, action.settings);
+  if (action.action === 'discover') return { discovery: await discoverImap(action.email) };
+  if (action.action === 'connect') return connect(user, wid, action.settings, action.detectSent ?? false);
   if (action.action === 'disconnect') return disconnect(user, wid);
   const row = await ownedCase(wid, action.caseId); assertMutableCase(row.data);
   const { connection, token } = await access(wid);
