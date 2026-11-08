@@ -1,5 +1,7 @@
 # Causality
 
+For the final AWS-track submission, start with the [submission checklist](docs/submission/README.md) and [judge walkthrough](docs/submission/judge-guide.md). These describe the final feature-branch deployment; historical validation notes below are not the current submission checklist.
+
 Causality investigates payment disputes using the records behind a transaction: tickets, delivery attempts, support messages, payment history, and relevant policies. The operator reviews sourced findings, edits a response, approves its exact revision, and exports or archives the packet.
 
 The hackathon deployment uses an **AWS backend and database**. Cloudflare Workers serves the existing Causality interface and an authenticated bridge. Private AWS Lambda runs the application, DynamoDB stores its records, S3 stores attachments and approved archives, and Amazon Bedrock performs the investigation.
