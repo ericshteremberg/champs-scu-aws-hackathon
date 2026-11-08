@@ -2,6 +2,8 @@
 
 This directory owns evaluation tools, source review and demo rehearsal. The user subsequently authorized prompt fixes, regression tests and a real Bedrock rerun on this branch. Submission work remains deferred; the selected track is AWS.
 
+[Contributor checkout and combined-branch verification](CONTRIBUTOR-HANDOFF.md) describes how to get the current branch, the merged mainline work and the remaining product limits.
+
 See [the prompt-rerun results](prompt-results.md) for the latest application changes and remaining defects. The earlier [checkpoint note](RELEASE-NOTE.md) documents the pre-fix baseline. This branch is ready to share with its observed limitations, not as a guarantee of correct generation.
 
 ## Work completed on this branch

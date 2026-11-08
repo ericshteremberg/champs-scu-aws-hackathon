@@ -54,6 +54,14 @@ npm ci
 npm run check
 ```
 
+The standalone merchant adapter has separate dependencies and checks, also run in its own CI job:
+
+```sh
+npm ci --prefix integrations/atmsphr
+npm run typecheck --prefix integrations/atmsphr
+npm test --prefix integrations/atmsphr
+```
+
 Use the organizer's [AWS workshop access guide](https://github.com/SCUACM/aws-access-26). In a terminal containing the current Workshop Studio credential exports, save the temporary session without printing it:
 
 ```sh

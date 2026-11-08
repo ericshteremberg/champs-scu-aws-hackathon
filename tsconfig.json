@@ -43,6 +43,7 @@
   ],
   "exclude": [
     "node_modules",
+    "integrations/atmsphr",
     "examples",
     "dist",
     ".vinext",

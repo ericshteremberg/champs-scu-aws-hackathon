@@ -13,7 +13,7 @@ Supports `summary`, `order`, `tickets`, `delivery`, `history`, `support`, `atten
 
 Implemented and locally tested against fictional records, including real embedded PostgreSQL query execution. The source column names and relationships were inspected in the merchant's Supabase dashboard. **Not deployed or connected to production. No merchant schema/data changes were made.** No real grant, Stripe credential, customer record, or database credential is bundled. SQL tests use a minimal projection of the inspected schema, not a complete migration or a production database clone.
 
-The existing root dependency lock has an unrelated clean-install problem (missing `@emnapi/core` and `@emnapi/runtime` entries). Root checks were run after installing dependencies without changing that lock. The adapter maintains its own pinned test tooling.
+The adapter maintains its own pinned dependencies, TypeScript configuration and CI job. Root application type checking excludes this standalone package; run the adapter checks below separately. The root lock includes the optional `@emnapi/core` and `@emnapi/runtime` entries needed for clean installs.
 
 ## Run and test
 
