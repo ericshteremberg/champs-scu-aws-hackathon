@@ -88,7 +88,7 @@ export function validateReport(input: unknown, evidence: EvidenceEnvelope[]): Re
   if (report.findings.some(finding => finding.kind !== 'missing' && !finding.evidenceIds.length)) throw new InvestigationError('missing_citation', 'Each supported finding or conflict must cite its source records.');
   if (ids.size && ![...report.content.matchAll(citationPattern)].length) throw new InvestigationError('missing_citation', 'The response must cite its retrieved evidence.');
   if (!ids.size && report.assessment !== 'insufficient') throw new InvestigationError('invalid_assessment', 'An investigation without source records must be marked insufficient.');
-  const gaps = [...new Set([...report.gaps, ...evidence.flatMap(section => section.limitations), ...evidence.filter(section => section.status === 'unavailable').map(section => `${section.section[0].toUpperCase()}${section.section.slice(1)} evidence is unavailable.`)])];
+  const gaps = [...new Set([...report.gaps, ...evidence.flatMap(section => section.limitations), ...evidence.filter(section => section.status === 'unavailable').map(section => section.sourceMode === 'attached' ? `No records were returned from the ${section.section} classification. Review related evidence in other sections before asserting an evidence gap.` : `${section.section[0].toUpperCase()}${section.section.slice(1)} evidence is unavailable.`)])];
   return { ...report, gaps, evidenceIds: cited };
 }
 

@@ -35,6 +35,15 @@ import type { CaseDoc } from '../aws/types.ts';
 const user: TrustedUser = { userId: 'connector-owner', email: 'owner@example.test', displayName: 'Owner' };
 const other: TrustedUser = { userId: 'connector-other', email: 'other@example.test', displayName: 'Other' };
 const wid = workspaceIdForUser(user.userId);
+it('does not claim an order is absent when a combined record is classified as attendance', () => {
+  const record = { id: 'ev_combined', caseId: 'case_combined', source: 'database' as const, title: 'Order and ticket record', content: 'Order ORDER-EXAMPLE is paid; no attendance scan is recorded.', occurredAt: '2026-11-08T00:00:00.000Z', reference: 'orders/example' };
+  const item = { id: 'case_combined', source: 'manual' } as CaseDoc;
+  const order = localEvidence(item, [record], 'order');
+  expect(order.status).toBe('unavailable');
+  expect(order.limitations.join(' ')).toContain('Related facts may appear in records filed under other sections');
+  expect(order.limitations.join(' ')).not.toContain('No order records are attached');
+  expect(localEvidence(item, [record], 'attendance').records[0].id).toBe(record.id);
+});
 async function save(index = 0) {
   const template = CONNECTOR_TEMPLATES[index];
   const result = await executeConnectorAction(user, { action: 'save', name: template.name, templateId: template.id, manifest: template.manifest });

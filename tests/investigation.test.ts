@@ -36,6 +36,14 @@ function wire(section: EvidenceSection = 'summary') {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe('portable investigation engine', () => {
+  it('does not equate an empty attached classification with missing source evidence', () => {
+    const empty = { ...envelope('order'), sourceMode: 'attached' as const, status: 'unavailable' as const, records: [], limitations: [] };
+    const result = validateReport(report(), [envelope('summary'), empty]);
+    expect(result.gaps).toContain('No records were returned from the order classification. Review related evidence in other sections before asserting an evidence gap.');
+    expect(result.gaps).not.toContain('Order evidence is unavailable.');
+    const live = validateReport(report(), [envelope('summary'), { ...empty, sourceMode: 'live' }]);
+    expect(live.gaps).toContain('Order evidence is unavailable.');
+  });
   it('retrieves scoped records, preserves IDs, and labels sample output honestly', async () => {
     const options = input();
     const result = await runInvestigation(options);

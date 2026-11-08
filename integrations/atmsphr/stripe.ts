@@ -27,7 +27,7 @@ export function stripeVerifier(keys: Partial<Record<CaseGrant['stripePlatform'],
       return JSON.parse(Buffer.concat(chunks).toString('utf8'));
     }
     const dispute = disputeSchema.parse(await get(`disputes/${grant.disputeId}`));
-    if (dispute.id !== grant.disputeId || dispute.livemode !== grant.livemode || !/^ch_[A-Za-z0-9]+$/.test(dispute.charge)) throw new Error('Dispute scope mismatch');
+    if (dispute.id !== grant.disputeId || dispute.livemode !== grant.livemode || !/^(?:ch|py)_[A-Za-z0-9]+$/.test(dispute.charge)) throw new Error('Dispute scope mismatch');
     const charge = chargeSchema.parse(await get(`charges/${dispute.charge}`));
     if (charge.id !== dispute.charge || charge.payment_intent !== grant.paymentRef || charge.livemode !== grant.livemode
       || !charge.paid || charge.currency !== dispute.currency || dispute.amount > charge.amount) throw new Error('Payment mapping mismatch');
